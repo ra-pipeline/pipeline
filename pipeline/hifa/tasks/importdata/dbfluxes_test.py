@@ -37,10 +37,10 @@ def test_fluxservice_reads_source_catalogue_columns_by_field_name():
             <TD>0.012</TD>
             <TD>0.345</TD>
             <TD>0.067</TD>
-            <TD>111</TD>
+            <TD>9001</TD>
             <TD>12.5</TD>
             <TD>extra source catalogue details</TD>
-            <TD>2026JUN</TD>
+            <TD>2026AUG</TD>
           </TR>
         </TABLEDATA>
       </DATA>
@@ -66,7 +66,46 @@ def test_fluxservice_reads_source_catalogue_columns_by_field_name():
     assert fluxdict['fluxdensityerror'] == '0.056'
     assert fluxdict['spectralindex'] == '-0.789'
     assert fluxdict['spectralindexerror'] == '0.012'
-    assert fluxdict['dataconditions'] == '111'
+    assert fluxdict['dataconditions'] == '9001'
     assert fluxdict['ageOfNearestMonitorPoint'] == '12.5'
-    assert fluxdict['version'] == '2026JUN'
+    assert fluxdict['version'] == '2026AUG'
     assert fluxdict['clarification'] is None
+
+
+def test_log_result_data_conditions():
+    source = mock.MagicMock(name='source')
+    source.name = 'J1427-4206'
+    spw = mock.MagicMock(name='spw')
+    spw.id = 16
+
+    with mock.patch.object(dbfluxes.LOG, 'info') as mock_info:
+        # Test 4-digit code (post-OFFLINE-2026AUG)
+        dbfluxes.log_result(source, spw, '1.2', '1.2', '-0.7', '12.5', 'https://example.test', '2026AUG',
+                            '0', '9001', None)
+        logged_messages = [call.args[0] % call.args[1:] if len(call.args) > 1 else call.args[0]
+                           for call in mock_info.call_args_list]
+        assert any('Number of measurements = >= 9' in msg for msg in logged_messages)
+        assert any('Measurements in >= 2 distinct bands? No' in msg for msg in logged_messages)
+        assert any('Observation date bracketed in time? No' in msg for msg in logged_messages)
+        assert any('Spectral index cross-band bracketed in time? Yes' in msg for msg in logged_messages)
+
+    with mock.patch.object(dbfluxes.LOG, 'info') as mock_info:
+        # Test 3-digit legacy code
+        dbfluxes.log_result(source, spw, '1.2', '1.2', '-0.7', '12.5', 'https://example.test', '2026AUG',
+                            '0', '311', None)
+        logged_messages = [call.args[0] % call.args[1:] if len(call.args) > 1 else call.args[0]
+                           for call in mock_info.call_args_list]
+        assert any('Number of measurements = 3' in msg for msg in logged_messages)
+        assert any('Measurements in >= 2 distinct bands? Yes' in msg for msg in logged_messages)
+        assert any('Observation date bracketed in time? Yes' in msg for msg in logged_messages)
+        assert any('Spectral index cross-band bracketed in time? N/A' in msg for msg in logged_messages)
+
+    with mock.patch.object(dbfluxes.LOG, 'info') as mock_info:
+        # Test empty/None code
+        dbfluxes.log_result(source, spw, '1.2', '1.2', '-0.7', '12.5', 'https://example.test', '2026AUG',
+                            '0', None, None)
+        logged_messages = [call.args[0] % call.args[1:] if len(call.args) > 1 else call.args[0]
+                           for call in mock_info.call_args_list]
+        assert any('Number of measurements = N/A' in msg for msg in logged_messages)
+        assert any('Spectral index cross-band bracketed in time? N/A' in msg for msg in logged_messages)
+

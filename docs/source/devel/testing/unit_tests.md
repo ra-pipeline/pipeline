@@ -2,8 +2,8 @@
 
 Unit tests are small, focused tests that validate individual functions, classes, or modules
 in isolation. They execute quickly and don't require external data files or full pipeline
-execution. For further background see [PIPE-862](https://open-jira.nrao.edu/browse/PIPE-862)
-and the testing framework overview in [PIPE-806](https://open-jira.nrao.edu/browse/PIPE-806).
+execution. For further background see {jira}`PIPE-862`
+and the testing framework overview in {jira}`PIPE-806`.
 
 ## Naming and location
 

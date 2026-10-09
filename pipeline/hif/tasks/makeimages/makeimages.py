@@ -29,14 +29,10 @@ LOG = infrastructure.get_logger(__name__)
 class MakeImagesInputs(vdp.StandardInputs):
     """Inputs for hif_makeimages."""
 
-    # Search order of input vis
-    processing_data_types = [
-        DataType.SELFCAL_LINE_SCIENCE,
-        DataType.REGCAL_LINE_SCIENCE,
-        DataType.SELFCAL_CONTLINE_SCIENCE,
-        DataType.REGCAL_CONTLINE_SCIENCE,
-        DataType.REGCAL_CONTLINE_ALL,
-        DataType.RAW]
+    # The vis parameters are passed in via the clean target list
+    # generated in other tasks. Specifying any default here would
+    # render misleading vis selections in the weblog (PIPE-3052, PIPE-3231).
+    processing_data_types = []
 
     calcsb = vdp.VisDependentProperty(default=False)
     cleancontranges = vdp.VisDependentProperty(default=False)
@@ -199,6 +195,18 @@ class MakeImagesInputs(vdp.StandardInputs):
             parallel: Use CASA/tclean built-in parallel imaging for individual scientific targets, or, perform continuum imaging
                 of multiple target (calibrators) concurrently without the CASA/tclean built-in parallelization.
 
+                .. note::
+                    This note pertains specifically to CASA's built-in ``tclean`` parallel synthesis imaging
+                    (Tier-1 parallelization used for individual scientific targets). It is unrelated to Pipeline
+                    Tier-0 parallel processing (which dispatches separate calibrator imaging tasks concurrently across MPI servers).
+
+                    As documented in `CASAdocs synthesis imaging <https://casadocs.readthedocs.io/en/stable/notebooks/synthesis_imaging.html>`__:
+                    *"The tclean parameter 'parallel' is ignored for cube imaging. It is relevant only for continuum imaging."*
+                    Whenever running inside an active ``mpicasa`` session, CASA's built-in ``tclean`` automatically executes cube
+                    major cycles in parallel across available MPI processes, regardless of whether ``parallel`` is set to ``True``
+                    or ``False``. The ``parallel`` parameter primarily controls built-in parallelization for continuum imaging
+                    (``specmode='mfs'`` / ``'cont'``).
+
                 Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
 
                 Default: ``'automatic'`` - optimizes the parallelization mode based on the imaging target type
@@ -282,9 +290,16 @@ class MakeImages(basetask.StandardTaskTemplate):
                 try:
                     worker_result = task.get_result()
                 except exceptions.PipelineException as ex:
-                    error_msg = ('Cleaning failure for field {!s}, intent {!s}, specmode {!s}, spw {!s}. '
-                                 'Exception from hif_tclean: {!s}'.format(
-                                 target['field'], target['intent'], target['specmode'], target['spw'], ex))
+                    error_msg = (
+                        'Cleaning failure for field {!s}, intent {!s}, specmode {!s}, spw {!s}. '
+                        'Exception from hif_tclean: {!s}'.format(
+                            utils.condense_field_names(target['field']),
+                            target['intent'],
+                            target['specmode'],
+                            target['spw'],
+                            ex,
+                        )
+                    )
                     worker_result = TcleanResult()
                     worker_result.qa.pool.append(pqa.QAScore(0.34, longmsg=error_msg, shortmsg='Cleaning failure'))
                     result.add_result(worker_result, target, outcome='failure')
@@ -296,9 +311,9 @@ class MakeImages(basetask.StandardTaskTemplate):
 
                     # Export RMS of  sources
                     if self._is_target_for_sensitivity(worker_result, heuristics):
-                        s = self._get_image_rms_as_sensitivity(worker_result, target, heuristics)
-                        if s is not None:
-                            result.sensitivities_for_aqua.append(s)
+                        result.sensitivities_for_aqua.extend(
+                            self._get_image_rms_as_sensitivity(worker_result, target, heuristics)
+                        )
 
                     del heuristics
 
@@ -461,7 +476,7 @@ class MakeImages(basetask.StandardTaskTemplate):
 
         imlist = utils.glob_ordered(imagename.replace('.image', '.*'))
 
-        vis_name = self.inputs.vis[0]
+        vis_name = tclean_result.vis[0]
         msobj = self.inputs.context.observing_run.get_ms(vis_name)
         job = casa_tasks.flagdata(vis=vis_name, mode='summary', spwchan=True,  spw=tclean_result.spw)
         flag_stats = self._executor.execute(job)
@@ -572,7 +587,7 @@ class MakeImages(basetask.StandardTaskTemplate):
 
     def _get_image_rms_as_sensitivity(self, result, target, heuristics):
         if not result.image:
-            return None
+            return []
 
         extension = 'tt0.' if result.multiterm else '' # Needed when nterms=2, see PIPE-1361
         # the tt0 needs to be inserted before the ending ".pbcor" in the image name
@@ -580,7 +595,7 @@ class MakeImages(basetask.StandardTaskTemplate):
         imname = result.image[:index] + extension + result.image[index:]
 
         if not os.path.exists(imname):
-            return None
+            return []
 
         cqa = casa_tools.quanta
         cell = target['cell'][0:2] if len(target['cell']) >= 2 else (target['cell'][0], target['cell'][0])
@@ -612,44 +627,50 @@ class MakeImages(basetask.StandardTaskTemplate):
             else:
                 is_representative = False
 
-        # Sensitivities are currently reported for Stokes I only. For IQUV imaging the
-        # correct values have to be fetched from the new parameters since the previous
-        # ones will contain mixtures of I, Q, U and V due to the "axes" parameter in
-        # the ia.statistics() calls (PIPE-2464). TODO: Refactor the code to have just
-        # one set of statistical parameters.
-        if result.stokes == 'IQUV':
-            pbcor_image_rms = result.image_rms_iquv[0]
-            pbcor_image_min = result.image_min_iquv[0]
-            pbcor_image_max = result.image_max_iquv[0]
-            nonpbcor_image_min = result.nonpbcor_image_min_iquv[0]
-            nonpbcor_image_max = result.nonpbcor_image_max_iquv[0]
-        else:
-            pbcor_image_rms = result.image_rms
-            pbcor_image_min = result.image_min
-            pbcor_image_max = result.image_max
-            nonpbcor_image_min = result.nonpbcor_image_min
-            nonpbcor_image_max = result.nonpbcor_image_max
+        common_kwargs = dict(
+            array=array,
+            intent=target['intent'],
+            field=target['field'],
+            spw=result.spw,
+            is_representative=is_representative,
+            bandwidth=chanwidth_of_image,
+            effective_bw=effectiveBW_of_image,
+            bwmode=result.hm_specmode,
+            beam=restoringbeam,
+            cell=cell,
+            robust=target['robust'],
+            uvtaper=target['uvtaper'],
+            theoretical_sensitivity=cqa.quantity(result.sensitivity, 'Jy/beam'),
+            imagename=imname.replace('.pbcor', ''),
+            datatype=result.datatype,
+        )
 
-        return Sensitivity(array=array,
-                           intent=target['intent'],
-                           field=target['field'],
-                           spw=result.spw,
-                           is_representative=is_representative,
-                           bandwidth=chanwidth_of_image,
-                           effective_bw=effectiveBW_of_image,
-                           bwmode=result.hm_specmode,
-                           beam=restoringbeam,
-                           cell=cell,
-                           robust=target['robust'],
-                           uvtaper=target['uvtaper'],
-                           theoretical_sensitivity=cqa.quantity(result.sensitivity, 'Jy/beam'),
-                           observed_sensitivity=cqa.quantity(pbcor_image_rms, 'Jy/beam'),
-                           pbcor_image_min=cqa.quantity(pbcor_image_min, 'Jy/beam'),
-                           pbcor_image_max=cqa.quantity(pbcor_image_max, 'Jy/beam'),
-                           nonpbcor_image_min=cqa.quantity(nonpbcor_image_min, 'Jy/beam'),
-                           nonpbcor_image_max=cqa.quantity(nonpbcor_image_max, 'Jy/beam'),
-                           imagename=imname.replace('.pbcor', ''),
-                           datatype=result.datatype)
+        # For IQUV imaging, per-Stokes stats are stored separately since the generic
+        # result.image_rms etc. mix all planes (PIPE-2464). Report one Sensitivity
+        # entry per Stokes plane (PIPE-3104).
+        if result.stokes == 'IQUV':
+            return [
+                Sensitivity(
+                    stokes=stokes,
+                    observed_sensitivity=cqa.quantity(result.image_rms_iquv[i], 'Jy/beam'),
+                    pbcor_image_min=cqa.quantity(result.image_min_iquv[i], 'Jy/beam'),
+                    pbcor_image_max=cqa.quantity(result.image_max_iquv[i], 'Jy/beam'),
+                    nonpbcor_image_min=cqa.quantity(result.nonpbcor_image_min_iquv[i], 'Jy/beam'),
+                    nonpbcor_image_max=cqa.quantity(result.nonpbcor_image_max_iquv[i], 'Jy/beam'),
+                    **common_kwargs,
+                )
+                for i, stokes in enumerate(['I', 'Q', 'U', 'V'])
+            ]
+
+        return [Sensitivity(
+            stokes='I',
+            observed_sensitivity=cqa.quantity(result.image_rms, 'Jy/beam'),
+            pbcor_image_min=cqa.quantity(result.image_min, 'Jy/beam'),
+            pbcor_image_max=cqa.quantity(result.image_max, 'Jy/beam'),
+            nonpbcor_image_min=cqa.quantity(result.nonpbcor_image_min, 'Jy/beam'),
+            nonpbcor_image_max=cqa.quantity(result.nonpbcor_image_max, 'Jy/beam'),
+            **common_kwargs,
+        )]
 
 
 class CleanTaskFactory:
@@ -840,6 +861,8 @@ class CleanTaskFactory:
 
         if target['vis']:
             task_args['vis'] = target['vis']
+        elif image_heuristics and getattr(image_heuristics, 'vislist', None):
+            task_args['vis'] = image_heuristics.vislist
 
         if target['is_per_eb']:
             task_args['is_per_eb'] = target['is_per_eb']

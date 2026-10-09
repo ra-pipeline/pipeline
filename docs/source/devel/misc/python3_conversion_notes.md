@@ -4,7 +4,7 @@ This document provides notes on the conversion of the Pipeline code to become
 Python 3 compatible.
 
 Python 3 conversion is tracked in
-[PIPE-10](https://open-jira.nrao.edu/browse/PIPE-10) and its sub-task tickets.
+{jira}`PIPE-10` and its sub-task tickets.
 
 ## Updating code with '2to3' tool
 

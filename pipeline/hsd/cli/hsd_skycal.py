@@ -12,7 +12,7 @@ def hsd_skycal(calmode=None, fraction=None, noff=None,
     Produces a caltable storing the reference (OFF-source) spectra that are subtracted from
     on-source spectra to remove non-source contributions (atmosphere + receiver noise).
 
-    The WebLog shows integrated OFF spectra per spw and per source for each MS. The y-axis
+    The WebLog shows integrated OFF-source spectra per spw and per source for each MS. The y-axis
     represents the direct correlator output dominated by atmospheric and receiver signals.
     Different colors indicate different antennas; magenta lines show the atmospheric
     transmission curves. Time-averaged OFF spectra plots are also shown to assess time
@@ -25,6 +25,16 @@ def hsd_skycal(calmode=None, fraction=None, noff=None,
 
        Example of an OFF spectrum. Different antennas are shown in different colours;
        atmospheric transmission is shown in magenta.
+
+    .. figure:: /figures/elevation_difference.png
+       :width: 60%
+       :alt: Elevation difference heuristic plot
+
+       Plot showing elevations of ON-source and OFF-source positions (upper panel)
+       and their differences (lower panel). The red points in the lower panel
+       indicate the difference between ON and OFF is > 3 degrees.
+
+
 
     Notes:
         QA scoring:

@@ -16,11 +16,20 @@ def hifa_importdata(vis=None, session=None, asis=None, process_caldevice=None, o
     then when the output MS already exists in the output directory, the importasdm conversion step is skipped, and
     the existing MS will be imported instead.
 
-    The WebLog page shows a summary of imported MSs and flux densities of calibrators. Flux densities are first
-    read from the Source.xml table of the ASDM (recorded by the online system from the calibrator catalog), then
-    updated by querying the online ALMA calibrator flux service (controlled by ``dbservice=True``), allowing
-    post-observation observatory measurements to be used. The flux densities for each calibrator in each science
-    spw in each MS are written to the file ``flux.csv`` in the ``calibration/`` subdirectory.
+    The WebLog page shows a summary of imported MSs and the flux densities of calibrators along with the spectral
+    index. Flux densities are first read from the Source.xml table of the ASDM (recorded by the online system
+    during data acquisition from the calibrator catalog), these are then updated during :func:`~pipeline.hifa.cli.hifa_importdata`
+    that queries the online ALMA calibrator flux service (controlled by ``dbservice=True``), allowing post-observation
+    observatory measurements to be used. If the query is successful, these updated values are those shown. The flux
+    densities for each calibrator in each science spw in each MS are written to the file ``flux.csv`` in the
+    ``calibration/`` subdirectory.
+
+    Separate tables present information for the "Representative Target" - including the field name, spw ID,
+    frequency, bandwidth and channel width; and the "Intent Separation Angles" - that indicates the separation
+    of TARGET, PHASE and CHECK intents on the sky. The separations are also shown graphically, large plus
+    symbols representing the various intents. If there are >5 TARGET fields, only the minimum and maximum
+    separations to the PHASE intent are tabulated, while for mosaics, the median field position is provided
+    and the TARGET name is suffixed "mosaic".
 
     If a POLARIZATION intent is present, the parallactic angle coverage of each polarization session is shown
     graphically and reported quantitatively.

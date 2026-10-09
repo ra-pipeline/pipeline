@@ -3,6 +3,7 @@ import collections
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.renderer.basetemplates as basetemplates
 import pipeline.infrastructure.utils as utils
+from pipeline.infrastructure.utils import find_ranges, wrap_long_str
 
 LOG = logging.get_logger(__name__)
 
@@ -44,11 +45,7 @@ class T2_4MDetailsCheckProductSizeRenderer(basetemplates.T2_4MDetailsDefaultRend
             hm_cell = 'default'
 
         if 'field' in result.size_mitigation_parameters:
-            fieldnames = str(result.size_mitigation_parameters['field']).split(',')
-            if len(fieldnames) > 5:
-                for i in range(5, len(fieldnames), 5):
-                    fieldnames[i] = '<br>%s' % (fieldnames[i])
-            field = ','.join(fieldnames)
+            field = wrap_long_str(str(result.size_mitigation_parameters['field']), newline='<br>')
         else:
             field = 'default'
 
@@ -59,14 +56,19 @@ class T2_4MDetailsCheckProductSizeRenderer(basetemplates.T2_4MDetailsDefaultRend
 
         rows = [TR(nbins=nbins, hm_imsize=hm_imsize, hm_cell=hm_cell, field=field, spw=spw)]
 
-        # imsize mitigation may have spwspec (band) dependent mitigation parameters (see PIPE-676)
+        # imsize mitigation may have field and spw dependent mitigation parameters (see PIPE-676)
         if 'multi_target_size_mitigation' in result.size_mitigation_parameters:
             # overwriting rows is acceptable because byte size (content of rows above) and imsize mitigation with
             # potentially multiple targets and/or bands are mutually exclusive.
             rows = []
-            for spwspec, smp in result.size_mitigation_parameters['multi_target_size_mitigation'].items():
+            for mitigation_key, smp in result.size_mitigation_parameters['multi_target_size_mitigation'].items():
+                # Mitigation key is now a tuple: (field, spw)
+                field_name, spw_spec = mitigation_key
+                # Wrap long field names for readability in the weblog
+                field_name = wrap_long_str(field_name, newline='<br>')
                 hm_imsize = [str(smp['hm_imsize']) if 'hm_imsize' in smp.keys() else 'default'][0]
                 hm_cell = [str(smp['hm_cell']) if 'hm_cell' in smp.keys() else 'default'][0]
-                rows.append(TR(spw=spwspec, nbins='default', hm_imsize=hm_imsize, hm_cell=hm_cell, field='default'))
+                spw_range = find_ranges(spw_spec) if spw_spec != 'default' else spw_spec
+                rows.append(TR(spw=spw_range, nbins='default', hm_imsize=hm_imsize, hm_cell=hm_cell, field=field_name))
 
         return utils.merge_td_columns(rows)

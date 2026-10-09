@@ -1201,7 +1201,7 @@ def evalPerAntBP_Platform(data, output_dir, ms, caltable, create_plots) -> dict:
 
                     subb_spk = np.abs(np.nanmean([left,right]) - bp_amp[lower_index:upper_index])
                     subb_spkmax_id = np.argmax(subb_spk)
-                    spk_step = subb_spk[subb_spkmax_id]
+                    spk_step = subb_spk.flat[subb_spkmax_id]
 
                     if subb_spike < abs(spk_step):
                         subb_spike = abs(spk_step)

@@ -12,12 +12,16 @@ def hif_selfcal(vis=None, field=None, spw=None, contfile=None, hm_imsize=None, h
                 dividing_factor=None, check_all_spws=None, inf_EB_gaincal_combine=None,
                 usermask=None, usermodel=None, allow_wproject=None,
                 parallel=None):
-    """Perform iterative self-calibration on science targets with sufficient signal.
+    """This task attempts to perform self-calibration on all science targets for which the 
+    estimated SNR per-EB per-antenna is >3. The task channels-averages the science data to 
+    15.625 MHz, flags line channels (from :func:`~pipeline.hif.cli.hif_findcont`), splits 
+    each source into a temporary MS, and then iterates through a series of gain solution 
+    intervals. In the event that self-calibration succeeds for a given target, the successful 
+    self-calibration solutions are applied to that target. For sources where self-calibration 
+    does not succeed, or for which self-calibration is not attempted due to the estimated 
+    SNR per-EB per-antenna being too low, no solutions are applied.
 
-    Attempts phase-only self-calibration on each science target for which the estimated SNR per-EB
-    per-antenna exceeds 3. The task channels-averages the science data to 15.625 MHz, flags
-    line channels (from :func:`~pipeline.hif.cli.hif_findcont`), splits each source into a temporary MS, and then
-    iterates through a series of gain solution intervals.
+    **Handling of Data and Imaging During hif_selfcal**
 
     The pipeline tracks multiple data type labels to manage regular and self-calibrated data:
 
@@ -28,47 +32,186 @@ def hif_selfcal(vis=None, field=None, spw=None, contfile=None, hm_imsize=None, h
     - ``REGCAL_LINE_SCIENCE`` / ``SELFCAL_LINE_SCIENCE``: equivalent line (continuum-subtracted)
       datatypes in ``*_targets_line.ms``.
 
-    **Solution interval sequence**: The first interval is always ``inf_EB`` (``combine='scan'``,
-    ``solint='inf'``, ``gaintype='G'``), covering one entire EB and initially solving per-spw,
-    per-polarization. Subsequent intervals use ``combine='spw'``, ``gaintype='T'``: ``inf``
-    (one solution per scan), intermediate intervals splitting the median scan time, and finally
-    ``int`` (one solution per integration). The target is 5 total intervals including ``inf`` and
-    ``int``. Only the final successful interval and ``inf_EB`` (if not the final) are applied;
-    intermediate successful intervals are discarded.
+    At the beginning of this task, lines found by :func:`~pipeline.hif.cli.hif_findcont` (i.e., 
+    the complement of the channel ranges found for continuum) are flagged, the data for each 
+    science target are split from the ``REGCAL_CONTLINE_SCIENCE`` column into temporary individual 
+    MS files with channels averaged to 15.625 MHz, and the original data is reverted to its 
+    pre-line flagging state. The task then uses these averaged, per-source temporary MS files 
+    for all imaging and calibration during the self-calibration process. If self-calibration 
+    is successful for a given science target, the solutions are applied to both the calibrated 
+    visibility data labeled as ``REGCAL_CONTLINE_SCIENCE`` and ``REGCAL_LINE_SCIENCE`` and stored 
+    in the ``CORRECTED`` columns of :file:`*_targets.ms` and :file:`*_targets_line.ms`,
+    respectively.
 
-    **Solution acceptance**: A solution interval is accepted if all of the following hold:
+    All images generated as a part of :func:`~pipeline.hif.cli.hif_selfcal` are made from all 
+    SPWs for a given source and use ``robust=0.5`` along with auto-masking to define the mask 
+    during the cleaning process. The thresholds cleaned to, however, vary over the course of the 
+    self-calibration process and are described further below.
 
-    - The synthesized beam area does not increase by more than 5% compared with the pre-selfcal
-      image.
-    - The SNR of the post-selfcal image exceeds the SNR of the pre-selfcal image.
-    - The near-field SNR (rms measured in an annulus just outside the clean mask) also improves.
-    - The rms does not increase by more than 5%.
+    **Self-calibration Workflow**
 
-    If self-calibration succeeds, results are applied to both ``*_targets.ms`` and
-    ``*_targets_line.ms``. The final image is cleaned to the minimum of ``3 x rms`` (from the
-    final successful interval) and the pre-selfcal clean threshold.
+    :func:`~pipeline.hif.cli.hif_selfcal` starts by making a dirty image of each source to be 
+    self-calibrated and follows with a cleaned initial image with a threshold determined by in 
+    the same way as is done for :func:`~pipeline.hif.cli.hif_makeimages` (cont), using the 
+    predicted rms noise and a dynamic range correction factor. This initial image is used to 
+    assess whether there is sufficient SNR per-EB per-antenna and per-sub-field in the case of 
+    mosaics to attempt self-calibration and also to set the thresholds for each successive 
+    iteration of self-calibration (described further in the next section).
 
-    The WebLog shows a summary table of solution intervals attempted, SNR/rms before and after
-    each interval, and whether self-calibration succeeded. Per-interval QA plot pages show
-    before/after images and gain solutions per EB and antenna.
+    The task will then attempt self-calibration of all science targets that were deemed to 
+    have sufficient signal (SNR per-EB per-antenna >3) to attempt the process. For each such 
+    target, the task will loop through the list of solution intervals to attempt and perform 
+    the following operations:
+
+    1. Generate a "pre" image of the data, with all calibrations, including previous 
+       self-calibration solution intervals when this is not the first iteration of 
+       self-calibration, applied. The clean threshold used is described below. The model 
+       generated by this imaging process is saved in the ``MODEL`` column.
+    2. Use the model generated in the previous step, placed in the ``MODEL`` column, along 
+       with the :func:`~casatasks.calibration.gaincal` CASA task to calculate gain solutions over 
+       the solution interval specified for this iteration. These solutions are applied to the 
+       science target.
+    3. Generate a "post" image of the data, with the gain solutions from this interval of 
+       self-calibration applied. The clean threshold used is *exactly* the same as the 
+       threshold used for the "pre" image of the same solution interval.
+    4. Evaluate the success of the gain solutions from this solution interval at improving 
+       the calibration of the data, discussed further in a subsequent section.
+    5. If the gain solutions are deemed to have improved the calibration for this science 
+       target, move on to the next solution interval and repeat from step 1, or end 
+       self-calibration for this target if there are no further solution intervals to 
+       attempt. If the gain solutions, however, do not improve the calibration of the 
+       target then the calibration is reverted to its state prior to this iteration.
+
+    Once these iterations have been completed for each science target for which 
+    self-calibration was to be attempted, a final image is made with a clean threshold set 
+    by the minimum of 3x the rms determined from the final successful self-calibration 
+    iteration for that source and the clean threshold used to make the initial image prior 
+    to self-calibration. The latter is included to ensure that the final, self-calibrated 
+    image is always cleaned at least as deep as the initial image.
+
+    **Solution Intervals and Thresholds**
+
+    The self-calibration solution intervals to attempt and the thresholds to clean to for each of
+    those solution intervals are calculated in advance of the self-calibration process.
+    :func:`~pipeline.hif.cli.hif_selfcal` will start by cleaning relatively shallowly and with long
+    solution intervals for gain calibration, but will decrease both the solution intervals and
+    clean depths with each successive iteration.
+
+    The first solution interval, dubbed ``inf_EB``, is always set to use ``combine='scan'``,
+    ``solint='inf'``, and ``gaintype='G'`` i.e. it is calculated over an entire EB, with separate
+    solutions for each EB if multiple EBs are present. This first solution interval initially
+    attempts to calculate solutions per-polarization and per-spw, but will also test whether using
+    either a spw-map to map some spws to others with better solutions or ``combine='scan,spw'``
+    produces sufficiently less flagging. If successful, the gain table from this solution interval
+    is pre-applied before calculating the gains for subsequent solution intervals.
+
+    Subsequent solution intervals all use ``combine='spw'`` and ``gaintype='T'``. The second
+    solution interval is typically ``solint='inf'``, though in the event that a science target has
+    only a single scan this will be will skipped as it would be almost equivalent to the inf_EB
+    solution interval, and finish with ``solint='int'``. Between the ``inf`` solint, or ``inf_EB``
+    if ``inf`` is not included, and the ``int`` solution intervals,
+    :func:`~pipeline.hif.cli.hif_selfcal` will attempt solution intervals that split the median
+    scan time approximately evenly into multiple solution intervals. The task will target a total
+    of 5 iterations of self-calibration including the inf and int solution intervals, and the
+    amount that the current solution interval is divided by to reach the next solution interval is
+    set to reach this maximum number of 5 iterations, with some adjustments to avoid single
+    integrations from being left out.
+
+    The solution intervals are, with the exception of ``inf_EB``, not cumulative. That is to say
+    that if the solution intervals to attempt are [``inf_EB``, ``inf``, ``int``], the ``inf_EB``
+    solutions will be pre-applied when calculating gains for ``inf`` and ``int``, but ``inf`` will
+    not be pre-applied when calculating ``int``. At the end of self-calibration, only the gain
+    table from the final successful solution interval, along with the gain table from ``inf_EB`` if
+    it is not the final successful interval, will be applied. Any successful intermediate steps
+    will be discarded.
+
+    Clean thresholds are set initially as multiples of the rms of the image. The first ``inf_EB``
+    solution interval is set by the SNR of the initial image divided by a factor of 15, the final,
+    int, solution interval is set to clean to a threshold of 5x the rms of the image, and the
+    thresholds in-between are scaled logarithmically between these two values. While the planned
+    thresholds for each solution interval are set as multiples of the rms and remain unchanged, the
+    rms of the images is measured from the "post" image of each solution interval, stored as the
+    current rms, and multiplied by the planned multiple of the rms for the next solution interval.
+
+    **Solution Acceptance/Rejection**
+    
+    Several criteria are considered when determining whether a given self-calibration solution has
+    successfully improved the calibration of a science target: 
+    
+    - The beam area in the image made after applying the solutions for the solution interval must
+      not increase by more than 5% compared with the beam size of the initial image,
+      pre-self-calibration
+    - The SNR of the "post" image for the current solution interval (step 3 above) must increase
+      compared with the SNR of the "pre" image of the current solution interval (step 1 above).
+      The rms of both "pre" and "post" images are measured outside of the clean mask from the
+      "post" image so that they are calculated from the same area of the image.
+    - :func:`~pipeline.hif.cli.hif_selfcal` further requires that the "near-field" SNR must also
+      increase in the "post" image as compared with the "pre" image. Statistics dubbed with the
+      moniker "near-field" (or "NF") use an rms measured in a mask that extends from slightly
+      beyond the clean mask out to a distance several times the largest angular scale beyond that
+      rather than the rms calculated outside of the clean mask out to the extent of the image.
+      The intention of this near-field mask is to measure the rms in regions close to the source,
+      where artifacts are expected to be particularly impactful so that the rms is not washed out
+      large empty regions of the image.
+    - Though some amount of flagging due to selfcal can lead to small increases in the rms, large
+      increases (>5%) in the rms, even with an accompanying increase in the SNR and NF SNR, are
+      not allowed.
+    
+    For the ``inf_EB`` solution interval, a slight (<2%) reduction in the SNR and/or the NF SNR is
+    allowed to enable the routine to go on to additional, shorter solution intervals, though if
+    this is allowed and then there are no further successful solution intervals, the ``inf_EB``
+    solution is later failed. 
+
+    For mosaics, these statistics are computed and evaluated on the mosaic as a whole, and also for
+    each individual component field of the mosaic. To avoid the cost of imaging a large number of
+    sub-fields individually, :func:`~pipeline.hif.cli.hif_selfcal` instead corrects the full-mosaic
+    image for the primary beam, makes a sub-image of each field, and then applies the single field
+    primary beam in order to approximate the image that would have been made from an individual
+    imaging run. In the event that an individual sub-field fails a given solint, the solutions for
+    the most recent successful solint for that sub-field are re-applied (if available), and the
+    image of the mosaic as a whole is remade prior to evaluating the success of the mosaic as a
+    whole. For a selfcal solution interval to be considered successful for a mosaic, the mosaic as
+    a whole must succeed, and at least one sub-field must also be improved.
+
+    **Weblog**
+
+    The :func:`~pipeline.hif.cli.hif_selfcal` stage Weblog page shows a summary table describing
+    the targets considered, the solution intervals to be considered, whether those solution
+    intervals were actually attempted and/or applied, and whether self-calibration was successful
+    for that target. For each target, there is then a table showing the initial and final images,
+    listing statistics for each such as the SNR and rms, along with a brief description of whether
+    self-calibration was successful, what the final solution interval was, and why self-calibration
+    was stopped. Then an additional table is provided providing statistics such as the SNR,
+    improvement of the SNR, RMS, improvement of the RMS, integrated flux within the clean mask,
+    beam size before and after that solution interval, and whether that solution interval succeeded
+    or failed (and why it failed) for each solution interval attempted for that source. Clicking on
+    the "QA Plots" link for each solution interval leads to a separate page showing the before and
+    after images as well as plots of the gain solutions for each EB and antenna combination. For
+    mosaics, there is an additional per-field sub page that repeats all of the same information,
+    but on a field-by-field basis. An example Weblog for the :func:`~pipeline.hif.cli.hif_selfcal`
+    stage is shown below.
 
     .. figure:: /figures/selfcal_weblog.png
        :width: 60%
        :alt: Self-calibration WebLog
 
-       Example WebLog. The 'List of Self-cal Targets' table shows targets, imaging
-       parameters, solution intervals, and success status. The 'Self-cal Target Details'
-       section shows before/after SNR, rms, beam size, and images, and describes why
-       self-calibration stopped.
+       Example WebLog for the :func:`~pipeline.hif.cli.hif_selfcal` stage. The List of Self-cal
+       Targets table shows the list of science targets considered for self-calibration, the imaging
+       parameters used, the solution intervals to be attempted, and whether or not self-calibration
+       was successful and applied. Then the Self-cal Target Details shows further details of the
+       before and after self-calibration status of the data, including SNR, rms, beam size, along
+       with before and after images and details about whether self-calibration was successful or
+       not, the final successful solution interval, and why self-calibration stopped for this
+       source.
 
     Notes:
         QA scores:
 
-        - QA = 1.0 if self-calibration was not attempted (SNR too low).
-        - QA = 0.99 if attempted but unsuccessful (solutions not applied).
-        - QA = 0.98 if attempted and applied successfully.
+        - QA = 1.0 if self-calibration was not attempted because the estimated SNR is too low.
+        - QA = 0.99 if attempted but unsuccessful and is therefore not applied.
+        - QA = 0.98 if successful and applied.
         - QA = 0.85 if applied but the RMS got worse for at least one source.
-        - QA = 0.90 if a new/experimental mode (e.g. mosaic self-calibration) was used.
+        - QA = 0.90 if a new/experimental mode was used.
         - QA = N/A for unsupported modes (e.g. ephemeris targets).
 
     Examples:

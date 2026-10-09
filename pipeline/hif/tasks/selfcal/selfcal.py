@@ -17,6 +17,7 @@ from astropy.utils.misc import JsonCustomEncoder
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
+import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.filenamer as filenamer
 import pipeline.infrastructure.mpihelpers as mpihelpers
 import pipeline.infrastructure.vdp as vdp
@@ -25,7 +26,7 @@ from pipeline.domain import DataType
 from pipeline.hif.heuristics.auto_selfcal import auto_selfcal
 from pipeline.hif.tasks.applycal import SerialIFApplycal
 from pipeline.hif.tasks.makeimlist import MakeImList
-from pipeline.infrastructure import callibrary, casa_tasks, casa_tools, task_registry, utils
+from pipeline.infrastructure import callibrary, casa_tasks, casa_tools, task_registry
 from pipeline.infrastructure.contfilehandler import contfile_to_chansel
 from pipeline.infrastructure.mpihelpers import TaskQueue
 
@@ -98,7 +99,9 @@ class SelfcalResults(basetask.Results):
 
             # Fetch the field names matching the given `calto.field` and `calto.intent`.
             # Use a set comprehension to collect unique field names, and join them into a single string.
-            field_name = ','.join({field.name for field in ms.get_fields(task_arg=calto.field, intent=calto.intent)})
+            field_name = ','.join(
+                utils.deduplicate(field.name for field in ms.get_fields(task_arg=calto.field, intent=calto.intent))
+            )
 
             # Retrieve the data type
             data_dtype = ms.get_data_type('DATA', field_name, spw_sel)
@@ -917,22 +920,23 @@ class Selfcal(basetask.StandardTaskTemplate):
     def _check_scaltargets(self, scal_targets):
         """Filter out the sources that the selfcal heuristics should not process.
 
-        PIPE-1447/PIPE-1915: we do not execute selfcal heuristics for mosaic or ephemeris sources.
+        PIPE-1447/PIPE-1915: we do not execute selfcal heuristics for ephemeris sources.
+        PIPE-684/PIPE-2943: disable selfcal heuristics for VLA mosaic observations (multiple pointings / "composite source").
         """
         final_scal_target = []
         for scal_target in scal_targets:
-            disable_mosaic = False
+            disable_mosaic = scal_target.get('sc_telescope') in ('VLA', 'EVLA', 'JVLA')
             if disable_mosaic and scal_target['is_mosaic']:
                 LOG.warning(
-                    'The self-calibration heuristics do not fully support mosaic yet. Skipping target=%r spw=%r.',
-                    scal_target['field'],
-                    scal_target['spw'])
+                    'The self-calibration heuristics do not support VLA mosaic yet. Skipping target=%r spw=%r.',
+                    utils.condense_field_names(scal_target['field'], max_chars=30),
+                    utils.find_ranges(scal_target['spw']))
                 continue
             if scal_target['is_eph_obj']:
                 LOG.warning(
                     'The self-calibration heuristics do not fully support ephemeris sources yet. Skipping target=%r spw=%r.',
-                    scal_target['field'],
-                    scal_target['spw'])
+                    utils.condense_field_names(scal_target['field'], max_chars=30),
+                    utils.find_ranges(scal_target['spw']))
                 continue
             final_scal_target.append(scal_target)
 

@@ -25,7 +25,7 @@ def hifa_exportdata(vis=None, session=None, imaging_products_only=None, exportms
     - a ``cont.dat`` file from :func:`~pipeline.hif.cli.hif_findcont` (imaging runs only)
     - a tar file per session containing the caltables for that session
     - a tar file containing the WebLog
-    - a text file containing the final list of CASA commands
+    - a log file containing the final list of CASA commands
     - an XML ``manifest`` file listing all products
     - an XML ``aquareport`` file listing QA scores, sub-scores, image sensitivities, and other
       numerical information

@@ -1,11 +1,11 @@
-# Pixi and Running Pixi tasks
+# Pixi Workflow for Pipeline Development
 
-[Pixi](https://prefix.dev/docs/pixi/overview) is a fast, cross-platform package manager built on top of the conda ecosystem.
-In Pipeline development, Pixi manages reproducible environments per CASA version and exposes common developer workflows as named tasks.
+[Pixi](https://prefix.dev/docs/pixi/overview) is a fast, cross-platform package manager built on top of the [Conda](https://docs.conda.io/en/latest/) ecosystem.
+Pipeline development uses Pixi to manage reproducible environments for each CASA version and provide common developer workflows as standardized named tasks.
 
 ---
 
-## Prerequisites
+## Quick Start & Installation
 
 Clone the repository:
 
@@ -36,9 +36,9 @@ pixi install          # resolves and downloads all deps into .pixi/envs/
 
 ---
 
-## Environments
+## CASA Versions & Python Variants
 
-Each environment pins a specific CASA release.  The `default` environment
+Each [Pixi environment](https://pixi.prefix.dev/latest/workspace/environment/) pins a specific CASA release.  The `default` environment
 tracks the latest supported CASA snapshot.
 
 ```{list-table}
@@ -63,9 +63,6 @@ tracks the latest supported CASA snapshot.
 * - `casa677-py313`
   - 6.7.7
   - 3.13 (linux-64 + osx-arm64)
-* - `casa674-py312`
-  - 6.7.4
-  - 3.12
 * - `docs`
   - 6.7.4
   - 3.12 (docs extras)
@@ -74,51 +71,76 @@ tracks the latest supported CASA snapshot.
 Select a non-default environment with `--environment` / `-e`:
 
 ```bash
-pixi run -e casa671-py312 test-unit
+pixi run -e casa676-py312 test-unit
 ```
 
 ---
 
-## Available tasks
+## Development & Testing Tasks
 
-### `casa` — launch interactive CASA shell
+### Interactive Tools
 
-Launches an interactive CASA shell (`casashell`) for interactive data inspection,
+#### `casa` — launch interactive CASA shell
+
+Launches an interactive CASA shell (`casashell`) for data inspection,
 testing, and development.
 
+The session starts in the directory where `pixi run` is invoked (`$INIT_CWD`),
+ensuring log files (`casa-*.log`) and temporary datasets remain in your current
+working directory.
+
+**Threading & Environment:**
+
+- Dynamically clamps default OpenMP and OpenBLAS thread pools to $\min(\text{available\_cpus}, 4)$ using `nproc` (Linux), `sysctl` / `getconf` (macOS), or a fallback default of 4.
+- Preserves explicit user environment variables (e.g. `OMP_NUM_THREADS=8`).
+- Sets `OMP_PLACES=threads`, `OMP_PROC_BIND=false`, and `PYTHONNOUSERSITE=1`.
+
 ```bash
+# Launch interactive shell in current directory (defaults to min(cpus, 4) threads)
 pixi run casa
+
+# Launch with explicit thread override
+OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8 pixi run casa
 
 # With a specific CASA version
 pixi run -e casa677-py312 casa
 ```
 
----
+#### `update-data` — update CASA runtime data
 
-### `update-data` — update CASA configuration and runtime data
-
-Updates CASA configuration, measures tables, and other runtime artifacts.
+Update CASA runtime data (measures tables and casarundata) to the latest version.
 Combines three operations: `--update-all`, `--summary`, and `--current-data`.
 
 ```bash
 pixi run update-data
 ```
 
----
+#### `bundle-assets` — bundle and minify weblog static assets
 
-### `casampi` — launch CASA with MPI support
+Bundles and minifies weblog static CSS and JavaScript assets using `scripts/bundle_assets.py`.
 
-Launches CASA in MPI mode with proper safety flags for parallel processing.
+```bash
+pixi run bundle-assets
+```
+
+#### `casampi` — launch CASA with MPI support
+
+Launches CASA in MPI mode with safety flags for parallel processing.
 Default: 4 processes. Override with environment variable `CASA_NPROCS`.
 
+The MPI launcher and all worker ranks execute directly in the directory where
+`pixi run` is invoked (`$INIT_CWD`) via `-wdir "${INIT_CWD:-.}"`.
+
 **Configuration:**
+
 - Disables InfiniBand (`--mca btl ^openib`)
 - Binds to all available threads (`--bind-to none`)
 - Sets thread affinity and suppresses pmix warnings
+- Sets rank working directory: `-wdir "${INIT_CWD:-.}"`
 - Environment: `OMP_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1` (prevents oversubscription)
 
 ```bash
-# Launch with default 4 processes
+# Launch with default 4 processes in current directory
 pixi run casampi
 
 # Override process count
@@ -128,9 +150,9 @@ CASA_NPROCS=8 pixi run casampi
 CASA_NPROCS=8 pixi run -e casa677-py312 casampi
 ```
 
----
+### Testing & Quality Assurance
 
-### `test-unit` — unit tests with coverage
+#### `test-unit` — unit tests with coverage
 
 Runs all unit tests (any `*_test.py` file under `pipeline/`) using
 `pytest-xdist` with `-n logical` to parallelize across available CPUs.
@@ -169,9 +191,7 @@ pixi run test-unit
    Tests use `casatools.ctsys.resolve()` to locate data files, which searches all paths in `datapath`.
 :::
 
----
-
-### `test-regression` — fast regression suite (xdist, no MPI)
+#### `test-regression` — fast regression suite (xdist, no MPI)
 
 Runs the full `tests/regression/fast/` suite in a plain Python session
 (not `mpicasa`) using `pytest-xdist -n 12 --dist worksteal` with 12 parallel
@@ -192,9 +212,7 @@ cd /my/workdir
 pixi run --manifest-path /path/to/pipeline/pyproject.toml test-regression
 ```
 
----
-
-### `test-pltest1` — single quick ALMA-IF regression test
+#### `test-pltest1` — single quick ALMA-IF regression test
 
 Runs one small ALMA 7m regression test
 (`test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression`)
@@ -211,9 +229,9 @@ cd /my/workdir
 pixi run --manifest-path /path/to/pipeline/pyproject.toml test-pltest1
 ```
 
----
+### Documentation Building
 
-### `build-docs` — build HTML documentation (full clean rebuild)
+#### `build-docs` — build HTML documentation (full clean rebuild)
 
 Builds the Sphinx documentation into `docs/_build/html/`.
 
@@ -224,9 +242,7 @@ pixi run build-docs
 pixi run -e docs build-docs
 ```
 
----
-
-### `build-docs-fast` — incremental HTML documentation build
+#### `build-docs-fast` — incremental HTML documentation build
 
 Reuses cached doctrees and autosummary stubs.  Much faster during active
 documentation development; use `build-docs` for a clean final build.
@@ -235,21 +251,42 @@ documentation development; use `build-docs` for a clean final build.
 pixi run build-docs-fast
 ```
 
----
-
-### `build-pdf` — build PDF (LaTeX) documentation
+#### `build-pdfs` — build all PDF (LaTeX) documentation
 
 ```bash
-pixi run build-pdf
+pixi run build-pdfs
+```
+
+#### `build-pdf-taskdocs` — build Task Reference Manual PDF
+
+```bash
+pixi run build-pdf-taskdocs
+```
+
+#### `build-pdf-userguide` — build User's Guide PDF
+
+```bash
+pixi run build-pdf-userguide
+```
+
+#### `update-references` — update BibTeX references from NASA/ADS
+
+Updates BibTeX literature citations in the documentation from the NASA/ADS
+public library using `scripts/update_references.py`.
+
+```bash
+pixi run update-references
 ```
 
 ---
 
-## Controlling the working directory (`$INIT_CWD`)
+## Environment & Workflow Configuration
 
-All test tasks (`test-unit`, `test-regression`, `test-pltest1`) start with
+### Managing Task Output & Working Directories
+
+All interactive, testing, and execution tasks (`casa`, `casampi`, `test-unit`, `test-regression`, `test-pltest1`) start with
 `cd $INIT_CWD`, where `$INIT_CWD` is the directory from which `pixi run` was
-invoked.  This means CASA log files (`casa-*.log`), pipeline output
+invoked (with OpenMPI worker ranks directed via `-wdir "${INIT_CWD:-.}"`). This means CASA log files (`casa-*.log`), pipeline output
 directories, and coverage artifacts land in your working directory — not in
 the source tree.
 
@@ -275,32 +312,28 @@ pixi run --manifest-path /path/to/pipeline/pyproject.toml test-pltest1
 > The `$INIT_CWD` variable is set by pixi to the shell's cwd at invocation time.
 > `$PIXI_PROJECT_ROOT` always points to the directory containing `pyproject.toml`.
 
----
-
-## Running tasks against a specific CASA version
+### Testing Across CASA Versions
 
 ```bash
 # Smoke-test with CASA 6.7.4
 pixi run -e casa674-py312 test-pltest1
 
-# Full regression with CASA 6.7.1 / Python 3.12
-pixi run -e casa671-py312 test-regression
+# Full regression with CASA 6.7.6 / Python 3.12
+pixi run -e casa676-py312 test-regression
 ```
 
----
-
-## Shell inside a pixi environment
+### Interactive Environment Access
 
 Drop into an interactive shell with the environment activated:
 
 ```bash
 pixi shell                  # default environment
-pixi shell -e casa671-py312 # specific environment
+pixi shell -e casa676-py312 # specific environment
 ```
 
 ---
 
-## Migrating conda dependencies to pixi
+## Advanced: Conda ↔ Pixi Migration
 
 If you have an existing `environment.yml` (conda) and want to migrate its
 packages into `pyproject.toml`, use `pixi`'s built-in import command:
@@ -352,9 +385,9 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
-  - openmpi>=5.0
+  - openmpi-mpicxx>=5.0
   - pip:
-    - casatasks>=6.6.6
+    - casatasks>=6.7.4.2
 ```
 
 ```toml
@@ -364,10 +397,10 @@ channels = ["conda-forge"]
 
 [tool.pixi.dependencies]
 python = "3.12.*"
-openmpi = ">=5.0"
+openmpi-mpicxx = ">=5.0"
 
 [tool.pixi.pypi-dependencies]
-casatasks = { version = ">=6.6.6", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casatasks = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 ```
 
 > **Tip:** Pixi version constraints use `">=x.y"` (string) rather than conda's
@@ -418,7 +451,7 @@ Or add it manually to the exported file:
 - pip:
   - --extra-index-url https://casa-pip.nrao.edu/repository/pypi-group/simple
   - casashell==6.7.4.*
-  - casatasks>=6.6.6
+  - casatasks>=6.7.4.2
   - ...
 ```
 
@@ -427,7 +460,7 @@ in the export.
 
 ---
 
-## Summary
+## Quick Reference: Common Tasks
 
 ```{list-table}
 :header-rows: 1
@@ -438,13 +471,16 @@ in the export.
   - Output cwd
 * - Launch CASA shell
   - `pixi run casa`
-  - interactive
+  - `$INIT_CWD` (invocation dir)
 * - Update CASA data
   - `pixi run update-data`
   - varies
-* - Launch CASA MPI (4 processes)
-  - `CASA_NPROCS=8 pixi run casampi`
-  - interactive
+* - Bundle weblog assets
+  - `pixi run bundle-assets`
+  - project root
+* - Launch CASA MPI (default 4 ranks)
+  - `pixi run casampi`
+  - `$INIT_CWD` (invocation dir)
 * - Unit tests
   - `pixi run test-unit`
   - `$INIT_CWD` (invocation dir)
@@ -460,7 +496,16 @@ in the export.
 * - Build docs (fast)
   - `pixi run build-docs-fast`
   - `docs/`
-* - Build PDF docs
-  - `pixi run build-pdf`
+* - Build all PDF docs
+  - `pixi run build-pdfs`
   - `docs/`
+* - Build Task Reference PDF
+  - `pixi run build-pdf-taskdocs`
+  - `docs/`
+* - Build User's Guide PDF
+  - `pixi run build-pdf-userguide`
+  - `docs/`
+* - Update BibTeX references
+  - `pixi run update-references`
+  - project root
 ```

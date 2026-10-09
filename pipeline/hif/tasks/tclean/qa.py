@@ -68,17 +68,21 @@ class TcleanQAHandler(pqa.QAPlugin):
                 # VLA-PI imaging modes
                 if result.inputs['specmode'] in ('cube', 'repBW'):
                     # PIPE-1346: score=1.0 for a succesfully imaged spectral line target.
-                    longmsg = f'cube imaging succeeded: field {result.sourcename}, spw {result.spw}'
+                    longmsg = f'cube imaging succeeded: field {utils.condense_field_names(result.sourcename)}, spw {result.spw}'
                     shortmsg = 'cube imaging succeeded'
-                    result.qa.pool.append(pqa.QAScore(1.0, longmsg=longmsg, shortmsg=shortmsg, applies_to=data_selection))
+                    result.qa.pool.append(
+                        pqa.QAScore(1.0, longmsg=longmsg, shortmsg=shortmsg, applies_to=data_selection)
+                    )
                 else:
                     # for cont/mfs imaging
                     snr = result.image_max / result.image_rms
                     score = scorecalc.linear_score(x=snr, x1=5, x2=100, y1=0.0, y2=1.0)  # CAS-10925
                     # Set score messages and origin.
-                    longmsg = ('{} pbcor image max / non-pbcor image RMS = {:0.2f}'.format(result.sourcename, snr))
-                    shortmsg = 'snr = {:0.2f}'.format(snr)
-                    result.qa.pool.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, applies_to=data_selection))
+                    longmsg = f'{utils.condense_field_names(result.sourcename)} pbcor image max / non-pbcor image RMS = {snr:0.2f}'
+                    shortmsg = f'snr = {snr:0.2f}'
+                    result.qa.pool.append(
+                        pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, applies_to=data_selection)
+                    )
             return
 
         # For all ALMA imaging modes
@@ -115,21 +119,27 @@ class TcleanQAHandler(pqa.QAPlugin):
             else:
                 rms_score = imageScorer(result.image_rms_iquv[0] / result.dr_corrected_sensitivity)
 
-            if (np.isnan(rms_score)):
+            if np.isnan(rms_score):
                 rms_score = 0.0
-                longmsg = 'Cleaning diverged, RMS is NaN. Field: %s Intent: %s SPW: %s' % (
-                    result.inputs['field'], result.intent, result.spw)
+                longmsg = (
+                    f'Cleaning diverged, RMS is NaN. Field: {utils.condense_field_names(result.inputs["field"])} '
+                    f'Intent: {result.intent} SPW: {result.spw}'
+                )
                 shortmsg = 'RMS is NaN'
             else:
                 if rms_score > 0.66:
-                    longmsg = 'RMS vs. DR corrected sensitivity. Field: %s Intent: %s SPW: %s' % (
-                        result.inputs['field'], result.intent, result.spw)
+                    longmsg = (
+                        f'RMS vs. DR corrected sensitivity. Field: {utils.condense_field_names(result.inputs["field"])} '
+                        f'Intent: {result.intent} SPW: {result.spw}'
+                    )
                     shortmsg = 'RMS vs. sensitivity'
                 else:
                     # The level of 2.7 comes from the Erf scorer limits of 1 and 5.
                     # The level needs to be adjusted if these limits are modified.
-                    longmsg = 'Observed RMS noise exceeds DR corrected sensitivity by more than 2.7. Field: %s Intent: %s SPW: %s' % (
-                        result.inputs['field'], result.intent, result.spw)
+                    longmsg = (
+                        f'Observed RMS noise exceeds DR corrected sensitivity by more than 2.7. '
+                        f'Field: {utils.condense_field_names(result.inputs["field"])} Intent: {result.intent} SPW: {result.spw}'
+                    )
                     shortmsg = 'RMS vs. sensitivity'
 
                 # Adjust RMS based score if there were PSF fit errors
@@ -137,15 +147,19 @@ class TcleanQAHandler(pqa.QAPlugin):
                     if result.bad_psf_channels.shape[0] <= 10:
                         rms_score -= 0.11
                         rms_score = max(0.0, rms_score)
-                        longmsg = '%s. Between 1-10 channels show significantly deviant synthesized beam(s), this is usually indicative of bad data, if at cube edge can likely be ignored.' % (
-                            longmsg)
-                        shortmsg = '%s. 1-10 channels masked.' % (shortmsg)
+                        longmsg = (
+                            f'{longmsg}. Between 1-10 channels show significantly deviant synthesized beam(s), '
+                            'this is usually indicative of bad data, if at cube edge can likely be ignored.'
+                        )
+                        shortmsg = f'{shortmsg}. 1-10 channels masked.'
                     else:
                         rms_score -= 0.34
                         rms_score = max(0.0, rms_score)
-                        longmsg = '%s. More than 10 channels show significantly deviant synthesized beams, this is usually indicative of bad data, and should be investigated.' % (
-                            longmsg)
-                        shortmsg = '%s. > 10 channels masked.' % (shortmsg)
+                        longmsg = (
+                            f'{longmsg}. More than 10 channels show significantly deviant synthesized beams, '
+                            'this is usually indicative of bad data, and should be investigated.'
+                        )
+                        shortmsg = f'{shortmsg}. > 10 channels masked.'
 
             origin = pqa.QAOrigin(metric_name='image rms / sensitivity',
                                   metric_score=(result.image_rms, result.dr_corrected_sensitivity),
@@ -165,7 +179,7 @@ class TcleanQAHandler(pqa.QAPlugin):
         # is used in the tclean calls for odd-shaped mosaics.
         if result.used_psfphasecenter:
             psfpc_score = 0.9
-            longmsg = f"Field {result.sourcename} has an odd-shaped mosaic - setting psfphasecenter to the position of the nearest pointing for SPW {result.spw}"
+            longmsg = f"Field {utils.condense_field_names(result.sourcename)} has an odd-shaped mosaic - setting psfphasecenter to the position of the nearest pointing for SPW {result.spw}"
             shortmsg = 'Odd-shaped mosaic'
             origin = pqa.QAOrigin(metric_name='psfphasecenter', metric_score='N/A', metric_units='N/A')
             # Add a hidden QA score. The psfphasecenter scores are aggregated in hif_makeimages to create

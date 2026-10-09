@@ -518,7 +518,7 @@ Pipeline tasks that permanently register new calibrations include:
 - `hifa_wvrgcal`: registers the WVR gain table.
 - `hifv_circfeedpolcal`: registers the polarization caltable for VLA circular feeds.
 - `hifv_finalcals`: registers the final calibration tables to be applied to the data in
-  the VLA CASA pipeline.
+  the VLA pipeline.
 - `hifv_priorcals`: gaincal curves, opcal, requantizer gains, switched power cal.
 - `hsd_k2jycal`: Kelvin to Jansky caltable.
 

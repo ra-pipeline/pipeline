@@ -55,8 +55,8 @@ class PlotbandpassDetailBase:
         # we should only request plots for the antennas and spws in the
         # caltable, which may be a subset of those in the measurement set
         caltable_wrapper = CaltableWrapperFactory.from_caltable(self._caltable)
-        antenna_ids = set(caltable_wrapper.antenna)
-        spw_ids = set(caltable_wrapper.spw)
+        antenna_ids = utils.deduplicate(caltable_wrapper.antenna)
+        spw_ids = utils.deduplicate(caltable_wrapper.spw)
 
         # use antenna name rather than ID where possible
         antenna_arg = ','.join([str(i) for i in antenna_ids])
@@ -95,7 +95,7 @@ class PlotbandpassDetailBase:
         self._figfile = collections.defaultdict(dict)
         root, ext = os.path.splitext(self._figroot)
 
-        scan_ids_in_caltable = sorted(list(set(caltable_wrapper.scan)))
+        scan_ids_in_caltable = utils.deduplicate(caltable_wrapper.scan)
         scan_to_suffix = {scan_id: '.t%02d' % i
                           for i, scan_id in enumerate(scan_ids_in_caltable)}
 
@@ -109,7 +109,7 @@ class PlotbandpassDetailBase:
                 # suffix plotbandpass will add to the png.
                 filtered = caltable_wrapper.filter(spw=[spw_id], antenna=[ant_id])
 
-                scan_ids = set(filtered.scan)
+                scan_ids = utils.deduplicate(filtered.scan)
                 # TODO this breaks if the spw is present in more than one scan!
                 # We're having to reverse engineer plotbandpass' naming scheme.
                 # Perhaps we should glob for files created somehow?
@@ -627,7 +627,7 @@ class AntSpwComposite(LeafComposite):
 
     def __init__(self, context, result, calapp, xaxis, yaxis, pol='', **kwargs):
         with casa_tools.TableReader(calapp.gaintable) as tb:
-            table_ants = set(tb.getcol('ANTENNA1'))
+            table_ants = utils.deduplicate(tb.getcol('ANTENNA1'))
 
         caltable_antennas = [int(ant) for ant in table_ants]
         children = [self.leaf_class(context, result, calapp, xaxis, yaxis,
@@ -644,7 +644,7 @@ class SpwPolComposite(LeafComposite):
 
     def __init__(self, context, result, calapp, xaxis, yaxis, ant='', **kwargs):
         with casa_tools.TableReader(calapp.gaintable) as tb:
-            table_spws = set(tb.getcol('SPECTRAL_WINDOW_ID'))
+            table_spws = utils.deduplicate(tb.getcol('SPECTRAL_WINDOW_ID'))
 
         caltable_spws = [int(spw) for spw in table_spws]
         children = [self.leaf_class(context, result, calapp, xaxis, yaxis,
@@ -661,7 +661,7 @@ class AntSpwPolComposite(LeafComposite):
 
     def __init__(self, context, result, calapp, xaxis, yaxis, **kwargs):
         with casa_tools.TableReader(calapp.gaintable) as tb:
-            table_ants = set(tb.getcol('ANTENNA1'))
+            table_ants = utils.deduplicate(tb.getcol('ANTENNA1'))
 
         caltable_antennas = [int(ant) for ant in table_ants]
         children = [self.leaf_class(context, result, calapp, xaxis, yaxis,
