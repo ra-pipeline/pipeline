@@ -178,7 +178,7 @@ def get_data_table_path(context: Context, msobj: MeasurementSet) -> str:
     origin_ms_name = os.path.basename(msobj.origin_ms)
     return relative_path(os.path.join(context.observing_run.ms_datatable_name, origin_ms_name))
 
-def match_origin_ms(ms_list: list[MeasurementSet], origin_name: str) -> MeasurementSet:
+def match_origin_ms(ms_list: list[MeasurementSet], origin_name: str, prefix_hint: str = "") -> MeasurementSet:
     """
     Return an MS domain object that has the same origin_ms as origin_name.
 
@@ -191,7 +191,7 @@ def match_origin_ms(ms_list: list[MeasurementSet], origin_name: str) -> Measurem
         found.
     """
     for ms in ms_list:
-        if ms.origin_ms == origin_name:
+        if ms.origin_ms == origin_name and (prefix_hint == "" or ms.basename.startswith(prefix_hint)):
             return ms
     return None
 

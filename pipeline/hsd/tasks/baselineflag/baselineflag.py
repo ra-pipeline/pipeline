@@ -455,7 +455,7 @@ class SerialSDBLFlag(basetask.StandardTaskTemplate):
         # name of MS to process
         cal_name = inputs.ms.name
         bl_list = context.observing_run.get_measurement_sets_of_type([DataType.BASELINED])
-        match = sdutils.match_origin_ms(bl_list, inputs.ms.origin_ms)
+        match = sdutils.match_origin_ms(bl_list, inputs.ms.origin_ms, prefix_hint=inputs.ms.basename)
         bl_name = match.name if match is not None else cal_name
         in_ant = inputs.antenna
         in_spw = inputs.spw

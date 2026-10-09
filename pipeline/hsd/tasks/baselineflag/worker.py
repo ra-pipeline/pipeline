@@ -53,7 +53,7 @@ class SDBLFlagWorkerInputs(vdp.StandardInputs):
     def bl_ms(self):
         """MeasurementSet domain object of baselined MS."""
         bl_list = self.context.observing_run.get_measurement_sets_of_type([DataType.BASELINED])
-        match = sdutils.match_origin_ms(bl_list, self.ms.origin_ms)
+        match = sdutils.match_origin_ms(bl_list, self.ms.origin_ms, prefix_hint=os.path.basename(self.vis))
         return match
 
 class SDBLFlagWorkerResults(common.SingleDishResults):
@@ -961,7 +961,7 @@ def _get_permanent_flag_summary( pflag:list[int], FlagRule:dict ) -> int:
         FlagRule : Flag rule
     Returns:
         mask
-    """    
+    """
     # OnlineFlag is always active
     if pflag[OnlineFlagIndex] == 0:
         mask = 0
@@ -1005,7 +1005,7 @@ def _get_stat_flag_summary( tflag:list[int], FlagRule:dict ) -> int:
 # has already been validated at upper level (baselineflag.py)
 def _get_iteration(reduction_group:dict, msobj:MeasurementSet, antid:int, fieldid:int, spwid:int) -> int:
     """
-    Get iteration 
+    Get iteration
 
     Args:
         reduction_group : Reduction group dictionary.
