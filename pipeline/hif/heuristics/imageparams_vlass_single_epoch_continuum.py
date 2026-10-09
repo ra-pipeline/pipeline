@@ -182,10 +182,6 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """Tclean gridder parameter heuristics."""
         return 'awproject'
 
-    @property
-    def uniform_band_cell(self) -> bool:
-        return False
-
     def cell(self, beam=None, pixperbeam=None) -> str | list:
         """Tclean cell parameter heuristics."""
         return ['0.6arcsec']

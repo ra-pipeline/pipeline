@@ -700,7 +700,7 @@ class ImageParamsHeuristics:
 
         For ALMA, cell size is kept identical for all targets within a receiver band
         (prior to per-field size mitigation overrides).
-        For VLA / VLASS, cell size can be determined independently for each field.
+        For VLA, cell size can be determined independently for each field.
         """
         return True
 
