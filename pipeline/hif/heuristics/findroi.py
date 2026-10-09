@@ -2982,6 +2982,12 @@ def _prepare_regridded_ms(
     return bin_ms_out, regridded_ms, (t1 - t0), (t2 - t1)
 
 
+def _is_empty_mstransform_selection_error(exc: Exception) -> bool:
+    '''Return whether a CASA mstransform failure indicates an empty selection.'''
+    message = str(exc)
+    return 'MSSelectionNullSelection' in message or 'selected table has zero rows' in message
+
+
 def _read_regridded_field(
     regridded_ms: str,
     field_id: int,
@@ -3520,17 +3526,29 @@ def _process_spw(
             cache_key = (outframe, None if outframe == 'LSRK' else int(source_id))
             if cache_key not in ms_cache:
                 frame_tag = f'{tag}_eb{eb_idx}' if outframe == 'LSRK' else f'{tag}_src{int(source_id)}_eb{eb_idx}'
-                _, regridded_ms, dt_bin, dt_regrid = _prepare_regridded_ms(
-                    vis,
-                    real_spw_id,
-                    outframe,
-                    timebin_sec,
-                    tmp_dir,
-                    frame_tag,
-                    antenna=antenna_selection,
-                    executor=executor,
-                    overwrite=tmp_overwrite,
-                )
+                try:
+                    _, regridded_ms, dt_bin, dt_regrid = _prepare_regridded_ms(
+                        vis,
+                        real_spw_id,
+                        outframe,
+                        timebin_sec,
+                        tmp_dir,
+                        frame_tag,
+                        antenna=antenna_selection,
+                        executor=executor,
+                        overwrite=tmp_overwrite,
+                    )
+                except Exception as exc:
+                    if not _is_empty_mstransform_selection_error(exc):
+                        raise
+                    LOG.warning(
+                        'Skipping empty hif_findroi selection for EB %s, spw %s, source %s: %s',
+                        os.path.basename(vis),
+                        spw_name,
+                        source_id,
+                        str(exc),
+                    )
+                    continue
                 ms_cache[cache_key] = (regridded_ms, float(dt_bin), float(dt_regrid))
                 source_regridded_ms_paths.setdefault(int(source_id), []).append(str(regridded_ms))
                 if verbose:
@@ -3566,7 +3584,6 @@ def _process_spw(
         results['sources'].setdefault(source_id, {})
         outframe = str(source_outframe.get(int(source_id), 'LSRK'))
         regrid_outframe = 'GEO' if outframe == 'SOURCE' else outframe
-        frame_tag = f'{tag}_eb0' if outframe == 'LSRK' else f'{tag}_src{int(source_id)}_eb0'
         frame_token = regrid_outframe.lower()
         geometry_plan = common_geometry_plan.get(int(source_id), {})
         chan_freqs_hz = None
@@ -3576,7 +3593,10 @@ def _process_spw(
         axis_field_id = int(sorted(field_chunks.keys())[0]) if field_chunks else None
         source_axis_diag = None
         try:
-            freqs = _get_temp_ms_chan_freqs_hz(os.path.join(tmp_dir, f'tmp_{frame_tag}_{frame_token}.ms'), ddid=0)
+            regridded_ms_paths = source_regridded_ms_paths.get(int(source_id), [])
+            if not regridded_ms_paths:
+                raise RuntimeError('No successful regridded MS is available for this source.')
+            freqs = _get_temp_ms_chan_freqs_hz(regridded_ms_paths[0], ddid=0)
             chan_freqs_geo_hz = np.asarray(freqs, dtype=np.float64).ravel()
             if outframe == 'SOURCE':
                 if axis_field_id is None:
@@ -4160,13 +4180,14 @@ def run_findroi_mpi(
     args = []
     target_field_names = utils.deduplicate(field_names_by_id.values())
     for ddid, spw_name, virtual_spw_id in sci_spw:
-        has_unflagged_data = False
-        has_inconclusive_probe = False
+        usable_vis_list = []
         for vis_name in vis_list:
+            vis_has_unflagged_data = False
+            vis_has_inconclusive_probe = False
             for field_name in target_field_names:
                 probe_result = _findroi_has_unflagged_data(data_heuristics, vis_name, field_name, int(virtual_spw_id))
                 if probe_result is True:
-                    has_unflagged_data = True
+                    vis_has_unflagged_data = True
                     break
                 elif probe_result is False:
                     LOG.debug(
@@ -4176,20 +4197,26 @@ def run_findroi_mpi(
                         virtual_spw_id,
                     )
                 else:
-                    has_inconclusive_probe = True
-            if has_unflagged_data:
-                break
-        if not has_unflagged_data and not has_inconclusive_probe:
+                    vis_has_inconclusive_probe = True
+            if vis_has_unflagged_data or vis_has_inconclusive_probe:
+                usable_vis_list.append(vis_name)
+            else:
+                LOG.warning(
+                    'No unflagged data found in EB %s for virtual spw %s; skipping EB.',
+                    os.path.basename(vis_name),
+                    virtual_spw_id,
+                )
+        if not usable_vis_list:
             LOG.warning('No unflagged data found in any EB/field for virtual spw %s; skipping.', virtual_spw_id)
             continue
         spw_ids_by_vis = _real_spw_ids_by_vis(
             context,
-            vis_list,
+            usable_vis_list,
             virtual_spw_id=virtual_spw_id,
             fallback_spw_id=int(ddid_rows[int(ddid)]['spw_id']),
         )
         corr_axis_by_vis = {}
-        for vis_name in vis_list:
+        for vis_name in usable_vis_list:
             real_spw_id = int(spw_ids_by_vis.get(
                 vis_name,
                 spw_ids_by_vis.get(os.path.basename(os.path.normpath(vis_name)), int(ddid_rows[int(ddid)]['spw_id'])),
@@ -4200,7 +4227,7 @@ def run_findroi_mpi(
                 str(corr) for corr in getattr(data_description, 'corr_axis', ())
             )
         args.append((
-            vis_list, ddid, spw_name, spw_ids_by_vis, corr_axis_by_vis,
+            usable_vis_list, ddid, spw_name, spw_ids_by_vis, corr_axis_by_vis,
             int(ddid_rows[int(ddid)]['spw_id']), field_groups,
             antenna_selections_by_vis,
             source_names_by_id, field_names_by_id,
