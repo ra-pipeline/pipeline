@@ -5506,7 +5506,7 @@ def score_testBPdcals_delay(vis: str, caltable: str, bandname: str) -> pqa.QASco
             longmsg = f"Median delay > 15 ns for {bandname} band"
             shortmsg = f"Median delay > 15 ns for {bandname} band"
         else:
-            score = rendererutils.SCORE_THRESHOLD_SUBOPTIMAL
+            score = 1.0
             longmsg = f"Median delay <= 15 ns for {bandname} band"
             shortmsg = f"Median delay <= 15 ns for {bandname} band"
 
