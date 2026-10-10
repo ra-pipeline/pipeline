@@ -4413,13 +4413,20 @@ def run_findroi_mpi(
         for source_id in field_groups:
             if str(project_outframes.get(int(source_id), 'LSRK')).upper() == 'SOURCE':
                 continue
-            source_field_selector = ','.join(
+            source_field_names = utils.deduplicate(
                 field_names_by_id[int(field_id)]
                 for field_id in field_groups[int(source_id)]
                 if field_names_by_id.get(int(field_id), '')
             )
             source_name = source_names_by_id.get(int(source_id), f'source_{int(source_id)}')
-            if not source_field_selector:
+            # hif_tclean passes one canonical field name to freq_intersection().
+            # imageparams_base.field() does not split comma-separated field names;
+            # for a mosaic, one FIELD name identifies all pointings with that name.
+            # Keep this local adapter aligned with that behavior rather than
+            # passing the same mosaic name once per field ID.
+            if len(source_field_names) == 1:
+                source_field_selector = source_field_names[0]
+            elif not source_field_names:
                 LOG.warning(
                     'Could not determine field selection for hif_findroi source %s, virtual spw %s; skipping source.',
                     source_name,
@@ -4428,6 +4435,19 @@ def run_findroi_mpi(
                 lsrk_frequency_plans[int(source_id)] = {
                     'valid': False,
                     'reason': 'source_field_selection_error',
+                }
+                continue
+            else:
+                LOG.warning(
+                    'Multiple field names %s found for hif_findroi source %s, virtual spw %s; '
+                    'retaining the unpruned frequency axis.',
+                    ','.join(source_field_names),
+                    source_name,
+                    virtual_spw_id,
+                )
+                lsrk_frequency_plans[int(source_id)] = {
+                    'valid': False,
+                    'reason': 'multiple_source_field_names',
                 }
                 continue
             try:
