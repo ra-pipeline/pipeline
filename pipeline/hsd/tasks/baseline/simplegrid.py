@@ -445,7 +445,7 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         for in_ms in self.inputs.member_ms:
             origin_ms = self.inputs.context.observing_run.get_ms(in_ms.origin_ms)
             entries = bind_to_grid[origin_ms.basename]
-            bl_ms = utils.match_origin_ms(bl_mses, in_ms.origin_ms)
+            bl_ms = utils.match_origin_ms(bl_mses, in_ms.origin_ms, prefix_hint=in_ms.basename)
             grid_ms = bl_ms if bl_ms is not None else in_ms
             vis = grid_ms.name
             ms_colname = utils.get_datacolumn_name(vis)
