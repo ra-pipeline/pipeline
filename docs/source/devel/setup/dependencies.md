@@ -81,6 +81,48 @@ Unix command-line tools:
 - **uncompress**: used by `tec_maps.py` in CASA for the VLA task
   `hifv_priorcals`.
 
+### Observatory Online Services & CASA Runtime Data
+
+During operation, the pipeline queries external observatory online services and also relies on
+[CASA runtime data](https://casadocs.readthedocs.io/en/stable/notebooks/external-data.html). Live health
+and availability are tracked via two status monitors:
+
+```{list-table}
+:header-rows: 1
+:widths: 30 45 25
+
+* - Service / Data Feed
+  - Description & Pipeline Touchpoints
+  - Status Monitor
+* - **CASA Runtime Data (`casa-data`)**
+  - Measures tables (IERS Earth Orientation Parameters, leap seconds, geodetic, ephemeris) managed by `casaconfig`.
+  - [Casaconfig Monitor](https://www.aoc.nrao.edu/~jmarvil/casaconfig-monitor.html)
+* - **ALMA Calibrator Flux Density Service**
+  - Queried by {func}`~pipeline.hifa.cli.hifa_importdata` (`dbservice=True`) to fetch calibrator fluxes via `FLUX_SERVICE_URL`.
+  - [Pipeline Services Monitor](https://ra-pipeline.github.io/pipeline-services-monitor/)
+* - **ALMA Antenna Positions Service**
+  - Queried by {func}`~pipeline.hifa.cli.hifa_antpos` via `getantposalma` to obtain baseline corrections.
+  - [Pipeline Services Monitor](https://ra-pipeline.github.io/pipeline-services-monitor/)
+* - **ALMA Jy/K Database (`jyperk`)**
+  - Queried by {func}`~pipeline.hsd.cli.hsd_k2jycal` (`dbservice=True`) via `JYPERKDB_URL` with
+    regional fallbacks (JAO, EA, NA, EU) for Single-Dish Kelvin-to-Jansky conversion factors.
+  - [Pipeline Services Monitor](https://ra-pipeline.github.io/pipeline-services-monitor/)
+* - **VLA Antenna Position Corrections**
+  - Queried by {func}`~pipeline.hifv.cli.hifv_priorcals` via CASA `gencal` to retrieve antenna position offset tables.
+  - [Pipeline Services Monitor](https://ra-pipeline.github.io/pipeline-services-monitor/)
+* - **VLA Ionospheric TEC Maps (`tec_maps`)**
+  - Queried by {func}`~pipeline.hifv.cli.hifv_priorcals` to download external daily IONEX maps from CDDIS / NASA / IGS servers.
+  - [Pipeline Services Monitor](https://ra-pipeline.github.io/pipeline-services-monitor/)
+```
+
+- [Casaconfig Monitor](https://www.aoc.nrao.edu/~jmarvil/casaconfig-monitor.html): Tracks the synchronization, age,
+  and health of CASA runtime data (casa-data / casaconfig measures, IERS Earth Orientation Parameters, geodetic tables,
+  and upstream FTP/HTTPS tarballs). Maintained by J. Marvil (NRAO).
+- [Pipeline Services Monitor](https://ra-pipeline.github.io/pipeline-services-monitor/): Tracks live operational
+  availability and response latencies of external web services queried by the pipeline during reduction (ALMA flux
+  density, antenna positions, and Jy/K database; VLA antenna positions and TEC maps). Maintained by
+  [`ra-pipeline`](https://github.com/ra-pipeline).
+
 ## Development Tools
 
 ### Environment Management

@@ -89,4 +89,6 @@ manages directories it initialized itself.
 For testing cases that require a specific `casa-data` version: since `casaconfig` does not
 support rollback, use the Git repo approach. Note that versions of certain data (e.g. geodetic
 measures) in a Git checkout may occasionally lag behind those fetched by `casaconfig`'s
-auto-update mechanism from external providers (e.g. the ASTRO FTP server).
+auto-update mechanism from external providers (e.g. the ASTRO or NRAO server). To verify whether
+upstream Measures tables (e.g., IERS EOP prediction and actual tables from ASTRON or NRAO) are
+current and properly synchronized, consult the [casaconfig monitor](https://www.aoc.nrao.edu/~jmarvil/casaconfig-monitor.html).
