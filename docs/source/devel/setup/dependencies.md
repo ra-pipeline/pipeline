@@ -117,10 +117,11 @@ and availability are tracked via two status monitors:
 
 - [Casaconfig Monitor](https://www.aoc.nrao.edu/~jmarvil/casaconfig-monitor.html): Tracks the synchronization, age,
   and health of CASA runtime data (casa-data / casaconfig measures, IERS Earth Orientation Parameters, geodetic tables,
-  and upstream FTP/HTTPS tarballs).
+  and upstream FTP/HTTPS tarballs). Maintained by J. Marvil (NRAO).
 - [Pipeline Services Monitor](https://ra-pipeline.github.io/pipeline-services-monitor/): Tracks live operational
   availability and response latencies of external web services queried by the pipeline during reduction (ALMA flux
-  density, antenna positions, and Jy/K database; VLA antenna positions and TEC maps).
+  density, antenna positions, and Jy/K database; VLA antenna positions and TEC maps). Maintained by
+  [`ra-pipeline`](https://github.com/ra-pipeline).
 
 ## Development Tools
 
