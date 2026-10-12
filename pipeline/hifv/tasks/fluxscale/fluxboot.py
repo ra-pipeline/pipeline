@@ -457,7 +457,7 @@ class Fluxboot(basetask.StandardTaskTemplate):
         for field in calfieldliststrings:
             fieldobj = m.get_fields(field_id=int(field))
             nfldobj = len(fieldobj[0].intents)
-            if (nfldobj == 1 and 'POINTING' in fieldobj[0].intents) or \
+            if not ((nfldobj == 1 and 'POINTING' in fieldobj[0].intents) or \
                (nfldobj == 1 and 'SYSTEM_CONFIGURATION' in fieldobj[0].intents) or \
                (nfldobj == 1 and 'UNSPECIFIED#UNSPECIFIED' in fieldobj[0].intents) or \
                (nfldobj == 2 and 'POINTING' in fieldobj[0].intents and 'SYSTEM_CONFIGURATION' in fieldobj[0].intents) or \
@@ -465,13 +465,8 @@ class Fluxboot(basetask.StandardTaskTemplate):
                (nfldobj == 2 and 'SYSTEM_CONFIGURATION' in fieldobj[0].intents and 'UNSPECIFIED#UNSPECIFIED' in fieldobj[0].intents) or \
                (nfldobj == 3 and 'POINTING' in fieldobj[0].intents and 'SYSTEM_CONFIGURATION' in fieldobj[0].intents and 'UNSPECIFIED#UNSPECIFIED' in fieldobj[0].intents) or \
                (nfldobj > 1 and 'POINTING' in fieldobj[0].intents and 'TARGET' in fieldobj[0].intents and
-                    not any(intent in ['PHASE', 'BANDPASS'] for intent in fieldobj[0].intents)):
+                    not any(intent in ['PHASE', 'BANDPASS'] for intent in fieldobj[0].intents))):
 
-                LOG.warning("Field {!s}: {!s}, "
-                            "has intents {!s}. Due to POINTING/SYS_CONFIG intents, "
-                            "it is not used in the "
-                            "fluxscale() transfer keyword.".format(field, fieldobj[0].name, fieldobj[0].intents))
-            else:
                 calfieldlist.append(field)
 
         fluxscale_result = []
