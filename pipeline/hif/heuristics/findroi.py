@@ -377,6 +377,121 @@ def _findroi_has_unflagged_data(
     return bool(result.get((field_name, 'TARGET'), False))
 
 
+def _findroi_lsrk_frequency_plan(
+    heuristics: Any,
+    vis_list: list[str],
+    field_selector: str,
+    spw_id: int,
+) -> dict[str, Any]:
+    '''Return the standard automatic LSRK cube frequency plan for findROI.'''
+    try:
+        if0, if1, channel_width = heuristics.freq_intersection(
+            vis_list,
+            field_selector,
+            'TARGET',
+            int(spw_id),
+            'LSRK',
+        )
+    except Exception as exc:
+        LOG.warning(
+            'Could not determine the LSRK frequency intersection for field selection %s, spw %s: %s',
+            field_selector,
+            spw_id,
+            str(exc),
+        )
+        return {'valid': False, 'reason': 'frequency_intersection_error'}
+
+    if if0 == -1 or if1 == -1 or channel_width == 0:
+        return {'valid': False, 'reason': 'no_frequency_intersection'}
+
+    # This intentionally mirrors the automatic cube setup in
+    # pipeline/hif/tasks/tclean/tclean.py and pipeline/hif/tasks/findcont/findcont.py.
+    # Keep this local until a future ticket can introduce a shared imaging-grid helper.
+    nchan = int(utils.round_half_up((if1 - if0) / channel_width - 2))
+    if nchan < 1:
+        return {'valid': False, 'reason': 'empty_pruned_frequency_intersection'}
+
+    start_hz = float(if0) + 1.5 * float(channel_width)
+    return {
+        'valid': True,
+        'channel_width_hz': float(channel_width),
+        'start_hz': start_hz,
+        'nchan': nchan,
+    }
+
+
+def _findroi_channel_indices_for_plan(
+    chan_freqs_hz: np.ndarray,
+    frequency_plan: dict[str, Any],
+) -> np.ndarray | None:
+    '''Map a common frequency plan to one compatible temporary-MS axis.'''
+    freq = np.asarray(chan_freqs_hz, dtype=np.float64).ravel()
+    if not frequency_plan.get('valid') or freq.size == 0:
+        return None
+
+    nchan = int(frequency_plan['nchan'])
+    width_hz = abs(float(frequency_plan['channel_width_hz']))
+    targets = float(frequency_plan['start_hz']) + np.arange(nchan, dtype=np.float64) * float(frequency_plan['channel_width_hz'])
+    if freq[0] > freq[-1] and targets[0] < targets[-1]:
+        targets = targets[::-1]
+    elif freq[0] < freq[-1] and targets[0] > targets[-1]:
+        targets = targets[::-1]
+
+    indices = np.asarray([int(np.argmin(np.abs(freq - target))) for target in targets], dtype=np.int64)
+    if indices.size != nchan or np.unique(indices).size != nchan:
+        return None
+    if np.any(np.diff(np.sort(indices)) != 1):
+        return None
+    if width_hz > 0.0 and np.max(np.abs(freq[indices] - targets)) > 0.51 * width_hz:
+        return None
+    return indices
+
+
+def _findroi_lsrk_channel_selection(
+    regridded_ms_paths: list[str],
+    frequency_plan: dict[str, Any],
+) -> dict[str, Any]:
+    '''Find per-EB channel selections for one common temporary-LSRK frequency plan.'''
+    if not frequency_plan.get('valid'):
+        return {'valid': False, 'reason': frequency_plan.get('reason', 'invalid_frequency_plan')}
+
+    if not regridded_ms_paths:
+        return {'valid': False, 'reason': 'no_temporary_axes'}
+
+    width_hz = abs(float(frequency_plan['channel_width_hz']))
+    reference_axis = None
+    indices_by_ms: dict[str, np.ndarray] = {}
+    input_nchan = None
+    for regridded_ms in regridded_ms_paths:
+        try:
+            axis = np.asarray(_get_temp_ms_chan_freqs_hz(regridded_ms, ddid=0), dtype=np.float64).ravel()
+        except Exception as exc:
+            LOG.warning(
+                'Could not read the LSRK channel axis from temporary MS %s: %s',
+                regridded_ms,
+                str(exc),
+            )
+            return {'valid': False, 'reason': 'temporary_axis_read_error'}
+        indices = _findroi_channel_indices_for_plan(axis, frequency_plan)
+        if indices is None:
+            return {'valid': False, 'reason': 'temporary_axis_incompatible'}
+        selected_axis = axis[indices]
+        if input_nchan is None:
+            input_nchan = int(axis.size)
+        if reference_axis is None:
+            reference_axis = selected_axis
+        elif width_hz > 0.0 and np.max(np.abs(selected_axis - reference_axis)) > 0.51 * width_hz:
+            return {'valid': False, 'reason': 'temporary_axes_do_not_agree'}
+        indices_by_ms[str(regridded_ms)] = indices
+
+    return {
+        'valid': True,
+        'indices_by_ms': indices_by_ms,
+        'chan_freqs_hz': reference_axis,
+        'input_nchan': input_nchan,
+    }
+
+
 def _field_task_arg(field: str | int | list[int | str] | tuple[int | str, ...] | None) -> str | int | None:
     '''Normalize explicit field selection into one CASA-style task argument.'''
     if field is None or field in ('', 'target', 'target_groups'):
@@ -2982,6 +3097,12 @@ def _prepare_regridded_ms(
     return bin_ms_out, regridded_ms, (t1 - t0), (t2 - t1)
 
 
+def _is_empty_mstransform_selection_error(exc: Exception) -> bool:
+    '''Return whether a CASA mstransform failure indicates an empty selection.'''
+    message = str(exc)
+    return 'MSSelectionNullSelection' in message or 'selected table has zero rows' in message
+
+
 def _read_regridded_field(
     regridded_ms: str,
     field_id: int,
@@ -3454,6 +3575,7 @@ def _process_spw(
     source_outframe: dict[int, str] | None = None,
     field_phase_centers: dict[int, tuple[float, float]] | None = None,
     field_ephemeris_paths: dict[int, str] | None = None,
+    lsrk_frequency_plans: dict[int, dict[str, Any]] | None = None,
     products_dir: str | None = None,
     dish_diameter_m: float = 12.0,
     timebin_sec: float = 240,
@@ -3500,9 +3622,13 @@ def _process_spw(
     source_names_by_id = {int(k): str(v) for k, v in (source_names_by_id or {}).items()}
     field_names_by_id = {int(k): str(v) for k, v in (field_names_by_id or {}).items()}
     field_ephemeris_paths = {int(k): str(v) for k, v in (field_ephemeris_paths or {}).items()}
+    lsrk_frequency_plans = {int(k): dict(v) for k, v in (lsrk_frequency_plans or {}).items()}
     source_stitch_meta: dict[int, dict[str, Any]] = {}
     source_stitch_states: dict[int, dict[str, Any]] = {}
     source_regridded_ms_paths: dict[int, list[str]] = {int(source_id): [] for source_id in field_groups.keys()}
+    field_chunk_ms_paths: dict[int, dict[int, list[str]]] = {
+        int(source_id): {} for source_id in field_groups.keys()
+    }
     common_geometry_plan = {int(k): dict(v) for k, v in (common_geometry_plan or {}).items()}
     mstransform_bin_s = 0.0
     mstransform_regrid_s = 0.0
@@ -3520,17 +3646,29 @@ def _process_spw(
             cache_key = (outframe, None if outframe == 'LSRK' else int(source_id))
             if cache_key not in ms_cache:
                 frame_tag = f'{tag}_eb{eb_idx}' if outframe == 'LSRK' else f'{tag}_src{int(source_id)}_eb{eb_idx}'
-                _, regridded_ms, dt_bin, dt_regrid = _prepare_regridded_ms(
-                    vis,
-                    real_spw_id,
-                    outframe,
-                    timebin_sec,
-                    tmp_dir,
-                    frame_tag,
-                    antenna=antenna_selection,
-                    executor=executor,
-                    overwrite=tmp_overwrite,
-                )
+                try:
+                    _, regridded_ms, dt_bin, dt_regrid = _prepare_regridded_ms(
+                        vis,
+                        real_spw_id,
+                        outframe,
+                        timebin_sec,
+                        tmp_dir,
+                        frame_tag,
+                        antenna=antenna_selection,
+                        executor=executor,
+                        overwrite=tmp_overwrite,
+                    )
+                except Exception as exc:
+                    if not _is_empty_mstransform_selection_error(exc):
+                        raise
+                    LOG.warning(
+                        'Skipping empty hif_findroi selection for EB %s, spw %s, source %s: %s',
+                        os.path.basename(vis),
+                        spw_name,
+                        source_id,
+                        str(exc),
+                    )
+                    continue
                 ms_cache[cache_key] = (regridded_ms, float(dt_bin), float(dt_regrid))
                 source_regridded_ms_paths.setdefault(int(source_id), []).append(str(regridded_ms))
                 if verbose:
@@ -3559,15 +3697,82 @@ def _process_spw(
             _profile_logf(tmp_dir, 'process_spw bulk_read spw=%s eb=%s source=%s n_fields=%s dt=%.3f', spw_name, eb_idx, source_id, len(fids), (time.perf_counter() - t_read_fields))
             for field_id, chunk in chunks_by_field.items():
                 spectra_by_source[source_id].setdefault(field_id, []).append(chunk)
+                field_chunk_ms_paths[source_id].setdefault(int(field_id), []).append(str(regridded_ms))
 
     results = {'spw_id': spw_id, 'spw_name': spw_name, 'sources': {}}
 
     for source_id, field_chunks in spectra_by_source.items():
         results['sources'].setdefault(source_id, {})
         outframe = str(source_outframe.get(int(source_id), 'LSRK'))
-        regrid_outframe = 'GEO' if outframe == 'SOURCE' else outframe
-        frame_tag = f'{tag}_eb0' if outframe == 'LSRK' else f'{tag}_src{int(source_id)}_eb0'
-        frame_token = regrid_outframe.lower()
+        source_chunk_ms_paths: list[str] = []
+        for field_id in field_chunks:
+            for regridded_ms in field_chunk_ms_paths[int(source_id)].get(int(field_id), []):
+                if regridded_ms not in source_chunk_ms_paths:
+                    source_chunk_ms_paths.append(regridded_ms)
+        lsrk_channel_selection = None
+        if outframe == 'LSRK':
+            frequency_plan = lsrk_frequency_plans.get(int(source_id))
+            if frequency_plan is None:
+                _rank_logf(
+                    tmp_dir,
+                    '[warn] no LSRK frequency plan for spw=%s source=%s; skipping source',
+                    spw_name,
+                    source_id,
+                )
+                continue
+            if not frequency_plan.get('valid'):
+                reason = frequency_plan.get('reason', 'invalid_frequency_plan')
+                if reason != 'frequency_intersection_error':
+                    _rank_logf(
+                        tmp_dir,
+                        '[warn] no usable LSRK frequency intersection for spw=%s source=%s reason=%s; skipping source',
+                        spw_name,
+                        source_id,
+                        reason,
+                    )
+                    continue
+                source_name = source_names_by_id.get(int(source_id), f'source_{int(source_id)}')
+                LOG.warning(
+                    'Could not determine a common LSRK frequency range for hif_findroi source %s, spw %s; retaining the unpruned frequency axis.',
+                    source_name,
+                    spw_name,
+                )
+                _rank_logf(
+                    tmp_dir,
+                    '[warn] LSRK frequency intersection failed for spw=%s source=%s; retaining the unpruned axis',
+                    spw_name,
+                    source_id,
+                )
+            else:
+                lsrk_channel_selection = _findroi_lsrk_channel_selection(
+                    source_chunk_ms_paths,
+                    frequency_plan,
+                )
+                if lsrk_channel_selection.get('valid'):
+                    _rank_logf(
+                        tmp_dir,
+                        '[findroi] spw=%s source=%s LSRK channel selection input_nchan=%s output_nchan=%s',
+                        spw_name,
+                        source_id,
+                        lsrk_channel_selection['input_nchan'],
+                        len(lsrk_channel_selection['chan_freqs_hz']),
+                    )
+                else:
+                    source_name = source_names_by_id.get(int(source_id), f'source_{int(source_id)}')
+                    LOG.warning(
+                        'Temporary LSRK channel axes do not support one common selection for hif_findroi source %s, spw %s (reason=%s); retaining the unpruned frequency axis.',
+                        source_name,
+                        spw_name,
+                        lsrk_channel_selection.get('reason', 'unknown'),
+                    )
+                    _rank_logf(
+                        tmp_dir,
+                        '[warn] temporary LSRK axes do not support one common channel selection for spw=%s source=%s reason=%s; retaining the unpruned axis',
+                        spw_name,
+                        source_id,
+                        lsrk_channel_selection.get('reason', 'unknown'),
+                    )
+                    lsrk_channel_selection = None
         geometry_plan = common_geometry_plan.get(int(source_id), {})
         chan_freqs_hz = None
         chan_freqs_geo_hz = None
@@ -3576,7 +3781,13 @@ def _process_spw(
         axis_field_id = int(sorted(field_chunks.keys())[0]) if field_chunks else None
         source_axis_diag = None
         try:
-            freqs = _get_temp_ms_chan_freqs_hz(os.path.join(tmp_dir, f'tmp_{frame_tag}_{frame_token}.ms'), ddid=0)
+            regridded_ms_paths = (
+                source_regridded_ms_paths.get(int(source_id), [])
+                if outframe == 'SOURCE' else source_chunk_ms_paths
+            )
+            if not regridded_ms_paths:
+                raise RuntimeError('No successful regridded MS is available for this source.')
+            freqs = _get_temp_ms_chan_freqs_hz(regridded_ms_paths[0], ddid=0)
             chan_freqs_geo_hz = np.asarray(freqs, dtype=np.float64).ravel()
             if outframe == 'SOURCE':
                 if axis_field_id is None:
@@ -3590,7 +3801,10 @@ def _process_spw(
                     ephem_path=field_ephemeris_paths.get(int(axis_field_id)),
                 )
             else:
-                chan_freqs_hz = chan_freqs_geo_hz.copy()
+                if lsrk_channel_selection is not None:
+                    chan_freqs_hz = lsrk_channel_selection['chan_freqs_hz'].copy()
+                else:
+                    chan_freqs_hz = chan_freqs_geo_hz.copy()
             ref_freq_hz = float(np.median(chan_freqs_hz))
             df = np.diff(chan_freqs_hz)
             chan_width_hz = float(np.median(df)) if df.size else None
@@ -3600,12 +3814,37 @@ def _process_spw(
             chan_freqs_geo_hz = None
             ref_freq_hz = None
             chan_width_hz = None
+        if lsrk_channel_selection is not None:
+            chunk_mapping_valid = all(
+                len(field_chunk_ms_paths[int(source_id)].get(int(field_id), [])) == len(chunks)
+                for field_id, chunks in field_chunks.items()
+            )
+            if not chunk_mapping_valid:
+                source_name = source_names_by_id.get(int(source_id), f'source_{int(source_id)}')
+                LOG.warning(
+                    'Could not match hif_findroi source %s visibility chunks to temporary LSRK MS products; retaining the unpruned frequency axis.',
+                    source_name,
+                )
+                lsrk_channel_selection = None
+                chan_freqs_hz = chan_freqs_geo_hz.copy()
+                ref_freq_hz = float(np.median(chan_freqs_hz))
+                df = np.diff(chan_freqs_hz)
+                chan_width_hz = float(np.median(df)) if df.size else None
         is_mosaic_source = bool(source_is_mosaic.get(int(source_id), False))
         template_artifacts: dict[str, str] = {}
         for field_id, chunks in field_chunks.items():
             t_field = time.perf_counter()
             t_concat = time.perf_counter()
-            d_preload = _concat_preloaded(chunks)
+            chunks_for_concat = chunks
+            if lsrk_channel_selection is not None:
+                chunk_ms_paths = field_chunk_ms_paths[int(source_id)].get(int(field_id), [])
+                chunks_for_concat = []
+                for chunk, regridded_ms in zip(chunks, chunk_ms_paths):
+                    indices = lsrk_channel_selection['indices_by_ms'][str(regridded_ms)]
+                    selected_chunk = dict(chunk)
+                    selected_chunk['V'] = chunk['V'][:, indices]
+                    chunks_for_concat.append(selected_chunk)
+            d_preload = _concat_preloaded(chunks_for_concat)
             _profile_logf(tmp_dir, 'process_spw concat spw=%s source=%s field=%s n_chunks=%s nrows=%s dt=%.3f', spw_name, source_id, field_id, len(chunks), int(d_preload['V'].shape[0]), (time.perf_counter() - t_concat))
             if ref_freq_hz is None or chan_width_hz is None:
                 _rank_logf(
@@ -4159,14 +4398,16 @@ def run_findroi_mpi(
 
     args = []
     target_field_names = utils.deduplicate(field_names_by_id.values())
+    canonical_vis_list = list(getattr(data_heuristics, 'vislist', vis_list))
     for ddid, spw_name, virtual_spw_id in sci_spw:
-        has_unflagged_data = False
-        has_inconclusive_probe = False
+        usable_vis_list = []
         for vis_name in vis_list:
+            vis_has_unflagged_data = False
+            vis_has_inconclusive_probe = False
             for field_name in target_field_names:
                 probe_result = _findroi_has_unflagged_data(data_heuristics, vis_name, field_name, int(virtual_spw_id))
                 if probe_result is True:
-                    has_unflagged_data = True
+                    vis_has_unflagged_data = True
                     break
                 elif probe_result is False:
                     LOG.debug(
@@ -4176,20 +4417,108 @@ def run_findroi_mpi(
                         virtual_spw_id,
                     )
                 else:
-                    has_inconclusive_probe = True
-            if has_unflagged_data:
-                break
-        if not has_unflagged_data and not has_inconclusive_probe:
+                    vis_has_inconclusive_probe = True
+            if vis_has_unflagged_data or vis_has_inconclusive_probe:
+                usable_vis_list.append(vis_name)
+            else:
+                LOG.warning(
+                    'No unflagged data found in EB %s for virtual spw %s; skipping EB.',
+                    os.path.basename(vis_name),
+                    virtual_spw_id,
+                )
+        if not usable_vis_list:
             LOG.warning('No unflagged data found in any EB/field for virtual spw %s; skipping.', virtual_spw_id)
             continue
+        # This is the local findROI equivalent of the automatic cube-frequency
+        # selection performed by the tclean and findcont tasks. Keep it here
+        # until a future ticket can provide a shared imaging-grid helper.
+        # SOURCE is intentionally excluded: its custom GEO-to-SOURCE correction
+        # below must continue to define the ephemeris channel axis.
+        lsrk_frequency_plans = {}
+        for source_id in field_groups:
+            if str(project_outframes.get(int(source_id), 'LSRK')).upper() == 'SOURCE':
+                continue
+            source_field_names = utils.deduplicate(
+                field_names_by_id[int(field_id)]
+                for field_id in field_groups[int(source_id)]
+                if field_names_by_id.get(int(field_id), '')
+            )
+            source_name = source_names_by_id.get(int(source_id), f'source_{int(source_id)}')
+            # hif_tclean passes one canonical field name to freq_intersection().
+            # imageparams_base.field() does not split comma-separated field names;
+            # for a mosaic, one FIELD name identifies all pointings with that name.
+            # Keep this local adapter aligned with that behavior rather than
+            # passing the same mosaic name once per field ID.
+            if len(source_field_names) == 1:
+                source_field_selector = source_field_names[0]
+            elif not source_field_names:
+                LOG.warning(
+                    'Could not determine field selection for hif_findroi source %s, virtual spw %s; skipping source.',
+                    source_name,
+                    virtual_spw_id,
+                )
+                lsrk_frequency_plans[int(source_id)] = {
+                    'valid': False,
+                    'reason': 'source_field_selection_error',
+                }
+                continue
+            else:
+                LOG.warning(
+                    'Multiple field names %s found for hif_findroi source %s, virtual spw %s; '
+                    'retaining the unpruned frequency axis.',
+                    ','.join(source_field_names),
+                    source_name,
+                    virtual_spw_id,
+                )
+                lsrk_frequency_plans[int(source_id)] = {
+                    'valid': False,
+                    'reason': 'multiple_source_field_names',
+                }
+                continue
+            try:
+                _, source_vis_indices = data_heuristics.get_scanidlist(
+                    canonical_vis_list,
+                    source_field_selector,
+                    'TARGET',
+                )
+            except Exception as exc:
+                LOG.warning(
+                    'Could not determine the EBs containing hif_findroi source %s, virtual spw %s: %s',
+                    source_name,
+                    virtual_spw_id,
+                    str(exc),
+                )
+                lsrk_frequency_plans[int(source_id)] = {
+                    'valid': False,
+                    'reason': 'source_visibility_selection_error',
+                }
+                continue
+            source_vis_list = [canonical_vis_list[i] for i in source_vis_indices]
+            if not source_vis_list:
+                LOG.warning(
+                    'No EBs contain hif_findroi source %s for virtual spw %s; skipping frequency plan.',
+                    source_name,
+                    virtual_spw_id,
+                )
+                lsrk_frequency_plans[int(source_id)] = {
+                    'valid': False,
+                    'reason': 'no_source_visibility',
+                }
+                continue
+            lsrk_frequency_plans[int(source_id)] = _findroi_lsrk_frequency_plan(
+                data_heuristics,
+                source_vis_list,
+                source_field_selector,
+                int(virtual_spw_id),
+            )
         spw_ids_by_vis = _real_spw_ids_by_vis(
             context,
-            vis_list,
+            usable_vis_list,
             virtual_spw_id=virtual_spw_id,
             fallback_spw_id=int(ddid_rows[int(ddid)]['spw_id']),
         )
         corr_axis_by_vis = {}
-        for vis_name in vis_list:
+        for vis_name in usable_vis_list:
             real_spw_id = int(spw_ids_by_vis.get(
                 vis_name,
                 spw_ids_by_vis.get(os.path.basename(os.path.normpath(vis_name)), int(ddid_rows[int(ddid)]['spw_id'])),
@@ -4200,11 +4529,12 @@ def run_findroi_mpi(
                 str(corr) for corr in getattr(data_description, 'corr_axis', ())
             )
         args.append((
-            vis_list, ddid, spw_name, spw_ids_by_vis, corr_axis_by_vis,
+            usable_vis_list, ddid, spw_name, spw_ids_by_vis, corr_axis_by_vis,
             int(ddid_rows[int(ddid)]['spw_id']), field_groups,
             antenna_selections_by_vis,
             source_names_by_id, field_names_by_id,
-            common_geometry_plan, project_outframes, field_phase_centers, field_ephemeris_paths, products_dir, dish_diameter_m,
+            common_geometry_plan, project_outframes, field_phase_centers, field_ephemeris_paths,
+            lsrk_frequency_plans, products_dir, dish_diameter_m,
             timebin_sec_eff, npix_eff, fov_pb_mult_eff,
             ref_sigma, mom0_thresh_sigma, gate_sigma,
             ref_zero_frac_thr, mom0_zero_frac_thr,
