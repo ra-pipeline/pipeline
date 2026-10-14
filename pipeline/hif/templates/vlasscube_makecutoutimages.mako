@@ -277,10 +277,10 @@ $(function () {
       <%
       type_item_scale=[('image','peak',1e3),
                   ('image','madrms',1e3),
-                  ('image','max/madrms',1),
+                  ('image','peak/madrms',1),
                   ('residual','peak',1e3),
                   ('residual','madrms',1e3),
-                  ('residual','max/madrms',1),
+                  ('residual','peak/madrms',1),
                   ('rms','max',1e3),
                   ('rms','median',1e3),
                   ('rms','pct<800e-6',1e2),
