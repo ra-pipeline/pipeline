@@ -20,7 +20,7 @@ import shutil
 import string
 import tarfile
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import datetime, timezone
 from functools import wraps
 from numbers import Number
@@ -34,7 +34,7 @@ from pipeline.infrastructure import casa_tools
 from .conversion import commafy, dequote, range_to_list
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Collection, Iterator, Sequence
+    from collections.abc import Callable, Collection, Iterator
     from io import TextIOWrapper
     from typing import Any, DefaultDict, OrderedDict
 
@@ -326,14 +326,14 @@ def get_spectralspec_to_spwid_map(spws: Collection) -> DefaultDict[str | None, l
 
 
 def imstat_items(
-        image: Any,
-        items: list[str] = ['min', 'max'],
-        mask: str | None = None,
-        ) -> OrderedDict[str, Any]:
+    image: Any,
+    items: Sequence[str] = ('min', 'max'),
+    mask: str | None = None,
+) -> OrderedDict[str, Any]:
     """Extract desired stats properties (per Stokes) using ia.statistics().
 
-    Beside the standard output, some additional stats property keys are supported.
-    Note: 'image' is expected to an instance of CASA ia tool.
+    Besides the standard output, some additional stats property keys are supported.
+    Note: 'image' is expected to be an instance of CASA ia tool.
     """
 
     imstats = image.statistics(robust=True, axes=[0, 1, 3], mask=mask)
@@ -341,27 +341,28 @@ def imstat_items(
 
     for item in items:
         if item.lower() == 'madrms':
-            stats['madrms'] = imstats['medabsdevmed']*1.4826  # see CAS-9631
+            stats['madrms'] = imstats['medabsdevmed'] * 1.4826  # see CAS-9631
         elif item.lower() == 'max/madrms':
-            stats['max/madrms'] = imstats['max']/imstats['medabsdevmed']*1.4826  # see CAS-9631
+            madrms = imstats['medabsdevmed'] * 1.4826  # see CAS-9631
+            stats['max/madrms'] = imstats['max'] / madrms
         elif item.lower() == 'maxabs':
             stats['maxabs'] = np.maximum(np.abs(imstats['max']), np.abs(imstats['min']))
         elif 'pct<' in item:
             threshold = float(item.replace('pct<', ''))
             imstats_threshold = image.statistics(robust=True, axes=[0, 1, 3], includepix=[0, threshold], mask=mask)
             if len(imstats_threshold['npts']) == 0:
-                # if no pixel is selected from the restricted pixel value range, the return of ia.statitics() would be empty.
-                imstats_threshold['npts'] = np.zeros(4)
-            stats[item] = imstats_threshold['npts']/imstats['npts']
+                # if no pixel is selected from the restricted pixel value range, the return of ia.statistics() would be empty.
+                imstats_threshold['npts'] = np.zeros_like(imstats['npts'])
+            stats[item] = imstats_threshold['npts'] / imstats['npts']
         elif item.lower() == 'pct_masked':
-            im_shape = (imstats['trc']-imstats['blc'])+1
-            stats[item] = 1.-imstats['npts']/im_shape[0]/im_shape[1]
+            im_shape = (imstats['trc'] - imstats['blc']) + 1
+            stats[item] = 1.0 - imstats['npts'] / im_shape[0] / im_shape[1]
         elif item.lower() == 'peak':  # Here 'peak' means the pixel value with largest deviation from zero.
             stats[item] = np.where(np.abs(imstats['max']) > np.abs(imstats['min']), imstats['max'], imstats['min'])
         elif item.lower() == 'peak/madrms':
             peak = np.where(np.abs(imstats['max']) > np.abs(imstats['min']), imstats['max'], imstats['min'])
-            madrms = imstats['medabsdevmed']*1.4826  # see CAS-9631
-            stats['peak/madrms'] = peak/madrms
+            madrms = imstats['medabsdevmed'] * 1.4826  # see CAS-9631
+            stats['peak/madrms'] = peak / madrms
         else:
             stats[item] = imstats[item.lower()]
 

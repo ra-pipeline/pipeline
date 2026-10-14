@@ -16,7 +16,7 @@ from pipeline.infrastructure.utils import caltable_tools
 from .utils import find_ranges, dict_merge, are_equal, approx_equal, flagged_intervals, \
     get_casa_quantity, fieldname_for_casa, fieldname_clean, \
     get_field_accessor, get_field_identifiers, get_receiver_type_for_spws, place_repr_source_first, \
-    get_taskhistory_fromimage, list_to_str, build_refantignore, wrap_long_str
+    get_taskhistory_fromimage, list_to_str, build_refantignore, wrap_long_str, imstat_items
 
 if TYPE_CHECKING:
     from typing import Any
@@ -353,3 +353,45 @@ def test_build_refantignore(refantignore, ignorerefant, expected):
 def test_wrap_long_str(item_str, kwargs, expected):
     """Test wrap_long_str() and verify it is exported in pipeline.infrastructure.utils."""
     assert wrap_long_str(item_str, **kwargs) == expected
+
+
+def test_imstat_items_basic():
+    """Test imstat_items() extraction of basic and derived statistics."""
+    image_mock = Mock()
+    image_mock.statistics.return_value = {
+        'min': np.array([-2.0]),
+        'max': np.array([10.0]),
+        'medabsdevmed': np.array([2.0]),
+        'trc': np.array([99, 99, 0, 0]),
+        'blc': np.array([0, 0, 0, 0]),
+        'npts': np.array([10000]),
+    }
+
+    # Test default items
+    default_stats = imstat_items(image_mock)
+    assert 'min' in default_stats and 'max' in default_stats
+    assert default_stats['max'][0] == 10.0
+
+    # Test madrms and max/madrms
+    stats = imstat_items(image_mock, items=['madrms', 'max/madrms', 'peak', 'peak/madrms'])
+    expected_madrms = 2.0 * 1.4826
+    expected_max_madrms = 10.0 / expected_madrms
+    np.testing.assert_allclose(stats['madrms'], expected_madrms)
+    np.testing.assert_allclose(stats['max/madrms'], expected_max_madrms)
+    np.testing.assert_allclose(stats['peak'], 10.0)
+    np.testing.assert_allclose(stats['peak/madrms'], expected_max_madrms)
+
+
+def test_imstat_items_pct_threshold():
+    """Test imstat_items() with pct< item when no pixels match."""
+    image_mock = Mock()
+    # Image with single Stokes plane
+    image_mock.statistics.side_effect = [
+        {'npts': np.array([1000])},  # first call: overall stats
+        {'npts': np.array([])},       # second call: threshold stats (empty)
+    ]
+    stats = imstat_items(image_mock, items=['pct<1e-4'])
+    assert 'pct<1e-4' in stats
+    assert stats['pct<1e-4'].shape == (1,)
+    assert stats['pct<1e-4'][0] == 0.0
+
