@@ -602,9 +602,10 @@ class TsysData(object):
                 continue  # normal, single-role field: unaffected by this case.
 
             bp_scans = [
-                s for s in msmd.scansforintent("CALIBRATE_BANDPASS#ON_SOURCE")
-                if fieldnumbers_for_fieldname[0] in msmd.fieldsforscan(s)
-            ]
+                    s for s in msmd.scansforintent("CALIBRATE_BANDPASS#ON_SOURCE")
+                    if any(f in msmd.fieldsforscan(s) for f in fieldnumbers_for_fieldname)
+                ]
+
             assert bp_scans, (
                 f"No CALIBRATE_BANDPASS#ON_SOURCE scan found for field "
                 f"'{fieldname}', which is expected to be the bandpass source."
@@ -762,6 +763,7 @@ class TsysData(object):
                 "%s not found in this dataset. Available intents: " % (intent),
                 allIntents,
             )
+    @staticmethod
     def _tsysmap_from_context(context, vis, tsystable, intent="TARGET"):
         """
         Retrieve the Tsys spwmap that h_tsyscal already computed and
