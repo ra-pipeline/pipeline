@@ -215,11 +215,12 @@ def get_vlass_metadata(imagename: str, stats: dict, parameters: dict) -> dict:
     else:
         vlass_im_mode = 'VLASS-QL'
 
+    # Nominal bandwidth: 128 MHz for CC products, 2 GHz for SE and QL products
     if vlass_im_mode == 'VLASS-SE-CUBE':
-        bandwidth = 2000000000
+        bandwidth = 128000000
         stokes = ''
     else:
-        bandwidth = 128000000
+        bandwidth = 2000000000
         stokes = 'I'
 
     im_type = get_vlass_image_type(imagename)
