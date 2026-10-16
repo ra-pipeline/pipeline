@@ -4,6 +4,7 @@
 :maxdepth: 1
 
 context_domain_objects
+datatypes
 callibrary
 versioning
 logging

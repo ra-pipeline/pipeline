@@ -80,45 +80,89 @@
         init();
     }
 
-    // --- Mermaid reset-zoom buttons ---
-    // sphinxcontrib-mermaid with mermaid_d3_zoom=True wraps each diagram in a
-    // <div class="mermaid-d3pan"> that owns an internal SVG managed by d3-zoom.
-    // We inject a small reset button that calls svg.__zoom.invert() to restore
-    // the identity transform.
-    function addMermaidResetButtons() {
-        document.querySelectorAll('.mermaid').forEach(function (container) {
-            // Avoid double-injection on re-renders.
-            if (container.parentElement.querySelector('.mermaid-reset-btn')) return;
+    // --- Mermaid Pan/Zoom and Toolbar Controls ---
+    function setupMermaidControls() {
+        // 1. Process all in-page mermaid containers
+        document.querySelectorAll('.mermaid-container').forEach(function (container) {
+            var svg = container.querySelector('.mermaid svg') || container.querySelector('svg');
+            if (!svg) return;
 
-            var btn = document.createElement('button');
-            btn.className = 'mermaid-reset-btn';
-            btn.setAttribute('title', 'Reset zoom');
-            btn.textContent = '\u21BA';  // ↺
-            btn.addEventListener('click', function () {
-                var svg = container.querySelector('svg');
-                if (!svg) return;
-                var g = svg.querySelector('g');
+            // Ensure diagram is centered in container
+            svg.style.display = 'block';
+            svg.style.marginLeft = 'auto';
+            svg.style.marginRight = 'auto';
+
+            // Prevent mouse wheel from hijacking normal web page scrolling:
+            // Remove wheel.zoom listener ONLY on in-page diagrams.
+            // Click & drag panning and double-click zoom remain fully active!
+            if (window.d3) {
+                window.d3.select(svg).on('wheel.zoom', null);
+            }
+
+            // Avoid duplicate reset button
+            if (container.querySelector('.mermaid-reset-btn')) return;
+
+            var resetBtn = document.createElement('button');
+            resetBtn.className = 'mermaid-reset-btn';
+            resetBtn.setAttribute('title', 'Reset pan/zoom');
+            resetBtn.setAttribute('aria-label', 'Reset diagram pan and zoom');
+            resetBtn.textContent = '\u21BA'; // ↺
+
+            resetBtn.addEventListener('click', function () {
+                var g = svg.querySelector('g.wrapper') || svg.querySelector('g');
                 if (g) g.setAttribute('transform', 'translate(0,0) scale(1)');
-                if (svg.__zoom) svg.__zoom = window.d3 ? window.d3.zoomIdentity : {k:1, x:0, y:0};
+                if (window.d3) {
+                    window.d3.select(svg).call(window.d3.zoom().transform, window.d3.zoomIdentity);
+                } else if (svg.__zoom) {
+                    svg.__zoom = { k: 1, x: 0, y: 0 };
+                }
             });
 
-            var wrapper = document.createElement('div');
-            wrapper.className = 'mermaid-zoom-wrapper';
-            container.parentNode.insertBefore(wrapper, container);
-            wrapper.appendChild(container);
-            wrapper.appendChild(btn);
+            // Insert reset button right next to the fullscreen button in the same container
+            var fsBtn = container.querySelector('.mermaid-fullscreen-btn');
+            if (fsBtn) {
+                container.insertBefore(resetBtn, fsBtn);
+            } else {
+                container.appendChild(resetBtn);
+            }
         });
     }
+
+    // Add reset button inside fullscreen lightbox modal when opened
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.closest('.mermaid-fullscreen-btn')) {
+            setTimeout(function () {
+                var modalContainer = document.querySelector('.mermaid-container-fullscreen');
+                if (!modalContainer || modalContainer.querySelector('.mermaid-modal-reset-btn')) return;
+
+                var resetModalBtn = document.createElement('button');
+                resetModalBtn.className = 'mermaid-modal-reset-btn';
+                resetModalBtn.setAttribute('title', 'Reset pan/zoom');
+                resetModalBtn.setAttribute('aria-label', 'Reset pan and zoom');
+                resetModalBtn.textContent = '\u21BA'; // ↺
+                resetModalBtn.addEventListener('click', function () {
+                    var modalSvg = modalContainer.querySelector('svg');
+                    if (!modalSvg) return;
+                    var g = modalSvg.querySelector('g.wrapper') || modalSvg.querySelector('g');
+                    if (g) g.setAttribute('transform', 'translate(0,0) scale(1)');
+                    if (window.d3) {
+                        window.d3.select(modalSvg).call(window.d3.zoom().transform, window.d3.zoomIdentity);
+                    }
+                });
+                modalContainer.appendChild(resetModalBtn);
+            }, 150);
+        }
+    });
 
     // Mermaid renders asynchronously; poll briefly until diagrams appear.
     function waitForMermaid() {
         var attempts = 0;
         var interval = setInterval(function () {
-            if (document.querySelector('.mermaid svg') || ++attempts > 40) {
+            if (document.querySelector('.mermaid-container svg') || ++attempts > 40) {
                 clearInterval(interval);
-                addMermaidResetButtons();
+                setupMermaidControls();
             }
-        }, 250);
+        }, 200);
     }
 
     if (document.readyState === 'loading') {
