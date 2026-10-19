@@ -315,20 +315,19 @@ figure figcaption, .figure figcaption, .caption-text {
 /* Ensure Mermaid diagrams fit content tightly, center horizontally, and stay well-proportioned */
 .mermaid-container:not(.mermaid-container-fullscreen),
 pre.mermaid:not(.mermaid-container-fullscreen *) {
-    display: flex !important;
-    justify-content: center !important;
+    display: block !important;
     text-align: center !important;
     width: 100% !important;
     margin: 1.5rem 0 !important;
 }
 
 .mermaid-container:not(.mermaid-container-fullscreen) > pre {
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
+    display: block !important;
     text-align: center !important;
     width: 100% !important;
     margin: 0 !important;
+    padding-top: 36px !important;
+    overflow-x: auto !important;
 }
 
 .mermaid-container:not(.mermaid-container-fullscreen) pre > svg,
@@ -338,10 +337,8 @@ pre.mermaid:not(.mermaid-container-fullscreen *) > svg,
     display: block !important;
     margin-left: auto !important;
     margin-right: auto !important;
-    width: auto !important;
-    max-width: 100% !important;
-    height: auto !important;
-    max-height: 800px !important;
+    max-width: 100%;
+    height: auto;
 }
 
 /* === Mermaid Controls & Button Toolbar === */

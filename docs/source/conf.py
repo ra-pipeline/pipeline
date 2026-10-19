@@ -279,7 +279,7 @@ html_js_files = [
 # -- Options for Mermaid output ---------------------------------------
 
 mermaid_d3_zoom = True
-mermaid_include_elk = True
+mermaid_include_elk = False
 mermaid_include_zenuml = False
 mermaid_height = 'auto'
 myst_fence_as_directive = ['mermaid']

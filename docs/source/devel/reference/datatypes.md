@@ -1,14 +1,14 @@
 # DataType Design
 
-This document describes how pipeline data types (`DataType`) are represented, updated, persisted, and queried across the pipeline workflow lifecycle.
+This document describes how pipeline data types ({class}`~pipeline.domain.DataType`) are represented, updated, persisted, and queried across the pipeline workflow lifecycle.
 
-Originally, the pipeline assumed visibility data lived either in `'DATA'` (for raw data) or `'CORRECTED_DATA'` (for calibrated data). With the addition of science target splitting (`_targets.ms`), continuum subtraction (`_targets_line.ms`), and self-calibration ({func}`~pipeline.hif.cli.hif_selfcal`), visibilities in `'DATA'` or `'CORRECTED_DATA'` can represent different data states in various reduction stages. The `DataType` design tracks these calibration states so that downstream tasks (such as imaging) can automatically select the appropriate columns and datasets per field and spectral window without hardcoding column information or explicit task input instructions.
+Originally, the pipeline assumed visibility data lived either in `'DATA'` (for raw data) or `'CORRECTED_DATA'` (for calibrated data). With the addition of science target splitting (`_targets.ms`), continuum subtraction (`_targets_line.ms`), and self-calibration ({func}`~pipeline.hif.cli.hif_selfcal`), visibilities in `'DATA'` or `'CORRECTED_DATA'` can represent different data states in various reduction stages. The `DataType` design tracks these calibration states so that downstream tasks (such as {func}`~pipeline.hif.cli.hif_makeimlist`) can automatically select the appropriate columns and datasets per field and spectral window without hardcoding column information or explicit task input instructions.
 
 ---
 
 ## Visibility Data Types
 
-Visibility types are defined by the {class}`~pipeline.domain.DataType` enum in {mod}`pipeline.domain.datatype`:
+Visibility types are defined by the {class}`~pipeline.domain.DataType` enum in {mod}`pipeline.domain`:
 
 * `RAW`: Uncalibrated visibility data.
 * `REGCAL_CONTLINE_ALL`: Standard-calibrated data containing both continuum and lines for all targets and calibrators.
@@ -35,13 +35,13 @@ Each {class}`~pipeline.domain.MeasurementSet` domain object tracks datatype stat
 
 These dictionaries are managed through:
 
-* {meth}`~pipeline.domain.MeasurementSet.set_data_column` `(dtype, column, source=None, spw=None, overwrite=False, save_to_ms=True)`
-* {meth}`~pipeline.domain.MeasurementSet.get_data_column` `(dtype, source=None, spw=None)`
-* {meth}`~pipeline.domain.MeasurementSet.get_data_type` `(column, source=None, spw=None)`
+* {meth}`~pipeline.domain.MeasurementSet.set_data_column`
+* {meth}`~pipeline.domain.MeasurementSet.get_data_column`
+* {meth}`~pipeline.domain.MeasurementSet.get_data_type`
 
 ### On-Disk Persistence (MS `HISTORY` Table)
 
-Starting in **v2025.1.0** (PL2025) (via {jira}`PIPE-2432`), whenever {meth}`~pipeline.domain.MeasurementSet.set_data_column` is called with `save_to_ms=True` (the default), the pipeline persists both dictionaries into the MS `HISTORY` subtable under `origin="Datatype Handler"`:
+Starting in **v2025.1.0** ({jira}`PIPE-2432`), whenever {meth}`~pipeline.domain.MeasurementSet.set_data_column` is called with `save_to_ms=True` (the default), the pipeline persists both dictionaries into the MS `HISTORY` subtable under `origin="Datatype Handler"`:
 
 ```text
 data_type_per_column = {'RAW': 'DATA', ...}
@@ -53,16 +53,12 @@ data_types_per_source_and_spw = {('FIELD_A', 0): ['RAW'], ...}
 You can inspect the persisted datatypes directly from Python using pipeline heuristics without loading a full pipeline context:
 
 ```python
-from pprint import pprint
 from pipeline.infrastructure import tablereader
 from pipeline.h.heuristics.importdata import get_ms_data_types_from_history
 
 ms_path = "uid___A002_Xc3412f_X2a7d_targets_line.ms"
 history_entries = tablereader.MeasurementSetReader.get_history(ms_path)
 data_type_per_column, data_types_per_source_spw = get_ms_data_types_from_history(history_entries)
-
-pprint(data_type_per_column)
-pprint(data_types_per_source_spw)
 ```
 
 Example output from a split line MS where self-calibration succeeded on spw 23 of target `G5.89-0.39`:
@@ -82,7 +78,7 @@ Example output from a split line MS where self-calibration succeeded on spw 23 o
 
 ---
 
-## Lifecycle Across Standard Reduction Workflows
+## Lifecycle across Standard Reduction Workflows
 
 The diagram below outlines when datatype information is assigned and propagated through a typical ALMA / VLA interferometry run:
 
@@ -100,25 +96,25 @@ flowchart TD
 ### Stage Details
 
 1. **`h*_importdata` ({func}`~pipeline.hifa.cli.hifa_importdata`, {func}`~pipeline.hifv.cli.hifv_importdata`, {func}`~pipeline.hsd.cli.hsd_importdata`)**:
-   * Reads MS `HISTORY` via `pipeline.h.heuristics.importdata.get_ms_data_types_from_history()`.
+   * Reads MS `HISTORY` via {func}`~pipeline.h.heuristics.importdata.get_ms_data_types_from_history`.
    * If entries are found (e.g. importing a pre-existing target MS), they are restored into `ms.data_column` and `ms.data_types_per_source_and_spw`.
    * If the user provided the `datacolumns` parameter, user-specified types override history.
-   * If no history exists (standard ASDM import), defaults to:
+   * If no history exists (e.g., standard ASDM import), defaults to:
      * `'DATA' -> DataType.RAW`
      * `'CORRECTED' -> DataType.REGCAL_CONTLINE_ALL` (if `CORRECTED_DATA` column exists).
 2. **`h*_applycal` ({func}`~pipeline.hif.cli.hif_applycal`, {func}`~pipeline.hifv.cli.hifv_applycals`)**:
    * After caltables are applied, `ApplycalResults.merge_with_context()` sets `DataType.REGCAL_CONTLINE_ALL` on `'CORRECTED_DATA'`.
 3. **`mssplit` / `transformimagedata`**:
    * When splitting target fields (`intent='TARGET'`), sets `'DATA'` of the new MS to `DataType.REGCAL_CONTLINE_SCIENCE`.
-4. **`hif_mstransform` ({func}`~pipeline.hif.cli.hif_mstransform`) / `hifv_mstransform` ({func}`~pipeline.hifv.cli.hifv_mstransform`)**:
+4. **`h*_mstransform` ({func}`~pipeline.hif.cli.hif_mstransform`), ({func}`~pipeline.hifv.cli.hifv_mstransform`)**:
    * Maps parent datatypes to transformed target types (`REGCAL_CONTLINE_SCIENCE -> IM_CONTLINE_SCIENCE`, `SELFCAL_CONTLINE_SCIENCE -> IM_CONTLINE_SCIENCE`).
    * For VLA, registers `DataType.REGCAL_CONT_SCIENCE` on `_targets.ms` and `DataType.REGCAL_CONTLINE_SCIENCE` on `_targets_line.ms`.
-5. **`hif_selfcal` ({func}`~pipeline.hif.cli.hif_selfcal`, {func}`~pipeline.hifv.cli.hifv_selfcal`)**:
+5. **`hif*_selfcal` ({func}`~pipeline.hif.cli.hif_selfcal`, {func}`~pipeline.hifv.cli.hifv_selfcal`)**:
    * When self-cal solutions are applied, maps the base `'DATA'` type to its selfcal equivalent (`REGCAL_* -> SELFCAL_*`).
    * Calls {meth}`~pipeline.domain.MeasurementSet.set_data_column` with `(dtype_applied, 'CORRECTED_DATA', source=field, spw=spw_sel)` for each successfully calibrated target and SPW.
-6. **`hif_uvcontsub` ({func}`~pipeline.hif.cli.hif_uvcontsub`)**:
+6. **`{func}`~pipeline.hif.cli.hif_uvcontsub`**:
    * Sets `'DATA'` of `_targets_line.ms` to `DataType.REGCAL_LINE_SCIENCE`.
-7. **Single Dish (`hsd_atmcor`, `hsd_baseline`)**:
+7. **Single Dish ({func}`~pipeline.hsd.cli.hsd_atmcor`, {func}`~pipeline.hsd.cli.hsd_baseline`)**:
    * Sets `'DATA'` to `DataType.ATMCORR` after atmospheric correction, and `DataType.BASELINED` after baseline subtraction.
 
 ---
@@ -129,9 +125,9 @@ flowchart TD
 
 When running standard restore tasks:
 
-1. `importdata` runs first, setting `'DATA'` to `DataType.RAW` and writing the initial history record.
+1. The import task class ({class}`~pipeline.hifa.tasks.importdata.almaimportdata.ALMAImportData` for ALMA, or {class}`~pipeline.hifv.tasks.importdata.importdata.VLAImportData` for VLA) is called directly as a subtask, setting `'DATA'` to `DataType.RAW` and writing the initial history record.
 2. Caltables and flags are unpacked and restored.
-3. `applycal` applies calibrations, generating `CORRECTED_DATA`, and registers `DataType.REGCAL_CONTLINE_ALL`, writing a second record to MS `HISTORY`.
+3. {class}`~pipeline.hif.tasks.applycal.ifapplycal.IFApplycal` or {class}`~pipeline.hifv.tasks.finalcals.applycals.Applycals` applies calibrations, generating `CORRECTED_DATA`, and registers `DataType.REGCAL_CONTLINE_ALL`, writing a second record to MS `HISTORY`.
 
 > **Note on `restoredata` Scope**:  
 > {func}`~pipeline.hifa.cli.hifa_restoredata` / {func}`~pipeline.hifv.cli.hifv_restoredata` only restores the parent EB (`<uid>.ms`). It does not split `_targets.ms` or apply self-calibration, so restored parent EBs will never contain `SELFCAL_*` datatypes.
@@ -158,8 +154,8 @@ sequenceDiagram
 ```
 
 1. **Solution Discovery**: `hif_selfcal` checks for `selfcal.json` in the current working directory, in `../products/`, or inside `auxproducts.tgz`. If found, it sideloads the solutions and skips the self-cal solver.
-2. **Selective Application**: For each target where self-calibration succeeded (`SC_success == True`), caltables are applied to `CORRECTED_DATA`. Unsuccessful targets are left uncalibrated in `CORRECTED_DATA` (or untouched).
-3. **Datatype Registration**: In `merge_with_context()`, `_register_datatype()` registers `DataType.SELFCAL_*` on `CORRECTED_DATA` scoped strictly to the successful field and SPW combinations.
+2. **Selective Application**: For each target where self-calibration succeeded (`SC_success == True`), caltables are applied to `CORRECTED_DATA`. Unsuccessful targets are left with standard-calibrated data in `CORRECTED_DATA` (from the initialization of the `CORRECTED_DATA` column).
+3. **Datatype Registration**: In the `merge_with_context()` class method, `_register_datatype()` registers `DataType.SELFCAL_*` on `CORRECTED_DATA` scoped strictly to the successful field and SPW combinations.
 4. **Target MS Persistence**: In ≥ PL2025, {meth}`~pipeline.domain.MeasurementSet.set_data_column` writes the updated dictionaries to the `HISTORY` table of the **split target MS** (`_targets.ms`).
 
 ---
@@ -197,7 +193,7 @@ In {func}`~pipeline.hif.cli.hif_makeimlist` and {func}`~pipeline.hif.cli.hif_edi
 
 ### 3. Image Product Filenames and Headers
 
-* **Filenames**: `EditImList` derives `datatype_suffix` (`'selfcal'` or `'regcal'`) based on the clean target's datatype, which `pipeline.infrastructure.filenamer` inserts into the FITS and CASA image names.
+* **Filenames**: {class}`~pipeline.hif.tasks.editimlist.Editimlist` derives `datatype_suffix` (`'selfcal'` or `'regcal'`) based on the clean target's datatype, which `pipeline.infrastructure.filenamer` inserts into the FITS and CASA image names.
 * **Headers**: `pipeline.infrastructure.imageheader` records the datatype string in image metadata.
 
 ### 4. WebLog & QA Handling
