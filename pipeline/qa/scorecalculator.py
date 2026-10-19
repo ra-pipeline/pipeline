@@ -139,14 +139,20 @@ def log_qa(method):
         # get the size of the CASA log before task execution
         qascore = method(self, *args, **kw)
         if basetask.DISABLE_WEBLOG:
-            if isinstance(qascore, tuple):
-                _qascore = qascore[0]
+            def _log_qa_message(x: Any):
+                if not isinstance(x, pqa.QAScore):
+                    return
+
+                if x.score >= rendererutils.SCORE_THRESHOLD_SUBOPTIMAL:
+                    LOG.info(x.longmsg)
+                else:
+                    LOG.warning(x.longmsg)
+
+            if isinstance(qascore, (tuple, list)):
+                for _qascore in qascore:
+                    _log_qa_message(_qascore)
             else:
-                _qascore = qascore
-            if _qascore.score >= rendererutils.SCORE_THRESHOLD_SUBOPTIMAL:
-                LOG.info(_qascore.longmsg)
-            else:
-                LOG.warning(_qascore.longmsg)
+                _log_qa_message(qascore)
         return qascore
 
     return f
@@ -302,6 +308,7 @@ def linear_score(x: float, x1: float, x2: float, y1: float = 0.0, y2: float = 1.
     return y1 + (y2 - y1) * (x_clipped - x1) / (x2 - x1)
 
 
+@log_qa
 def score_data_flagged_by_agents(ms, summaries, min_frac, max_frac, agents=None, intents=None):
     """
     Calculate a score for the agentflagger summaries based on the fraction of
@@ -342,6 +349,7 @@ def score_data_flagged_by_agents(ms, summaries, min_frac, max_frac, agents=None,
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin)
 
 
+@log_qa
 def score_vla_science_data_flagged_by_agents(ms, summaries, min_frac, max_frac, agents, intents=None):
     """
     Calculate a score for the agentflagger summaries based on the fraction of
@@ -383,6 +391,7 @@ def score_vla_science_data_flagged_by_agents(ms, summaries, min_frac, max_frac, 
 # - exported scoring functions -----------------------------------------------------------------------------------------
 
 
+@log_qa
 def score_ms_model_data_column_present(all_mses, mses_with_column):
     """
     Give a score for a group of mses based on the number with modeldata
@@ -1890,35 +1899,6 @@ def score_sdtotal_data_flagged(frac_flagged: float,
 
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=selection)
 
-@log_qa
-def score_sdtotal_data_flagged_old(name, ant, spw, pol, frac_flagged, field=None):
-    """
-    Calculate a score for the flagging task based on the total fraction of
-    data flagged.
-
-    0%-5% flagged   -> 1
-    5%-50% flagged  -> 0.5
-    50-100% flagged -> 0
-    """
-    if frac_flagged > 0.5:
-        score = 0
-    else:
-        score = linear_score(frac_flagged, 0.05, 0.5, 1.0, 0.5)
-
-    percent = 100.0 * frac_flagged
-    if field is None:
-        longmsg = '%0.2f%% of data in %s (Ant=%s, SPW=%d, Pol=%d) was flagged' % (percent, name, ant, spw, pol)
-    else:
-        longmsg = ('%0.2f%% of data in %s (Ant=%s, Field=%s, SPW=%d, Pol=%s) was '
-                   'flagged' % (percent, name, ant, field, spw, pol))
-    shortmsg = '%0.2f%% data flagged' % percent
-
-    origin = pqa.QAOrigin(metric_name='score_sdtotal_data_flagged_old',
-                          metric_score=frac_flagged,
-                          metric_units='Fraction of data newly flagged')
-
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=os.path.basename(name), origin=origin)
-
 
 @log_qa
 def score_tsysspwmap(ms, unmappedspws):
@@ -2983,7 +2963,6 @@ def get_line_ranges(lines: list[list[float | bool]]) -> list[tuple[int, int]]:
     return line_ranges
 
 
-@log_qa
 def examine_sd_edge_lines(line_ranges: list[tuple[int, int]], nchan: int, edge: tuple[int, int] = (0, 0)) -> float:
     """Examine the existence of lines at edge channels.
 
@@ -3008,7 +2987,6 @@ def examine_sd_edge_lines(line_ranges: list[tuple[int, int]], nchan: int, edge: 
     return chan_leftmost <= edge[0] or nchan - 1 - edge[1] <= chan_rightmost
 
 
-@log_qa
 def examine_sd_wide_lines(line_ranges: list[tuple[int, int]], nchan: int, edge: tuple[int, int] = (0, 0)) -> float:
     """Examine the existence of wide lines.
 
@@ -3064,6 +3042,7 @@ def select_deviation_masks(deviation_masks: dict, reduction_group_member: 'MSRed
     spw_id = reduction_group_member.spw_id
     antenna_id = reduction_group_member.antenna_id
     return deviation_masks[ms_name].get((field_id, antenna_id, spw_id), [])
+
 
 def channel_ranges_for_image(edge: tuple[int, int], nchan: int, sideband: int, ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
     """Convert channel ranges in MS coordinate to those in image coordinate.
@@ -4024,6 +4003,7 @@ def score_sdimage_masked_pixels(context: Context, result: SDImagingResultItem) -
                        applies_to=selection)
 
 
+@log_qa
 def score_sd_line_emission_off_range_at_peak(context: Context, result: SDImagingResultItem) -> pqa.QAScore:
     """Evaluate QA score based on the detection of off-line-range emission at peak.
 
@@ -4070,6 +4050,7 @@ def score_sd_line_emission_off_range_at_peak(context: Context, result: SDImaging
                        applies_to=selection)
 
 
+@log_qa
 def score_sd_line_emission_off_range_extended(context: Context, result: SDImagingResultItem) -> pqa.QAScore:
     """Evaluate QA score based on the detetion of off-line-range extended emission.
 
@@ -4313,6 +4294,7 @@ def score_science_spw_names(mses, virtual_science_spw_names):
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
 
 
+@log_qa
 def score_renorm(result):
     if result.renorm_applied:
         msg = 'Restore successful with renormalization applied'
@@ -4593,6 +4575,7 @@ def score_polcal_results(session_name: str, caltables: list) -> pqa.QAScore:
                           metric_units='polarisation caltables')
 
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
+
 
 @log_qa
 def score_separation_angles(mses: MeasurementSet, sepangles: dict) -> list[pqa.QAScore]:
@@ -5103,6 +5086,10 @@ def score_amp_vs_time_plots(context: Context, result: SDApplycalResults) -> list
     Returns:
         A List which contains QAScore objects..
     """
+    if basetask.DISABLE_WEBLOG:
+        # skip scoring if weblog is disabled
+        return []
+
     vis = os.path.basename(result.inputs['vis'])
     ms = context.observing_run.get_ms(vis)
     spwids = [spw.id for spw in ms.get_spectral_windows()]
@@ -5245,6 +5232,7 @@ def score_parallactic_angle_range(
     return all_scores, all_metrics
 
 
+@log_qa
 def score_pointing_outlier(
     ms: MeasurementSet,
     pointing: bool,
@@ -5441,6 +5429,7 @@ def score_longsolint(context, result) -> list[pqa.QAScore]:
                           metric_units='')
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
 
+
 @log_qa
 def score_testBPdcals_dts_ants(vis: str, amp_collection: dict, phase_collection: dict, bandname: str) -> pqa.QAScore:
     """Evaluate QA score based on the number of antennas affected by DTS issues."""
@@ -5466,6 +5455,7 @@ def score_testBPdcals_dts_ants(vis: str, amp_collection: dict, phase_collection:
 
     return qa_score
 
+
 @log_qa
 def score_testBPdcals_refant(vis: str, bad_refant: list, bandname: str) -> pqa.QAScore:
     """Evaluate QA score based on reference antenna validity."""
@@ -5485,6 +5475,7 @@ def score_testBPdcals_refant(vis: str, bad_refant: list, bandname: str) -> pqa.Q
     qa_score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)
 
     return qa_score
+
 
 @log_qa
 def score_testBPdcals_delay(vis: str, caltable: str, bandname: str) -> pqa.QAScore:
@@ -5516,6 +5507,7 @@ def score_testBPdcals_delay(vis: str, caltable: str, bandname: str) -> pqa.QASco
     qa_score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)
 
     return qa_score
+
 
 @log_qa
 def score_flagged_ant_spw(vis:str, flaggedSolnApplycaldelay:dict) -> [pqa.QAScore]:
@@ -5719,6 +5711,7 @@ def score_fluxboot(context, result) -> list[pqa.QAScore]:
 
     return qascores
 
+
 # PIPE-2512: adding QA score for solint of spws
 @log_qa
 def score_spw_solint(vis: str, band: str, spw_solint: dict)-> pqa.QAScore | None:
@@ -5756,6 +5749,7 @@ def score_spw_solint(vis: str, band: str, spw_solint: dict)-> pqa.QAScore | None
         )
 
     return qascore
+
 
 # PIPE-3046: adding QA score 1 if cont.dat is applied
 @log_qa
