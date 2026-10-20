@@ -8,7 +8,7 @@ This directory contains utility and maintenance scripts for developing, building
 
 - [1. `bundle_assets.py` — Weblog Asset Minification & Bundling](#1-bundle_assetspy--weblog-asset-minification--bundling)
 - [2. `procedure_add_parallel.py` — Parallel Procedure Generator](#2-procedure_add_parallelpy--parallel-procedure-generator)
-- [3. `update_references.py` — NASA/ADS Reference Synchronizer](#3-update_referencespy--nasaads-reference-synchronizer)
+- [3. `update_references.py` — NASA SciX (ADS) Reference Synchronizer](#3-update_referencespy--nasa-scix-ads-reference-synchronizer)
 - [4. `build_backend.py` — In-Tree PEP 517 Build Backend Wrapper](#4-build_backendpy--in-tree-pep-517-build-backend-wrapper)
 - [5. `install_dependencies.py` — Monolithic CASA Dependency Installer](#5-install_dependenciespy--monolithic-casa-dependency-installer)
 - [6. `dbfluxes_query.py` — Flux Catalogue Query](#6-dbfluxes_querypy--flux-catalogue-query)
@@ -81,23 +81,23 @@ python scripts/procedure_add_parallel.py PPR_uid___A001_X362b_X53a.xml PPR_uid__
 
 ---
 
-## 3. `update_references.py` — NASA/ADS Reference Synchronizer
+## 3. `update_references.py` — NASA SciX (ADS) Reference Synchronizer
 
-Fetches the latest Pipeline publication and bibliography records from the [NASA/ADS Public Library](https://ui.adsabs.harvard.edu/public-libraries/w9Eg1EwtTAK14nz2CuQ2Fg) and writes the resolved BibTeX entries to `docs/source/references/pipeline.bib`.
+Fetches the latest Pipeline publication and bibliography records from the [NASA SciX Public Library](https://scixplorer.org/public-libraries/w9Eg1EwtTAK14nz2CuQ2Fg) (formerly NASA/ADS) via the SciX API (`https://api.scixplorer.org/v1`) and writes the resolved BibTeX entries to `docs/source/references/pipeline.bib`.
 
 ### Requirements
 
-Requires an active NASA/ADS developer API token. The script checks for the token in the following order:
+Requires an active NASA SciX or ADS developer API token. The script checks for the token in the following order:
 
 1. `--token` CLI argument
-2. `ADS_DEV_KEY`, `ADS_API_TOKEN`, or `ADSTOKEN` environment variables
-3. `~/.ads/dev_key` or `~/.ads/token` config files
+2. `SCIX_API_TOKEN`, `SCIX_DEV_KEY`, `ADS_DEV_KEY`, `ADS_API_TOKEN`, or `ADSTOKEN` environment variables
+3. `~/.scix/token`, `~/.scix/dev_key`, `~/.ads/dev_key`, or `~/.ads/token` config files
 
 ### Usage
 
 ```bash
 # Set your token and run via Pixi task:
-export ADS_DEV_KEY="your-ads-token"
+export SCIX_API_TOKEN="your-scix-token"
 pixi run update-references
 
 # Or run directly:

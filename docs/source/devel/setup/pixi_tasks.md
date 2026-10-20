@@ -269,10 +269,10 @@ pixi run build-pdf-taskdocs
 pixi run build-pdf-userguide
 ```
 
-#### `update-references` — update BibTeX references from NASA/ADS
+#### `update-references` — update BibTeX references from NASA SciX (ADS)
 
-Updates BibTeX literature citations in the documentation from the NASA/ADS
-public library using `scripts/update_references.py`.
+Updates BibTeX literature citations in the documentation from the NASA SciX
+(formerly NASA/ADS) public library using `scripts/update_references.py`.
 
 ```bash
 pixi run update-references
