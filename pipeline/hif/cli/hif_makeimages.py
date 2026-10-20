@@ -238,6 +238,11 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
          * - >= 200
            - DR / 200
 
+      For images made with ``datatype='selfcal'`` (see the :func:`~pipeline.hif.cli.hif_makeimlist` ``datatype`` parameter), 
+      the dynamic range correction factor is set to `(final rms measured by` :func:`~pipeline.hif.cli.hif_selfcal` `) /
+      (predicted rms noise)`. If, however, prior ``datatype='regcal'`` imaging of the same target has been performed, the dynamic range 
+      correction factor is set to the minimum of the two values.
+
     Notes:
         The following base QA behavior applies to ALMA imaging:
 
