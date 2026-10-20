@@ -2,13 +2,15 @@
 
 ## PL2026
 
-**2026.2.0.27**
+2026.2.0.30 used from Nov 2026 (CASA 6.7.4-12)
+
+2026.2.0.27 used Oct - Nov 2026 (CASA 6.7.4-8)
 
 ### CASA 2026
 
 1. In {func}`~casatasks.imaging.tclean` `briggsbwtaper`, the fractional bandwidth is calculated per-chunk, so parallelizing with different breadth gives different answers ({jira}`CAS-14520` and {jira}`PIPE-2832`).
-2. **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`** will crash on source names that are integers because the CASA task {func}`~casatasks.calibration.wvrgcal` no longer supports them ({jira}`CAS-14850`).
-3. There is a possibility that imaging multi-EB datasets where the SPW ID changes between the EBs with {func}`~casatasks.imaging.tclean` in parallel will produce an odd beam-size-per-channel, as shown below ({jira}`CAS-14874`).
+2. **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`** will crash on source names that are integers because the CASA task {func}`~casatasks.calibration.wvrgcal` no longer supports them ({jira}`CAS-14850`). ***Fixed in CASA 6.7.4-12***
+3. There is a possibility that imaging multi-EB datasets where the SPW ID changes between the EBs with {func}`~casatasks.imaging.tclean` in parallel will produce an odd beam-size-per-channel, as shown below ({jira}`CAS-14874`). ***Fixed in CASA 6.7.4-12***
 
    ```{figure} cas14874_n8workers.png
    ---
