@@ -3740,7 +3740,7 @@ def _process_spw(
                 continue
             if not frequency_plan.get('valid'):
                 reason = frequency_plan.get('reason', 'invalid_frequency_plan')
-                if reason != 'frequency_intersection_error':
+                if reason not in ('frequency_intersection_error', 'multiple_source_field_names'):
                     _rank_logf(
                         tmp_dir,
                         '[warn] no usable LSRK frequency intersection for spw=%s source=%s reason=%s; skipping source',
@@ -3751,15 +3751,17 @@ def _process_spw(
                     continue
                 source_name = source_names_by_id.get(int(source_id), f'source_{int(source_id)}')
                 LOG.warning(
-                    'Could not determine a common LSRK frequency range for hif_findroi source %s, spw %s; retaining the unpruned frequency axis.',
+                    'Could not determine a common LSRK frequency range for hif_findroi source %s, spw %s (reason=%s); retaining the unpruned frequency axis.',
                     source_name,
                     spw_name,
+                    reason,
                 )
                 _rank_logf(
                     tmp_dir,
-                    '[warn] LSRK frequency intersection failed for spw=%s source=%s; retaining the unpruned axis',
+                    '[warn] LSRK frequency intersection failed for spw=%s source=%s reason=%s; retaining the unpruned axis',
                     spw_name,
                     source_id,
+                    reason,
                 )
             else:
                 lsrk_channel_selection = _findroi_lsrk_channel_selection(
@@ -4510,7 +4512,10 @@ def run_findroi_mpi(
                     'reason': 'source_visibility_selection_error',
                 }
                 continue
-            source_vis_list = [canonical_vis_list[i] for i in source_vis_indices]
+            source_vis_list = [
+                canonical_vis_list[i] for i in source_vis_indices
+                if canonical_vis_list[i] in usable_vis_list
+            ]
             if not source_vis_list:
                 LOG.warning(
                     'No EBs contain hif_findroi source %s for virtual spw %s; skipping frequency plan.',
