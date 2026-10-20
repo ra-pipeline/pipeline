@@ -147,7 +147,7 @@ _PROFILE_DEFAULT_DIR: str | None = None
 
 
 def _get_tb() -> Any:
-    '''Return the CASA table tool from the interactive namespace.'''
+    """Return the CASA table tool from the interactive namespace."""
     tb_obj = getattr(_main, 'tb', None)
     if tb_obj is None:
         try:
@@ -160,7 +160,7 @@ def _get_tb() -> Any:
 
 
 def _mpi_rank_size() -> tuple[int, int]:
-    '''Return current MPI rank and size if available, otherwise (0, 1).'''
+    """Return current MPI rank and size if available, otherwise (0, 1)."""
     try:
         import casampi as _casampi
         comm = _casampi.MPI.COMM_WORLD
@@ -175,7 +175,7 @@ def _mpi_rank_size() -> tuple[int, int]:
 
 
 def _rank_log(tmp_dir: str | None, msg: str) -> None:
-    '''Append a message to a per-rank log file when a tmp_dir is provided.'''
+    """Append a message to a per-rank log file when a tmp_dir is provided."""
     rank, size = _mpi_rank_size()
     if not tmp_dir:
         return
@@ -190,7 +190,7 @@ def _rank_log(tmp_dir: str | None, msg: str) -> None:
 
 
 def _rank_logf(tmp_dir: str | None, fmt: str, *args: Any) -> None:
-    '''Format and write one message into the per-rank log file.'''
+    """Format and write one message into the per-rank log file."""
     if args:
         try:
             msg = fmt % args
@@ -202,7 +202,7 @@ def _rank_logf(tmp_dir: str | None, fmt: str, *args: Any) -> None:
 
 
 def _rank_diag(tmp_dir: str | None, msg: str) -> None:
-    '''Append a message to a per-rank diagnostics text file.'''
+    """Append a message to a per-rank diagnostics text file."""
     rank, size = _mpi_rank_size()
     if not tmp_dir:
         return
@@ -217,7 +217,7 @@ def _rank_diag(tmp_dir: str | None, msg: str) -> None:
 
 
 def _rank_diagf(tmp_dir: str | None, fmt: str, *args: Any) -> None:
-    '''Format and append one message to a per-rank diagnostics text file.'''
+    """Format and append one message to a per-rank diagnostics text file."""
     if args:
         try:
             msg = fmt % args
@@ -233,7 +233,7 @@ def _ensure_row_chan_pol(
     nrow_expected: int,
     npol_hint: tuple[int, ...] = (1, 2, 4),
 ) -> np.ndarray:
-    '''Reorder DATA array into (row, chan, pol) format.'''
+    """Reorder DATA array into (row, chan, pol) format."""
     arr = np.asarray(arr)
     if arr.ndim != 3:
         raise RuntimeError(f'Expected 3D array, got {arr.shape}')
@@ -257,7 +257,7 @@ def _ensure_row_chan_pol(
 
 
 def resolve_vis_list(vis: str | list[str] | tuple[str, ...]) -> list[str]:
-    '''Resolve a vis input into a list of MS paths.'''
+    """Resolve a vis input into a list of MS paths."""
     if isinstance(vis, (list, tuple)):
         return list(vis)
     vis = str(vis)
@@ -272,7 +272,7 @@ def resolve_vis_list(vis: str | list[str] | tuple[str, ...]) -> list[str]:
 
 
 def _context_ms_for_vis(context: Any, vis: str) -> Any:
-    '''Return the context MeasurementSet matching a vis path or basename.'''
+    """Return the context MeasurementSet matching a vis path or basename."""
     try:
         return context.observing_run.get_ms(vis)
     except Exception:
@@ -284,7 +284,7 @@ def _context_ms_for_vis(context: Any, vis: str) -> Any:
 
 
 def _resolve_pipeline_vis_list(context: Any, vis: Any) -> list[str]:
-    '''Resolve vis through pipeline context, falling back to prototype resolution.'''
+    """Resolve vis through pipeline context, falling back to prototype resolution."""
     if vis not in (None, '', [], ['']):
         return resolve_vis_list(vis)
     datatypes = [
@@ -306,7 +306,7 @@ def _resolve_pipeline_vis_list(context: Any, vis: Any) -> list[str]:
 
 
 def _findroi_antenna_selections(context: Any, vis_list: list[str], intent: str = 'TARGET') -> dict[str, str]:
-    '''Return per-vis CASA antenna selections matching imaging antenna policy.'''
+    """Return per-vis CASA antenna selections matching imaging antenna policy."""
     canonical_vis_list = [_context_ms_for_vis(context, vis).name for vis in vis_list]
     project_structure = getattr(context, 'project_structure', None)
     imagename_prefix = '' if project_structure is None else getattr(project_structure, 'ousstatus_entity_id', '')
@@ -333,7 +333,7 @@ def _findroi_antenna_selections(context: Any, vis_list: list[str], intent: str =
 
 
 def _findroi_image_heuristics(context: Any, vis_list: list[str]) -> Any:
-    '''Create imaging heuristics matching hif_makeimlist data-availability checks.'''
+    """Create imaging heuristics matching hif_makeimlist data-availability checks."""
     canonical_vis_list = [_context_ms_for_vis(context, vis).name for vis in vis_list]
     project_structure = getattr(context, 'project_structure', None)
     imagename_prefix = '' if project_structure is None else getattr(project_structure, 'ousstatus_entity_id', '')
@@ -357,7 +357,7 @@ def _findroi_has_unflagged_data(
     field_name: str,
     spw_id: int,
 ) -> bool | None:
-    '''Mirror hif_makeimlist fully-flagged detection for one EB/field/SPW selection.'''
+    """Mirror hif_makeimlist fully-flagged detection for one EB/field/SPW selection."""
     try:
         result = heuristics.has_data(field_intent_list=[(field_name, 'TARGET')], spwspec=str(spw_id), vislist=[vis])
     except Exception as exc:
@@ -378,7 +378,7 @@ def _findroi_lsrk_frequency_plan(
     field_selector: str,
     spw_id: int,
 ) -> dict[str, Any]:
-    '''Return the standard automatic LSRK cube frequency plan for findROI.'''
+    """Return the standard automatic LSRK cube frequency plan for findROI."""
     try:
         if0, if1, channel_width = heuristics.freq_intersection(
             vis_list,
@@ -419,14 +419,16 @@ def _findroi_channel_indices_for_plan(
     chan_freqs_hz: np.ndarray,
     frequency_plan: dict[str, Any],
 ) -> np.ndarray | None:
-    '''Map a common frequency plan to one compatible temporary-MS axis.'''
+    """Map a common frequency plan to one compatible temporary-MS axis."""
     freq = np.asarray(chan_freqs_hz, dtype=np.float64).ravel()
     if not frequency_plan.get('valid') or freq.size == 0:
         return None
 
     nchan = int(frequency_plan['nchan'])
     width_hz = abs(float(frequency_plan['channel_width_hz']))
-    targets = float(frequency_plan['start_hz']) + np.arange(nchan, dtype=np.float64) * float(frequency_plan['channel_width_hz'])
+    start_hz = float(frequency_plan['start_hz'])
+    channel_width_hz = float(frequency_plan['channel_width_hz'])
+    targets = start_hz + np.arange(nchan, dtype=np.float64) * channel_width_hz
     if freq[0] > freq[-1] and targets[0] < targets[-1]:
         targets = targets[::-1]
     elif freq[0] < freq[-1] and targets[0] > targets[-1]:
@@ -446,7 +448,7 @@ def _findroi_lsrk_channel_selection(
     regridded_ms_paths: list[str],
     frequency_plan: dict[str, Any],
 ) -> dict[str, Any]:
-    '''Find per-EB channel selections for one common temporary-LSRK frequency plan.'''
+    """Find per-EB channel selections for one common temporary-LSRK frequency plan."""
     if not frequency_plan.get('valid'):
         return {'valid': False, 'reason': frequency_plan.get('reason', 'invalid_frequency_plan')}
 
@@ -488,7 +490,7 @@ def _findroi_lsrk_channel_selection(
 
 
 def _field_task_arg(field: str | int | list[int | str] | tuple[int | str, ...] | None) -> str | int | None:
-    '''Normalize explicit field selection into one CASA-style task argument.'''
+    """Normalize explicit field selection into one CASA-style task argument."""
     if field is None or field in ('', 'target', 'target_groups'):
         return None
     if isinstance(field, (list, tuple, set)):
@@ -501,7 +503,7 @@ def _field_ids_from_input(
     field: str | int | list[int | str] | tuple[int | str, ...] | None,
     all_fields: Any | None = None,
 ) -> list[int] | None:
-    '''Convert explicit field input to field IDs; return None for automatic target selection.'''
+    """Convert explicit field input to field IDs; return None for automatic target selection."""
     task_arg = _field_task_arg(field)
     if task_arg is None:
         return None
@@ -514,7 +516,7 @@ def _context_field_groups_by_source_id(
     vis: str,
     field: str | int | list[int | str] | tuple[int | str, ...] | None,
 ) -> dict[str, Any] | None:
-    '''Build field/source groups from hifa_importdata context when available.'''
+    """Build field/source groups from hifa_importdata context when available."""
     ms = _context_ms_for_vis(context, vis)
     explicit_fields = _field_ids_from_input(ms.name, field, getattr(ms, 'fields', []))
     target_intents = {'TARGET', 'OBSERVE_TARGET', 'SCIENCE'}
@@ -553,7 +555,7 @@ def _context_field_groups_by_source_id(
 
 
 def _spw_ids_from_input(spw: str | int | list[int] | tuple[int, ...] | None) -> set[int] | None:
-    '''Convert optional user SPW selection into an integer set.'''
+    """Convert optional user SPW selection into an integer set."""
     if spw in (None, '', [], ['']):
         return None
     if isinstance(spw, str):
@@ -570,7 +572,7 @@ def _filter_science_ddids(
     context: Any | None,
     vis0: str,
 ) -> list[int]:
-    '''Filter selected DDIDs by public virtual SPW IDs when context is available.'''
+    """Filter selected DDIDs by public virtual SPW IDs when context is available."""
     selected_spws = _spw_ids_from_input(spw)
     if selected_spws is None:
         return sci_ddids
@@ -597,7 +599,7 @@ def _real_spw_ids_by_vis(
     virtual_spw_id: int | None,
     fallback_spw_id: int,
 ) -> dict[str, int]:
-    '''Build per-MS real SPW ID mapping for a virtual science SPW.'''
+    """Build per-MS real SPW ID mapping for a virtual science SPW."""
     out: dict[str, int] = {}
     for vis in vis_list:
         real_spw = fallback_spw_id
@@ -612,7 +614,7 @@ def _real_spw_ids_by_vis(
 
 
 def get_chan_freqs_hz(ms: Any, ddid: int = 0) -> np.ndarray:
-    '''Return channel frequencies for an imported pipeline DDID.'''
+    """Return channel frequencies for an imported pipeline DDID."""
     dd = ms.get_data_description(id=int(ddid))
     if dd is None or getattr(dd, 'spw', None) is None:
         raise RuntimeError(f'No pipeline data description found for DDID {ddid}.')
@@ -629,7 +631,7 @@ def get_chan_freqs_hz(ms: Any, ddid: int = 0) -> np.ndarray:
 
 
 def _get_temp_ms_chan_freqs_hz(vis: str, ddid: int = 0) -> np.ndarray:
-    '''Return channel frequencies for a temporary regridded MS product.'''
+    """Return channel frequencies for a temporary regridded MS product."""
     tb_obj = _get_tb()
     tb_obj.open(vis + '/DATA_DESCRIPTION')
     spw_id = int(np.asarray(tb_obj.getcol('SPECTRAL_WINDOW_ID')).ravel()[ddid])
@@ -641,7 +643,7 @@ def _get_temp_ms_chan_freqs_hz(vis: str, ddid: int = 0) -> np.ndarray:
 
 
 def get_ddid_spw_inventory(vis: str, ms: Any) -> list[dict[str, Any]]:
-    '''Return DDID/SPW inventory from imported pipeline metadata plus MAIN row counts.'''
+    """Return DDID/SPW inventory from imported pipeline metadata plus MAIN row counts."""
     dd_rows = []
     for dd in getattr(ms, 'data_descriptions', []):
         spw = getattr(dd, 'spw', None)
@@ -676,7 +678,7 @@ def select_science_ddids(
     science_spw_ids: set[int],
     min_nchan: int = 5,
 ) -> list[int]:
-    '''Select science DDIDs using pipeline science SPWs plus a small averaged-data sanity check.'''
+    """Select science DDIDs using pipeline science SPWs plus a small averaged-data sanity check."""
     out = []
     for r in inv:
         if int(r['spw_id']) not in science_spw_ids:
@@ -690,7 +692,7 @@ def select_science_ddids(
 
 
 def _get_field_ephemeris_info(vis: str, field_id: int, ephem_path: str | None = None) -> tuple[int, str]:
-    '''Return (ephemeris_id, ephemeris_table_path) for a field.'''
+    """Return (ephemeris_id, ephemeris_table_path) for a field."""
     key = (os.path.abspath(vis), int(field_id))
     cached = _EPHEM_RADVEL_CACHE.get(key)
     if cached is not None:
@@ -711,7 +713,7 @@ def _get_field_ephemeris_info(vis: str, field_id: int, ephem_path: str | None = 
 
 
 def _get_ephemeris_radvel_series(vis: str, field_id: int, ephem_path: str | None = None) -> tuple[str, np.ndarray, np.ndarray]:
-    '''Return (ephem_path, mjd, radvel_m_s) for a field ephemeris table.'''
+    """Return (ephem_path, mjd, radvel_m_s) for a field ephemeris table."""
     key = (os.path.abspath(vis), int(field_id))
     cached = _EPHEM_RADVEL_CACHE.get(key)
     if cached is not None:
@@ -738,7 +740,7 @@ def _interp_ephemeris_radvel_to_times(
     times_s: np.ndarray,
     ephem_path: str | None = None,
 ) -> tuple[str, np.ndarray]:
-    '''Interpolate ephemeris RadVel onto row TIME values and return (path, v_rad_m_s).'''
+    """Interpolate ephemeris RadVel onto row TIME values and return (path, v_rad_m_s)."""
     ephem_path, mjd, radvel_m_s = _get_ephemeris_radvel_series(vis, field_id, ephem_path=ephem_path)
     t = np.asarray(times_s, dtype=np.float64).ravel()
     if t.size == 0:
@@ -764,7 +766,7 @@ def _ephemeris_geo_to_source_shift_hz(
     ref_freq_hz: float,
     radvel_m_s: np.ndarray,
 ) -> np.ndarray:
-    '''Return additive GEO->SOURCE frequency shift around a reference frequency.'''
+    """Return additive GEO->SOURCE frequency shift around a reference frequency."""
     beta = np.asarray(radvel_m_s, dtype=np.float64) / casa_tools.quanta.getvalue(
         casa_tools.quanta.convert(casa_tools.quanta.constants('c'), 'm/s')
     )[0]
@@ -778,7 +780,7 @@ def _build_ephemeris_source_axis_hz(
     chan_freqs_geo_hz: np.ndarray,
     ephem_path: str | None = None,
 ) -> tuple[np.ndarray, dict[str, Any]]:
-    '''Build a common SOURCE axis from the GEO axis using the reference-time RadVel.'''
+    """Build a common SOURCE axis from the GEO axis using the reference-time RadVel."""
     geo = np.asarray(chan_freqs_geo_hz, dtype=np.float64).ravel()
     t = np.asarray(times_s, dtype=np.float64).ravel()
     if geo.size == 0:
@@ -813,7 +815,7 @@ def _apply_ephemeris_geo_to_source_correction(
     log_dir: str | None = None,
     ephem_path: str | None = None,
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
-    '''Resample GEO-frame visibilities onto a common SOURCE grid using per-time RadVel.'''
+    """Resample GEO-frame visibilities onto a common SOURCE grid using per-time RadVel."""
     out = dict(preloaded)
     v_in = np.asarray(preloaded['V'], dtype=np.complex64)
     times = np.asarray(preloaded['TIME'], dtype=np.float64).ravel()
@@ -878,7 +880,7 @@ def _apply_ephemeris_geo_to_source_correction(
 
 
 def estimate_pb_fwhm_arcsec(ref_freq_hz: float, dish_diameter_m: float) -> float:
-    '''Estimate primary-beam FWHM in arcseconds.'''
+    """Estimate primary-beam FWHM in arcseconds."""
     wavelength_m = casa_tools.quanta.getvalue(
         casa_tools.quanta.convert(casa_tools.quanta.constants('c'), 'm/s')
     )[0] / ref_freq_hz
@@ -887,7 +889,7 @@ def estimate_pb_fwhm_arcsec(ref_freq_hz: float, dish_diameter_m: float) -> float
 
 
 def _wrap_pm_pi(angle_rad: np.ndarray | float) -> np.ndarray | float:
-    '''Wrap angles into [-pi, pi).'''
+    """Wrap angles into [-pi, pi)."""
     return (np.asarray(angle_rad) + np.pi) % (2.0 * np.pi) - np.pi
 
 
@@ -895,7 +897,7 @@ def _reference_center_rad(
     phase_centers_rad: dict[int, tuple[float, float]],
     field_ids: list[int],
 ) -> tuple[float, float]:
-    '''Return a stable spherical-mean reference center for tangent-plane offsets.'''
+    """Return a stable spherical-mean reference center for tangent-plane offsets."""
     xyz = []
     for fid in field_ids:
         ra, dec = phase_centers_rad[int(fid)]
@@ -917,7 +919,7 @@ def _field_offsets_arcsec_from_center(
     field_ids: list[int],
     center_rad: tuple[float, float],
 ) -> dict[int, tuple[float, float]]:
-    '''Return tangent-plane offsets in arcsec from a common center.'''
+    """Return tangent-plane offsets in arcsec from a common center."""
     ra0, dec0 = center_rad
     cos_dec0 = np.cos(dec0)
     out = {}
@@ -933,7 +935,7 @@ def _mosaic_bbox_center_rad(
     phase_centers_rad: dict[int, tuple[float, float]],
     field_ids: list[int],
 ) -> tuple[float, float]:
-    '''Return the midpoint of the field bounding box in tangent-plane coordinates.'''
+    """Return the midpoint of the field bounding box in tangent-plane coordinates."""
     ref_center = _reference_center_rad(phase_centers_rad, field_ids)
     offsets = _field_offsets_arcsec_from_center(phase_centers_rad, field_ids, ref_center)
     dl = np.asarray([offsets[int(fid)][0] for fid in field_ids], dtype=np.float64)
@@ -947,14 +949,14 @@ def _mosaic_bbox_center_rad(
 
 
 def _pb_cutoff_radius_arcsec(pb_fwhm_arcsec: float, pb_cutoff: float) -> float:
-    '''Return the radius where a Gaussian PB falls to pb_cutoff.'''
+    """Return the radius where a Gaussian PB falls to pb_cutoff."""
     cutoff = float(min(max(pb_cutoff, 1e-6), 0.999999))
     sigma_arcsec = float(pb_fwhm_arcsec) / np.sqrt(8.0 * np.log(2.0))
     return float(sigma_arcsec * np.sqrt(-2.0 * np.log(cutoff)))
 
 
 def _next_casa_friendly_size(n: int) -> int:
-    '''Round up to the next CASA-friendly image size with 2/3/5 prime factors only.'''
+    """Round up to the next CASA-friendly image size with 2/3/5 prime factors only."""
     n = max(int(n), 1)
 
     def _is_smooth(k: int) -> bool:
@@ -975,7 +977,7 @@ def _estimate_field_cell_arcsec(
     npix: int,
     fov_pb_mult: float,
 ) -> float:
-    '''Estimate the image cell size implied by the current field-imaging heuristic.'''
+    """Estimate the image cell size implied by the current field-imaging heuristic."""
     pb_fwhm_arcsec = estimate_pb_fwhm_arcsec(ref_freq_hz, dish_diameter_m)
     fov_arcsec = float(pb_fwhm_arcsec) * float(fov_pb_mult)
     return float(fov_arcsec / max(int(npix), 1))
@@ -991,7 +993,7 @@ def _source_common_geometry_plan(
     fov_pb_mult: float,
     pb_cutoff: float = 0.1,
 ) -> dict[str, Any]:
-    '''Plan one common spatial geometry for a source across all science SPWs.'''
+    """Plan one common spatial geometry for a source across all science SPWs."""
     field_ids_sorted = [int(fid) for fid in sorted(field_ids)]
     if not field_ids_sorted:
         raise RuntimeError(f'Cannot plan geometry for source {source_id} with no fields')
@@ -1056,7 +1058,7 @@ def _build_pb_images(
     pb_fwhm_arcsec: float,
     pb_cutoff: float = 0.1,
 ) -> tuple[np.ndarray, np.ndarray]:
-    '''Build PB and PB^2 images with a hard cutoff for stitching.'''
+    """Build PB and PB^2 images with a hard cutoff for stitching."""
     ny, nx = int(shape[0]), int(shape[1])
     key = (ny, nx, float(cell_arcsec), float(pb_fwhm_arcsec), float(pb_cutoff))
     cached = _PB_IMAGE_CACHE.get(key)
@@ -1084,7 +1086,7 @@ def _prepare_shift_add_geometry(
     dx_pix: float,
     dy_pix: float,
 ) -> list[tuple[slice, slice, slice, slice, float]]:
-    '''Precompute bilinear shift-add slice geometry for one source/destination pair.'''
+    """Precompute bilinear shift-add slice geometry for one source/destination pair."""
     src_ny, src_nx = int(src_shape[0]), int(src_shape[1])
     dst_ny, dst_nx = int(dst_shape[0]), int(dst_shape[1])
     src_cx = 0.5 * (src_nx - 1)
@@ -1137,7 +1139,7 @@ def _accumulate_shifted_plane(
     dy_pix: float,
     shift_terms: list[tuple[Any, ...]] | None = None,
 ) -> tuple[float, float]:
-    '''Shift-add a 2D or 3D image into a common grid using bilinear interpolation.'''
+    """Shift-add a 2D or 3D image into a common grid using bilinear interpolation."""
     src_arr = np.asarray(src, dtype=np.float32)
     w_num = np.asarray(num_weights, dtype=np.float32)
     w_den = np.asarray(den_weights, dtype=np.float32)
@@ -1182,7 +1184,7 @@ def _init_mosaic_stitch_state(
     forced_shape: tuple[int, int] | None = None,
     forced_center_rad: tuple[float, float] | None = None,
 ) -> dict[str, Any]:
-    '''Initialize in-memory stitch accumulators and geometry for one source/SPW.'''
+    """Initialize in-memory stitch accumulators and geometry for one source/SPW."""
     nchan, field_ny, field_nx = map(int, cube_shape)
     field_ids_sorted = sorted(int(fid) for fid in field_ids)
     mosaic_center = forced_center_rad if forced_center_rad is not None else _mosaic_bbox_center_rad(field_phase_centers_rad, field_ids_sorted)
@@ -1238,7 +1240,7 @@ def _accumulate_field_cube_to_stitch(
     field_id: int,
     cube: np.ndarray,
 ) -> None:
-    '''Accumulate one field cube into an in-memory stitch state.'''
+    """Accumulate one field cube into an in-memory stitch state."""
     num_sum, den_sum = _accumulate_shifted_plane(
         stitch_state['num'],
         stitch_state['den'],
@@ -1254,7 +1256,7 @@ def _accumulate_field_cube_to_stitch(
 
 
 def _finalize_mosaic_stitch_state(stitch_state: dict[str, Any]) -> tuple[np.ndarray, dict[str, Any]]:
-    '''Finalize one in-memory stitch state into a mosaic cube and metadata.'''
+    """Finalize one in-memory stitch state into a mosaic cube and metadata."""
     num = np.asarray(stitch_state['num'], dtype=np.float32)
     den = np.asarray(stitch_state['den'], dtype=np.float32)
     mosaic_cube = np.zeros_like(num, dtype=np.float32)
@@ -1283,7 +1285,7 @@ def _stitch_field_cubes_to_mosaic(
     pb_fwhm_arcsec: float,
     pb_cutoff: float = 0.1,
 ) -> tuple[np.ndarray, dict[str, Any]]:
-    '''Stitch per-field cubes into a detection-optimized mosaic statistic.'''
+    """Stitch per-field cubes into a detection-optimized mosaic statistic."""
     field_ids = sorted(int(fid) for fid in field_cube_paths.keys())
     if not field_ids:
         raise RuntimeError('No field cubes available for mosaic stitching.')
@@ -1321,7 +1323,7 @@ def _precompute_grid_indices(
     uv_taper_fwhm_cell: float = 2.0,
     cell_arcsec_override: float | None = None,
 ) -> GridPrecompute:
-    '''Precompute grid indices and weights for nearest-neighbor gridding.'''
+    """Precompute grid indices and weights for nearest-neighbor gridding."""
     # Record gridding precompute timing when profiling is enabled.
     t_profile_total = time.perf_counter()
     if cell_arcsec_override is None:
@@ -1398,7 +1400,7 @@ def _image_from_vis_precomputed(
     inb2: np.ndarray,
     return_timing: bool = False,
 ) -> tuple[np.ndarray, float, float] | np.ndarray:
-    '''Grid visibilities and return an astro-convention image with optional timing.'''
+    """Grid visibilities and return an astro-convention image with optional timing."""
     grid = np.zeros((npix * npix,), dtype=np.complex128)
     t0 = time.perf_counter()
     np.add.at(grid, idx, w * vrow[inb])
@@ -1429,7 +1431,7 @@ def _compute_cube_products(
     snr_dilate_width: int = 5,
     spatial_mask: np.ndarray | None = None,
 ) -> dict[str, np.ndarray]:
-    '''Compute cube products and derived spectra/evidence.'''
+    """Compute cube products and derived spectra/evidence."""
     # Record cube-product timings when profiling is enabled.
     t_profile_total = time.perf_counter()
     nchan = int(cube.shape[0])
@@ -1524,7 +1526,7 @@ def _raw_spectra_to_snr_evidence(
     neg_extent_trim_frac: float = 0.10,
     snr_dilate_width: int = 5,
 ) -> dict[str, Any]:
-    '''Convert raw spectra into conditioned SNR spectra and preliminary evidence.'''
+    """Convert raw spectra into conditioned SNR spectra and preliminary evidence."""
     spec_raw = np.asarray(reference_sum_raw, dtype=np.float64)
     mw_raw = np.asarray(moment0_weighted_sum_raw, dtype=np.float64)
     nchan = min(spec_raw.size, mw_raw.size)
@@ -1614,7 +1616,7 @@ def _raw_spectra_to_snr_evidence(
 
 
 def _trim_edge_zeros(arr: np.ndarray) -> np.ndarray:
-    '''Trim only contiguous leading/trailing zero runs from a 1D array.'''
+    """Trim only contiguous leading/trailing zero runs from a 1D array."""
     x = np.asarray(arr, dtype=np.float64).ravel()
     n = x.size
     if n == 0:
@@ -1631,7 +1633,7 @@ def _trim_edge_zeros(arr: np.ndarray) -> np.ndarray:
 
 
 def _zero_fraction_excluding_edge_runs(arr: np.ndarray) -> float:
-    '''Return zero fraction after excluding contiguous edge-zero runs.'''
+    """Return zero fraction after excluding contiguous edge-zero runs."""
     core = _trim_edge_zeros(arr)
     if core.size == 0:
         return 1.0
@@ -1642,7 +1644,7 @@ def _zero_fraction_excluding_edge_runs(arr: np.ndarray) -> float:
 
 
 def _smooth_tophat(arr: np.ndarray, width: int = 4) -> np.ndarray:
-    '''Top-hat smooth a 1D array while preserving NaN positions.'''
+    """Top-hat smooth a 1D array while preserving NaN positions."""
     x = np.asarray(arr, dtype=np.float64)
     w = int(max(width, 1))
     if x.size < 2 or w <= 1:
@@ -1658,7 +1660,7 @@ def _negative_extent_delta_trimmed(
     moment0_snr: np.ndarray,
     trim_frac: float = 0.10,
 ) -> float:
-    '''Measure how much deeper the moment0 SNR negative tail is vs reference SNR.'''
+    """Measure how much deeper the moment0 SNR negative tail is vs reference SNR."""
     ref = np.asarray(reference_snr, dtype=np.float64).ravel()
     mw = np.asarray(moment0_snr, dtype=np.float64).ravel()
     n = min(ref.size, mw.size)
@@ -1682,7 +1684,7 @@ def _rolling_rms_median_excluding_ranges(
     exclude_ranges: list[tuple[int, int]],
     window: int = 10,
 ) -> float:
-    '''Return the median rolling RMS, excluding ROI ranges from the median statistic.'''
+    """Return the median rolling RMS, excluding ROI ranges from the median statistic."""
     x = np.asarray(snr, dtype=np.float64).ravel()
     n = x.size
     if n == 0:
@@ -1709,7 +1711,7 @@ def _rolling_rms_median_excluding_ranges(
 
 
 def _rolling_rms_spectrum(snr: np.ndarray, window: int = 10) -> np.ndarray:
-    '''Return per-channel rolling RMS spectrum for a 1D SNR track.'''
+    """Return per-channel rolling RMS spectrum for a 1D SNR track."""
     x = np.asarray(snr, dtype=np.float64).ravel()
     if x.size == 0:
         return np.asarray([], dtype=np.float64)
@@ -1734,7 +1736,7 @@ def _adaptive_noise_stats(
     dilate_width: int = 5,
     k_exceed: float = 4.0,
 ) -> tuple[float, float, np.ndarray | None, str]:
-    '''Estimate adaptive robust center/sigma and a retained-noise mask.'''
+    """Estimate adaptive robust center/sigma and a retained-noise mask."""
     x = np.asarray(spec, dtype=np.float64)
     if x.size == 0:
         return float('nan'), float('nan'), None, 'empty'
@@ -1838,7 +1840,7 @@ def _adaptive_noise_stats(
 
 
 def _robust_sigma(img: np.ndarray) -> float:
-    '''Return a robust sigma estimate using adaptive tail-aware clipping on flattened pixels.'''
+    """Return a robust sigma estimate using adaptive tail-aware clipping on flattened pixels."""
     vals = np.asarray(img, dtype=np.float64).ravel()
     vals = vals[np.isfinite(vals)]
     if vals.size == 0:
@@ -1862,7 +1864,7 @@ def _compute_reference_spectrum(
     ref_sigma: float = 3.0,
     spatial_mask: np.ndarray | None = None,
 ) -> np.ndarray:
-    '''Compute reference spectrum by summing high-sigma pixels per channel.'''
+    """Compute reference spectrum by summing high-sigma pixels per channel."""
     mask2d = None if spatial_mask is None else np.asarray(spatial_mask, dtype=bool)
     cube_use = cube.reshape(cube.shape[0], -1) if mask2d is None else cube[:, mask2d]
     sig = np.asarray(sig_k, dtype=np.float64).reshape(-1, 1)
@@ -1877,7 +1879,7 @@ def _compute_moment0(
     mom0_thresh_sigma: float = 5.0,
     spatial_mask: np.ndarray | None = None,
 ) -> np.ndarray:
-    '''Compute moment-0 map by summing pixels above a sigma threshold.'''
+    """Compute moment-0 map by summing pixels above a sigma threshold."""
     nchan, ny, nx = cube.shape
     mask2d = None if spatial_mask is None else np.asarray(spatial_mask, dtype=bool)
     cube_use = cube.reshape(nchan, -1) if mask2d is None else cube[:, mask2d]
@@ -1900,7 +1902,7 @@ def _compute_mom0_weighted_spectrum(
     gate_sigma: float = 1.0,
     spatial_mask: np.ndarray | None = None,
 ) -> np.ndarray:
-    '''Compute spectrum weighted by moment-0 amplitudes and a per-channel gate.'''
+    """Compute spectrum weighted by moment-0 amplitudes and a per-channel gate."""
     mask2d = None if spatial_mask is None else np.asarray(spatial_mask, dtype=bool)
     cube_use = cube.reshape(cube.shape[0], -1) if mask2d is None else cube[:, mask2d]
     w = np.abs(moment0).astype(np.float32, copy=False)
@@ -1922,7 +1924,7 @@ def _snr_from_spectrum(
     k_exceed: float = 4.0,
     return_mask: bool = False,
 ) -> tuple[np.ndarray, np.ndarray | None] | np.ndarray:
-    '''Normalize a spectrum using adaptive tail-aware clipping.'''
+    """Normalize a spectrum using adaptive tail-aware clipping."""
     x = np.asarray(spec, dtype=np.float64)
     snr = np.full_like(x, np.nan, dtype=np.float64)
     if x.size == 0:
@@ -1947,7 +1949,7 @@ def _estimate_noise_autocorr(
     noise_mask: np.ndarray | None,
     maxlag: int = 64,
 ) -> np.ndarray:
-    '''Estimate noise autocorrelation coefficients from SNR and a noise mask.'''
+    """Estimate noise autocorrelation coefficients from SNR and a noise mask."""
     x = np.asarray(snr, dtype=np.float64).ravel()
     n = x.size
     if n == 0:
@@ -1994,7 +1996,7 @@ def _estimate_noise_autocorr(
 
 
 def _effective_nbin_from_rho(nbin: int, rho: np.ndarray) -> float:
-    '''Compute the effective sample count for one top-hat scale from autocorrelation.'''
+    """Compute the effective sample count for one top-hat scale from autocorrelation."""
     n = int(max(nbin, 1))
     rho1 = np.asarray(rho, dtype=np.float64).ravel()
     if rho1.size <= 1:
@@ -2043,7 +2045,7 @@ def cube_threshold_spectrum(
     return_cube: bool = False,
     log_dir: str | None = None,
 ) -> dict[str, Any]:
-    '''Generate a cube and spectra using preloaded visibilities.'''
+    """Generate a cube and spectra using preloaded visibilities."""
     if preloaded is None:
         raise RuntimeError('cube_threshold_spectrum requires preloaded data in MPI mode.')
     v = preloaded['V']
@@ -2191,7 +2193,7 @@ def _acf_hwhm_fwhm(
     smooth_frac: float | None = None,
     edge_trim_frac: float = 0.0,
 ) -> tuple[int, int]:
-    '''Estimate half-width and full-width from the autocorrelation.'''
+    """Estimate half-width and full-width from the autocorrelation."""
     y = np.asarray(spec, dtype=np.float64)
     y = y[np.isfinite(y)]
     if y.size < 8:
@@ -2234,7 +2236,7 @@ def _acf_hwhm_fwhm(
 
 
 def _mask_to_ranges(mask: np.ndarray) -> list[tuple[int, int]]:
-    '''Convert a boolean mask into contiguous index ranges.'''
+    """Convert a boolean mask into contiguous index ranges."""
     idx = np.where(mask)[0]
     if idx.size == 0:
         return []
@@ -2244,12 +2246,12 @@ def _mask_to_ranges(mask: np.ndarray) -> list[tuple[int, int]]:
 
 
 def _now_utc_iso() -> str:
-    '''Return current UTC timestamp in ISO-8601 Z format.'''
+    """Return current UTC timestamp in ISO-8601 Z format."""
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')
 
 
 def _source_name_for_id(source_names: dict[int, str], source_id: int) -> str:
-    '''Return a stable source name for a source_id.'''
+    """Return a stable source name for a source_id."""
     name = source_names.get(int(source_id))
     if name:
         return str(name)
@@ -2257,12 +2259,12 @@ def _source_name_for_id(source_names: dict[int, str], source_id: int) -> str:
 
 
 def _sanitize_token(text: str) -> str:
-    '''Return a filename-safe token from arbitrary text.'''
+    """Return a filename-safe token from arbitrary text."""
     return re.sub(r'[^A-Za-z0-9._-]+', '_', str(text)).strip('_')
 
 
 def _field_name_for_id(field_names: list[str], field_id: int) -> str:
-    '''Return a stable field name for a field_id.'''
+    """Return a stable field name for a field_id."""
     if 0 <= int(field_id) < len(field_names):
         return str(field_names[int(field_id)])
     return f'field_{int(field_id)}'
@@ -2272,7 +2274,7 @@ def _chan_ranges_to_frame_freq_ranges_ghz(
     chan_ranges: list[tuple[int, int]],
     chan_freqs_hz: np.ndarray | None,
 ) -> list[tuple[float, float]]:
-    '''Convert channel ranges into output-frame frequency ranges in GHz.'''
+    """Convert channel ranges into output-frame frequency ranges in GHz."""
     if chan_freqs_hz is None:
         return []
     freq = np.asarray(chan_freqs_hz, dtype=np.float64).ravel()
@@ -2291,7 +2293,7 @@ def _fmt_frame_freq_ranges(
     freq_ranges_ghz: list[tuple[float, float]],
     outframe: str,
 ) -> list[str]:
-    '''Format GHz ranges to cont.dat-like lines.'''
+    """Format GHz ranges to cont.dat-like lines."""
     return [f'{lo:.10f}~{hi:.10f}GHz {str(outframe)}' for lo, hi in freq_ranges_ghz]
 
 
@@ -2300,7 +2302,7 @@ def _roi_detected_from_raw(
     chan_freqs_hz: np.ndarray | None = None,
     outframe: str = 'LSRK',
 ) -> dict[str, Any] | None:
-    '''Strip internal ROI detection fields from an ROI detection result.'''
+    """Strip internal ROI detection fields from an ROI detection result."""
     if mini is None:
         nchan = int(np.asarray(chan_freqs_hz, dtype=np.float64).size) if chan_freqs_hz is not None else 0
         cont_ranges = [(0, nchan - 1)] if nchan > 0 else []
@@ -2408,7 +2410,7 @@ def _roi_detected_from_raw(
 
 
 def _spectra_block_from_raw(s: dict[str, Any]) -> dict[str, Any]:
-    '''Build a spectra block from an internal spectra result.'''
+    """Build a spectra block from an internal spectra result."""
     return {
         'reference_sum_raw': s['reference_sum_raw'],
         'moment0_weighted_sum_raw': s['moment0_weighted_sum_raw'],
@@ -2425,7 +2427,7 @@ def _spectra_block_from_raw(s: dict[str, Any]) -> dict[str, Any]:
 
 
 def _artifact_block_from_raw(s: dict[str, Any]) -> dict[str, Any]:
-    '''Build an artifact block from an internal spectra result.'''
+    """Build an artifact block from an internal spectra result."""
     return {
         'cube_path': s.get('cube_path'),
         'moment0_path': s.get('moment0_path'),
@@ -2441,7 +2443,7 @@ def _source_spw_identity_block(
     ddid: int,
     outframe: str,
 ) -> dict[str, Any]:
-    '''Build source-aggregate identity metadata for one source/SPW block.'''
+    """Build source-aggregate identity metadata for one source/SPW block."""
     return {
         'source_id': int(source_id),
         'source_name': str(source_name),
@@ -2466,7 +2468,7 @@ def _field_identity_block(
     is_mosaic: bool,
     outframe: str,
 ) -> dict[str, Any]:
-    '''Build per-field identity metadata for one source/SPW block.'''
+    """Build per-field identity metadata for one source/SPW block."""
     return {
         'source_id': int(source_id),
         'source_name': str(source_name),
@@ -2500,7 +2502,7 @@ def _build_findroi_stage_product(
     run_timing: dict[str, Any],
     save_results_path: str | None,
 ) -> dict[str, Any]:
-    '''Build the canonical findROI stage product schema.'''
+    """Build the canonical findROI stage product schema."""
     selected_ddids = {int(v) for v in sci_ddids}
     source_names_by_id = {int(k): str(v) for k, v in field_info.get('source_names', {}).items()}
     field_names = [str(v) for v in field_info.get('field_names', [])]
@@ -2687,7 +2689,7 @@ def _science_spw_metadata_from_inventory(
     inv: list[dict[str, Any]],
     sci_ddids: list[int],
 ) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
-    '''Build canonical science-SPW metadata from context-backed inventory/MS state.'''
+    """Build canonical science-SPW metadata from context-backed inventory/MS state."""
     selected_ddids = {int(v) for v in sci_ddids}
     science_spws: dict[str, dict[str, Any]] = {}
     science_rows: list[dict[str, Any]] = []
@@ -2742,7 +2744,7 @@ def _save_default_summary_plots(
     results: dict[str, Any],
     products_dir: str,
 ) -> dict[str, dict[str, dict[str, str]]]:
-    '''Generate and save per-field, per-SPW summary plots; return artifact paths.'''
+    """Generate and save per-field, per-SPW summary plots; return artifact paths."""
     import matplotlib.pyplot as plt
     from pipeline.hif.tasks.findroi import plots as fplots
     plt.ioff()
@@ -2830,7 +2832,7 @@ def _save_default_summary_plots(
 
 
 def _merge_channel_ranges(ranges: list[tuple[int, int]], nchan: int) -> list[tuple[int, int]]:
-    '''Merge overlapping channel ranges after clipping to channel bounds.'''
+    """Merge overlapping channel ranges after clipping to channel bounds."""
     if nchan <= 0:
         return []
     clipped: list[tuple[int, int]] = []
@@ -2854,7 +2856,7 @@ def _merge_channel_ranges(ranges: list[tuple[int, int]], nchan: int) -> list[tup
 
 
 def _complement_channel_ranges(excluded: list[tuple[int, int]], nchan: int) -> list[tuple[int, int]]:
-    '''Return complement channel ranges for [0, nchan-1] after excluding merged ranges.'''
+    """Return complement channel ranges for [0, nchan-1] after excluding merged ranges."""
     if nchan <= 0:
         return []
     merged = _merge_channel_ranges(excluded, nchan)
@@ -2877,7 +2879,7 @@ def _write_roi_dat_files(
     roi_thresh: float,
     roi_cont_thresh: float,
 ) -> dict[str, str]:
-    '''Write ROI.dat and ROIcont.dat in cont.dat-like format from source-aggregate products.'''
+    """Write ROI.dat and ROIcont.dat in cont.dat-like format from source-aggregate products."""
     os.makedirs(products_dir, exist_ok=True)
     roi_path = os.path.join(products_dir, 'ROI.dat')
     roi_cont_path = os.path.join(products_dir, 'ROIcont.dat')
@@ -3006,7 +3008,7 @@ def _prepare_regridded_ms(
     executor: Any | None = None,
     overwrite: bool = True,
 ) -> tuple[str, str, float, float]:
-    '''Create outframe-regridded MS files.'''
+    """Create outframe-regridded MS files."""
     t_profile_total = time.perf_counter()
     is_ephem = str(outframe).upper() == 'SOURCE'
     bin_ms = os.path.join(tmp_root, f'tmp_{tag}_bin.ms')
@@ -3093,7 +3095,7 @@ def _prepare_regridded_ms(
 
 
 def _is_empty_mstransform_selection_error(exc: Exception) -> bool:
-    '''Return whether a CASA mstransform failure indicates an empty selection.'''
+    """Return whether a CASA mstransform failure indicates an empty selection."""
     message = str(exc)
     return 'MSSelectionNullSelection' in message or 'selected table has zero rows' in message
 
@@ -3103,7 +3105,7 @@ def _read_regridded_field(
     field_id: int,
     datacolumn: str = 'DATA',
 ) -> dict[str, np.ndarray] | None:
-    '''Read a single field from a regridded MS and return visibility blocks.'''
+    """Read a single field from a regridded MS and return visibility blocks."""
     out = _read_regridded_fields(regridded_ms, [field_id], datacolumn=datacolumn)
     return out.get(int(field_id))
 
@@ -3113,7 +3115,7 @@ def _read_regridded_fields(
     field_ids: list[int],
     datacolumn: str = 'DATA',
 ) -> dict[int, dict[str, np.ndarray]]:
-    '''Read multiple fields from one regridded MS in a single table query.'''
+    """Read multiple fields from one regridded MS in a single table query."""
     # Record bulk table-read timings when profiling is enabled.
     t_profile_total = time.perf_counter()
     want = sorted({int(v) for v in field_ids})
@@ -3216,7 +3218,7 @@ def _read_regridded_fields(
 
 
 def _concat_preloaded(chunks: list[dict[str, np.ndarray]]) -> dict[str, np.ndarray]:
-    '''Concatenate preloaded visibility chunks.'''
+    """Concatenate preloaded visibility chunks."""
     # Record concatenation timing when profiling is enabled.
     t_profile_total = time.perf_counter()
     v = np.concatenate([c['V'] for c in chunks], axis=0)
@@ -3239,7 +3241,7 @@ def _mini_findcont_with_fwhm(
     use_neff_scaling: bool = True,
     n_eff_maxlag: int = 64,
 ) -> dict[str, Any]:
-    '''Compute line and continuum ranges using multi-scale evidence thresholds.'''
+    """Compute line and continuum ranges using multi-scale evidence thresholds."""
     evid = np.asarray(evid, dtype=np.float64)
     nchan = evid.size
     fwhm = max(int(round(fwhm_chan)), 1)
@@ -3313,7 +3315,7 @@ def _evidence_noise_mask(
     use_mw: bool,
     nchan: int,
 ) -> np.ndarray:
-    '''Build one evidence-noise mask from reference and moment0 noise masks.'''
+    """Build one evidence-noise mask from reference and moment0 noise masks."""
     if ref_mask is None:
         ref_use = np.ones((nchan,), dtype=bool)
     else:
@@ -3343,7 +3345,7 @@ def _combine_evidence_safely(
     use_mw: bool,
     negative: bool = False,
 ) -> np.ndarray:
-    '''Combine spectra into a finite evidence array.'''
+    """Combine spectra into a finite evidence array."""
     ref = np.asarray(ref_snr, dtype=np.float64)
     mw = np.asarray(mw_snr, dtype=np.float64)
     a = -ref if negative else ref
@@ -3366,7 +3368,7 @@ def _empty_mini_with_continuum(
     dv_kms: float,
     reason: str,
 ) -> dict[str, Any]:
-    '''Build an empty ROI result that still preserves full continuum coverage.'''
+    """Build an empty ROI result that still preserves full continuum coverage."""
     cont_ranges = [(0, int(nchan) - 1)] if int(nchan) > 0 else []
     return {
         'thr': float(thr),
@@ -3418,7 +3420,7 @@ def _run_final_roi_detection(
     neg_extent_delta_thr: float,
     neg_extent_trim_frac: float,
 ) -> dict[str, Any]:
-    '''Run two-pass ROI detection with ratio renormalization and final ROI products.'''
+    """Run two-pass ROI detection with ratio renormalization and final ROI products."""
     # Record ROI-pass timing when profiling is enabled.
     t_profile_total = time.perf_counter()
     ref_snr_use = np.asarray(ref_snr, dtype=np.float64)
@@ -3619,7 +3621,7 @@ def _process_spw(
     uv_taper_fwhm_cell: float = 2.0,
     executor: Any | None = None,
 ) -> dict[str, Any]:
-    '''Process one SPW and return per-field spectra and evidence.'''
+    """Process one SPW and return per-field spectra and evidence."""
     t_all = time.perf_counter()
     rank, size = _mpi_rank_size()
     _set_profile_default_dir(tmp_dir)
@@ -3751,14 +3753,16 @@ def _process_spw(
                     continue
                 source_name = source_names_by_id.get(int(source_id), f'source_{int(source_id)}')
                 LOG.warning(
-                    'Could not determine a common LSRK frequency range for hif_findroi source %s, spw %s (reason=%s); retaining the unpruned frequency axis.',
+                    'Could not determine a common LSRK frequency range for hif_findroi source %s, spw %s '
+                    '(reason=%s); retaining the unpruned frequency axis.',
                     source_name,
                     spw_name,
                     reason,
                 )
                 _rank_logf(
                     tmp_dir,
-                    '[warn] LSRK frequency intersection failed for spw=%s source=%s reason=%s; retaining the unpruned axis',
+                    '[warn] LSRK frequency intersection failed for spw=%s source=%s reason=%s; '
+                    'retaining the unpruned axis',
                     spw_name,
                     source_id,
                     reason,
@@ -3780,14 +3784,16 @@ def _process_spw(
                 else:
                     source_name = source_names_by_id.get(int(source_id), f'source_{int(source_id)}')
                     LOG.warning(
-                        'Temporary LSRK channel axes do not support one common selection for hif_findroi source %s, spw %s (reason=%s); retaining the unpruned frequency axis.',
+                        'Temporary LSRK channel axes do not support one common selection for hif_findroi source %s, '
+                        'spw %s (reason=%s); retaining the unpruned frequency axis.',
                         source_name,
                         spw_name,
                         lsrk_channel_selection.get('reason', 'unknown'),
                     )
                     _rank_logf(
                         tmp_dir,
-                        '[warn] temporary LSRK axes do not support one common channel selection for spw=%s source=%s reason=%s; retaining the unpruned axis',
+                        '[warn] temporary LSRK axes do not support one common channel selection for spw=%s '
+                        'source=%s reason=%s; retaining the unpruned axis',
                         spw_name,
                         source_id,
                         lsrk_channel_selection.get('reason', 'unknown'),
@@ -3842,7 +3848,8 @@ def _process_spw(
             if not chunk_mapping_valid:
                 source_name = source_names_by_id.get(int(source_id), f'source_{int(source_id)}')
                 LOG.warning(
-                    'Could not match hif_findroi source %s visibility chunks to temporary LSRK MS products; retaining the unpruned frequency axis.',
+                    'Could not match hif_findroi source %s visibility chunks to temporary LSRK MS products; '
+                    'retaining the unpruned frequency axis.',
                     source_name,
                 )
                 lsrk_channel_selection = None
@@ -4226,7 +4233,7 @@ def run_findroi_mpi(
     tmp_dir: str = 'tmp_findroi',
     parallel: str | bool = 'automatic',
 ) -> dict[str, Any] | None:
-    '''Run MPI-parallel findROI processing and return the stage product.'''
+    """Run MPI-parallel findROI processing and return the stage product."""
     cfg = copy.deepcopy(_DEFAULT_FINDROI_CONFIG)
     timebin_sec = float(cfg['timebin_sec'])
     min_nchan = int(cfg['min_nchan'])
