@@ -559,29 +559,6 @@ class TsysData(object):
             auxi.setdefault(v, []).append(k)
         self.inversetsysmap = auxi.copy()
 
-        # intent = dict()
-        # for scan in set(list(scans)):
-        #     # This is a bit tricky. We need all intents on the source _name_ associated with the scan. Necessary for mosaics.
-        #     fieldnumbers_for_fieldname = msmd.fieldsforname(
-        #         msmd.fieldnames()[msmd.fieldsforscan(scan)[0]]
-        #     )
-        #     all_intents = []
-        #     for f in fieldnumbers_for_fieldname:
-        #         all_intents += msmd.intentsforfield(f)
-        #     _ii = []
-        #     # print(all_intents)
-        #     if "CALIBRATE_BANDPASS#ON_SOURCE" in all_intents:
-        #         _ii.append("bandpass")
-        #     if "CALIBRATE_PHASE#ON_SOURCE" in all_intents:
-        #         _ii.append("phasecal")
-        #     if "OBSERVE_TARGET#ON_SOURCE" in all_intents:
-        #         _ii.append("science")
-        #     if len(_ii) == 0:
-        #         _ii = ["other"]
-        #     intent[scan] = ",".join(_ii)
-        # msmd.done()
-        # break
-
         # --- PIPEREQ-449 BP=PH. Drop the PH intents. 
         atm_scans_by_fieldname = dict()
         for scan in set(list(scans)):
@@ -602,9 +579,9 @@ class TsysData(object):
                 continue  # normal, single-role field: unaffected by this case.
 
             bp_scans = [
-                    s for s in msmd.scansforintent("CALIBRATE_BANDPASS#ON_SOURCE")
-                    if any(f in msmd.fieldsforscan(s) for f in fieldnumbers_for_fieldname)
-                ]
+                s for s in msmd.scansforintent("CALIBRATE_BANDPASS#ON_SOURCE")
+                if any(f in msmd.fieldsforscan(s) for f in fieldnumbers_for_fieldname)
+            ]
 
             assert bp_scans, (
                 f"No CALIBRATE_BANDPASS#ON_SOURCE scan found for field "
@@ -713,6 +690,7 @@ class TsysData(object):
         self.absorptionfields = ["spw", "scan", "absorption"]
         self.absorptiondata = np.array([spws, scans, absorptions], dtype=object)
 
+    @staticmethod
     def tsysmap(
         vis, tsystable, msmdtool_instance=None, intent="OBSERVE_TARGET#ON_SOURCE",
         context=None,

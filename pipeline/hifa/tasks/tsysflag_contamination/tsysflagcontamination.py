@@ -17,9 +17,8 @@ from pipeline.h.tasks.tsysflag.resultobjects import TsysflagResults
 from pipeline.infrastructure import task_registry
 from pipeline.infrastructure.basetask import StandardTaskTemplate
 from pipeline.infrastructure.exceptions import PipelineException
+from pipeline.infrastructure.launcher import Context
 from pipeline.infrastructure.pipelineqa import QAScore, TargetDataSelection
-
-import pipeline.infrastructure.launcher as launcher # PIPE-3257, to use context in the extern code
 
 
 __all__ = ["TsysFlagContamination", "TsysFlagContaminationInputs"]
@@ -185,7 +184,7 @@ class ExternFunctionArguments:
     pl_run_dir: str
     plots_path: str
     single_polarization: bool
-    context: launcher.Context # PIPE-3257
+    context: Context
 
     @staticmethod
     def from_inputs(inputs: TsysFlagContaminationInputs) -> ExternFunctionArguments:
