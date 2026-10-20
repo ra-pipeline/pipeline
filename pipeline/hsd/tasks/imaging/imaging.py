@@ -2026,7 +2026,9 @@ class SDImaging(basetask.StandardTaskTemplate):
         Args:
             tirp : Parameter object of calculate_theoretical_image_rms()
         """
-        with casa_tools.MSMDReader(tirp.infile) as _msmd:
+        # ad hoc fix for CAS-14919
+        msobj = tirp.context.observing_run.get_ms(tirp.infile)
+        with casa_tools.MSMDReader(msobj.origin_ms) as _msmd:
             tirp.effBW = _msmd.chaneffbws(tirp.spwid).mean()
             LOG.info('Using an MS effective bandwidth, {} kHz'.format(tirp.effBW * 0.001))
 
