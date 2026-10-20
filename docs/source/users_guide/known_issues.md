@@ -4,7 +4,7 @@
 
 2026.2.0.30 used from Nov 2026 (CASA 6.7.4-12)
 
-2026.2.0.27 used Oct - Nov 2026 (CASA 6.7.4-8)
+2026.2.0.27 used Oct 2026 (CASA 6.7.4-8)
 
 ### CASA 2026
 

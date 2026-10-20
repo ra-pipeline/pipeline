@@ -29,10 +29,10 @@
     - <a href="/en/v2026.2.0/users_guide/known_issues.html">ALMA PL2026 known issues</a>
     - <a href="/en/v2026.2.0/apisummary.html">Task Ref. Manual</a> (<a href="/en/v2026.2.0/taskdocs.pdf">PDF</a>)
   - - 2026-10
-  - - [casa-6.7.4-12-pipeline-2026.2.0.30-py3.12.el8.tar.xz](https://casa.nrao.edu/download/distro/casa-pipeline/release/linux) (2026Oct)
-    - [casa-6.7.4.12-pipeline-2026.2.0.30-15.0-arm64-py312.dmg](https://casa.nrao.edu/download/distro/casa-pipeline/release/osx15) (2026Oct)
-    - ~~[casa-6.7.4-8-pipeline-2026.2.0.27-py3.12.el8.tar.xz](https://casa.nrao.edu/download/distro/casa-pipeline/release/linux) (2026Aug)~~
-    - ~~[casa-6.7.4.8-pipeline-2026.2.0.27-15.0-arm64-py312.dmg](https://casa.nrao.edu/download/distro/casa-pipeline/release/osx15) (2026Aug)~~
+  - - [casa-6.7.4-12-pipeline-2026.2.0.30-py3.12.el8.tar.xz](https://casa.nrao.edu/download/distro/casa-pipeline/release/linux) (latest)
+    - [casa-6.7.4.12-pipeline-2026.2.0.30-15.0-arm64-py312.dmg](https://casa.nrao.edu/download/distro/casa-pipeline/release/osx15) (latest)
+    - [casa-6.7.4-8-pipeline-2026.2.0.27-py3.12.el8.tar.xz](https://casa.nrao.edu/download/distro/casa-pipeline/release/linux)
+    - [casa-6.7.4.8-pipeline-2026.2.0.27-15.0-arm64-py312.dmg](https://casa.nrao.edu/download/distro/casa-pipeline/release/osx15)
 
 * - 2026.1.0.5
   - 6.7.1-13-gpu

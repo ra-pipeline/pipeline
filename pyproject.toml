@@ -422,7 +422,7 @@ build-pdfs = { cmd = "make latexpdf", cwd = "docs" }
 build-pdf-taskdocs = { cmd = "make latex && cd _build/latex && make taskdocs.pdf", cwd = "docs" }
 # Build User Guide PDF
 build-pdf-userguide = { cmd = "make latex && cd _build/latex && make users_guide.pdf", cwd = "docs" }
-# Update BibTeX references from NASA/ADS public library
+# Update BibTeX references from NASA SciX (ADS) public library
 update-references = { cmd = "python scripts/update_references.py" }
 
 [tool.pixi.environments]
