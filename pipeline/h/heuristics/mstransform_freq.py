@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import math
+import itertools
 import typing
 
 import numpy as np
@@ -8,6 +8,7 @@ import numpy as np
 from pipeline.domain.measures import FrequencyUnits
 import pipeline.infrastructure.casa_tools as casa_tools
 import pipeline.infrastructure.logging as logging
+import pipeline.infrastructure.utils as utils
 
 if typing.TYPE_CHECKING:
     from pipeline.domain.observingrun import ObservingRun
@@ -33,9 +34,13 @@ def configure_frequency(
     ]
 
     # get list of target sources
-    target_sources = np.unique(
-        [list(map(lambda x: x.source.name, ms.get_fields(intent="TARGET")))
-         for ms in ms_list]
+    target_sources = utils.deduplicate(
+        map(
+            lambda x: x.source.name,
+            itertools.chain.from_iterable(
+                (ms.get_fields(intent="TARGET") for ms in ms_list)
+            )
+        )
     )
 
     # output dictionary
