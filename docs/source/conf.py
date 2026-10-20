@@ -280,8 +280,11 @@ html_js_files = [
 
 mermaid_d3_zoom = True
 mermaid_include_elk = False
+# mermaid_elk_version = '0.2.3'
 mermaid_include_zenuml = False
 mermaid_height = 'auto'
+mermaid_version = '12.2.0'
+# mermaid_light_theme = 'neutral'
 myst_fence_as_directive = ['mermaid']
 
 # -- Options for HTMLHelp output ---------------------------------------

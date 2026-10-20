@@ -83,14 +83,78 @@ Example output from a split line MS where self-calibration succeeded on spw 23 o
 The diagram below outlines when datatype information is assigned and propagated through a typical ALMA / VLA interferometry run:
 
 ```mermaid
+%%{init: {
+  "theme": "base",
+  "elk": {"lineHops": false}
+}}%%
 flowchart TD
-    A["Raw Ingestion<br><code>h*_importdata</code>"] -->|"DATA: RAW<br>CORRECTED: REGCAL_CONTLINE_ALL (if present)"| B["Calibration Application<br><code>h*_applycal</code>"]
-    B -->|"CORRECTED_DATA: REGCAL_CONTLINE_ALL"| C["Split Science Targets<br><code>mssplit / transformimagedata</code>"]
-    C -->|"DATA: REGCAL_CONTLINE_SCIENCE"| D["Transform / Line Splitting<br><code>hif_mstransform / hifv_mstransform</code>"]
-    D -->|"_targets.ms DATA:<br>REGCAL_CONT_SCIENCE / IM_CONTLINE_SCIENCE"| E["Self-Calibration<br><code>hif_selfcal</code>"]
-    D -->|"_targets_line.ms DATA:<br>REGCAL_LINE_SCIENCE"| F["Continuum Subtraction<br><code>hif_uvcontsub</code>"]
-    E -->|"CORRECTED_DATA:<br>SELFCAL_*_SCIENCE (per field/spw)"| G["Clean Target List & Imaging<br><code>makeimlist / tclean</code>"]
-    F -->|"DATA: REGCAL_LINE_SCIENCE"| G
+    subgraph ALMA ["ALMA Data Workflow"]
+        direction LR
+        A1["Raw Ingestion<br><code>hifa_importdata</code>"] -->|"DATA:<BR>RAW"| B1["Calibration<br><code>hif_applycal</code>"]
+        B1 -->|"CORRECTED_DATA:<br>REGCAL_CONTLINE_ALL"| C1["Target Splitting<br><code>hif_mstransform</code>"]
+        
+        %% Single data node for the split target MS; consumers fan out from it
+        C1 --> T1["_targets.ms<br>DATA: REGCAL_CONTLINE_SCIENCE"]
+
+        %% Finding cont.dat and line extraction
+        T1 --> FC1["Cont. Finding<br><code>hif_findcont</code>"]
+        FC1 --> CD1[("cont.dat<br>Line-free ranges")]
+        
+        T1 --> UVC1["Cont. Subtraction<br><code>hif_uvcontsub</code>"]
+        CD1 -.->|"Fit ranges"| UVC1
+        UVC1 -->TL1["_targets_line.ms DATA:<br>REGCAL_LINE_SCIENCE"]
+        
+        %% Standard Cont. Imaging
+        T1 --> IMG1_CONT["Standard Cont. Imaging<br><code>hif_makeimages (cont)</code>"]
+        CD1 -.->|"Channel selection"| IMG1_CONT
+        
+        %% Self-Calibration & Selfcal Imaging
+        T1 --> SC1["Self-Calibration<br><code>hif_selfcal</code>:solve"]
+        CD1 -.->|"Flag lines before solve"| SC1
+        SC1 --> |"<code>hif_selfcal</code>:apply"| SC_DATA1["_targets.ms CORRECTED_DATA:<br>SELFCAL_CONTLINE_SCIENCE<br><br>_targets_line.ms CORRECTED_DATA:<br>SELFCAL_LINE_SCIENCE"]
+        TL1 -->|"<code>hif_selfcal</code>:apply"| SC_DATA1
+        SC_DATA1 --> IMG1_SC["Selfcal/Standard Imaging<br><code>hif_makeimages (datatype='best')</code>"]
+    end
+
+    subgraph VLA ["VLA Data Workflow"]
+        direction LR
+        A2["Raw Ingestion<br><code>hifv_importdata</code>"] -->|"DATA:<BR>RAW"| B2["Calibration<br><code>hifv_applycals</code>"]
+        B2 -->|"CORRECTED_DATA:<br>REGCAL_CONTLINE_ALL"| C2["Dual Target Split<br><code>hifv_mstransform</code>"]
+        
+        %% Data nodes for the two split MSs; consumers fan out from them
+        C2 --> T2["_targets.ms<br>DATA: REGCAL_CONTLINE_SCIENCE<BR>without RFI flagging"]
+        C2 --> TC2["_targets_cont.ms<br>DATA: REGCAL_CONT_SCIENCE<BR>with RFI flagging"]
+
+        %% Finding cont.dat and line extraction
+        T2 --> FC2["Cont. Finding<br><code>hif_findcont</code>"]
+        FC2 --> CD2[("cont.dat<br>Line-free ranges")]
+        
+        T2 --> UVC2["Cont. Subtraction<br><code>hif_uvcontsub</code>"]
+        CD2 -.->|"Fit ranges"| UVC2
+        UVC2 -->TL2["_targets_line.ms DATA: REGCAL_LINE_SCIENCE"]
+
+        TL2 --> IMG2_LINE["Standard Cube Imaging<br><code>hif_makeimages (cube)</code>"]
+        
+        %% Standard Cont. Imaging
+        TC2 --> IMG2_CONT["Standard Cont. Imaging<br><code>hif_makeimages (cont)</code>"]
+        
+        %% Self-Calibration & Selfcal Imaging
+        TC2 --> SC2["Self-Calibration<br><code>hif_selfcal</code>:solve"]
+        CD2 -.->|"Flag lines before solve"| SC2
+        SC2 --> |"<code>hif_selfcal</code>:apply"| SC_DATA2["_targets_cont.ms CORRECTED_DATA:<br>SELFCAL_CONT_SCIENCE<br><br>_targets_line.ms CORRECTED_DATA:<br>SELFCAL_LINE_SCIENCE"]
+        TL2 -->|"<code>hif_selfcal</code>:apply"| SC_DATA2
+        SC_DATA2 --> IMG2_SC["Selfcal Imaging<br><code>hif_makeimages (datatype='selfcal')</code>"]
+    end
+
+    %% Data nodes styled like the edge labels: grey fill, no border
+    classDef datalabel fill:#e8e8e8,color:#333
+    class T1,TL1,T2,TL2,TC2 datalabel
+
+    %% Data nodes styled like the edge labels: grey fill, no border
+    classDef dataupdate fill:#e8e8e8,stroke-width:0px,color:#333
+    class SC_DATA1,SC_DATA2 dataupdate
+
+    ALMA ~~~ VLA
 ```
 
 ### Stage Details
@@ -106,13 +170,13 @@ flowchart TD
    * After caltables are applied, `ApplycalResults.merge_with_context()` sets `DataType.REGCAL_CONTLINE_ALL` on `'CORRECTED_DATA'`.
 3. **`mssplit` / `transformimagedata`**:
    * When splitting target fields (`intent='TARGET'`), sets `'DATA'` of the new MS to `DataType.REGCAL_CONTLINE_SCIENCE`.
-4. **`h*_mstransform` ({func}`~pipeline.hif.cli.hif_mstransform`), ({func}`~pipeline.hifv.cli.hifv_mstransform`)**:
+4. **`h*_mstransform` ({func}`~pipeline.hif.cli.hif_mstransform`, {func}`~pipeline.hifv.cli.hifv_mstransform`)**:
    * Maps parent datatypes to transformed target types (`REGCAL_CONTLINE_SCIENCE -> IM_CONTLINE_SCIENCE`, `SELFCAL_CONTLINE_SCIENCE -> IM_CONTLINE_SCIENCE`).
    * For VLA, registers `DataType.REGCAL_CONT_SCIENCE` on `_targets.ms` and `DataType.REGCAL_CONTLINE_SCIENCE` on `_targets_line.ms`.
 5. **`hif*_selfcal` ({func}`~pipeline.hif.cli.hif_selfcal`, {func}`~pipeline.hifv.cli.hifv_selfcal`)**:
    * When self-cal solutions are applied, maps the base `'DATA'` type to its selfcal equivalent (`REGCAL_* -> SELFCAL_*`).
    * Calls {meth}`~pipeline.domain.MeasurementSet.set_data_column` with `(dtype_applied, 'CORRECTED_DATA', source=field, spw=spw_sel)` for each successfully calibrated target and SPW.
-6. **`{func}`~pipeline.hif.cli.hif_uvcontsub`**:
+6. **{func}`~pipeline.hif.cli.hif_uvcontsub`**:
    * Sets `'DATA'` of `_targets_line.ms` to `DataType.REGCAL_LINE_SCIENCE`.
 7. **Single Dish ({func}`~pipeline.hsd.cli.hsd_atmcor`, {func}`~pipeline.hsd.cli.hsd_baseline`)**:
    * Sets `'DATA'` to `DataType.ATMCORR` after atmospheric correction, and `DataType.BASELINED` after baseline subtraction.
@@ -129,34 +193,46 @@ When running standard restore tasks:
 2. Caltables and flags are unpacked and restored.
 3. {class}`~pipeline.hif.tasks.applycal.ifapplycal.IFApplycal` or {class}`~pipeline.hifv.tasks.finalcals.applycals.Applycals` applies calibrations, generating `CORRECTED_DATA`, and registers `DataType.REGCAL_CONTLINE_ALL`, writing a second record to MS `HISTORY`.
 
-> **Note on `restoredata` Scope**:  
-> {func}`~pipeline.hifa.cli.hifa_restoredata` / {func}`~pipeline.hifv.cli.hifv_restoredata` only restores the parent EB (`<uid>.ms`). It does not split `_targets.ms` or apply self-calibration, so restored parent EBs will never contain `SELFCAL_*` datatypes.
+> **Note on `restoredata` Scope & Target Splitting**:  
+> {func}`~pipeline.hifa.cli.hifa_restoredata` / {func}`~pipeline.hifv.cli.hifv_restoredata` only restores the parent EB (`<uid>.ms`) with standard-calibrated data in `CORRECTED_DATA`. It does not split science targets or apply self-calibration, so restored parent EBs will never contain `SELFCAL_*` datatypes.  
+> Consequently, workflows must explicitly run {func}`~pipeline.hif.cli.hif_mstransform` (ALMA) or {func}`~pipeline.hifv.cli.hifv_mstransform` (VLA) between standard restore and self-calibration restore. Self-calibration restoration operates directly on the split target MeasurementSets (`_targets.ms`), not on the parent EB (see below).
 
 ### Follow-up Self-Calibration Restore (`hif_selfcal` Apply-Only Mode)
 
-To restore self-calibrated data, a workflow should execute {func}`~pipeline.hif.cli.hif_selfcal` in restore mode (`recal=False`, `apply=True`) following the standard restore and target split:
+To restore self-calibrated data, a workflow must run {func}`~pipeline.hif.cli.hif_mstransform` / {func}`~pipeline.hifv.cli.hifv_mstransform` to generate `_targets.ms`, followed by {func}`~pipeline.hif.cli.hif_selfcal` in restore mode (`recal=False`, `apply=True`):
 
 ```mermaid
+%%{init: {
+  "theme": "base",
+  "elk": {"lineHops": false}
+}}%%
 sequenceDiagram
     autonumber
-    participant RestoreScript as Restore Script
+    participant Workflow as Self-Calibration<br>Restore Workflow
     participant hif_selfcal as hif_selfcal
-    participant selfcal_json as selfcal.json / auxproducts
-    participant TargetMS as _targets.ms (TableWriter)
-    participant History as _targets.ms HISTORY
+    participant selfcal_json as selfcal.json<br>auxproducts.tgz
+    participant TargetMS as _targets[_cont].ms
+    participant LineMS as _targets_line.ms
+    participant History as _targets[_cont].ms<br>HISTORY
+    participant LineHistory as _targets_line.ms<br>HISTORY    
 
-    RestoreScript->>hif_selfcal: hif_selfcal(recal=False, apply=True)
+    Workflow->>hif_selfcal: hif_selfcal(recal=False, apply=True)
+    hif_selfcal->>TargetMS: Check processing_data_types (DATA: REGCAL_CONT[LINE]_SCIENCE)
+    hif_selfcal->>LineMS: Check processing_data_types (DATA: REGCAL_LINE_SCIENCE)
     hif_selfcal->>selfcal_json: _check_restore_from_resources()
-    selfcal_json-->>hif_selfcal: scal_targets (SC_success flags)
+    selfcal_json-->>hif_selfcal: scal_targets (SC_success flags, caltables)
     hif_selfcal->>TargetMS: _apply_scal(): apply caltables to CORRECTED_DATA
+    hif_selfcal->>LineMS: _apply_scal(): apply caltables to CORRECTED_DATA
     hif_selfcal->>hif_selfcal: merge_with_context() -> _register_datatype()
-    hif_selfcal->>History: set_data_column(SELFCAL_*_SCIENCE, 'CORRECTED_DATA', source, spw)
+    hif_selfcal->>History: set_data_column(SELFCAL_CONT[LINE]_SCIENCE, 'CORRECTED_DATA', source, spw)
+    hif_selfcal->>LineHistory: set_data_column(SELFCAL_LINE_SCIENCE, 'CORRECTED_DATA', source, spw)
 ```
 
-1. **Solution Discovery**: `hif_selfcal` checks for `selfcal.json` in the current working directory, in `../products/`, or inside `auxproducts.tgz`. If found, it sideloads the solutions and skips the self-cal solver.
-2. **Selective Application**: For each target where self-calibration succeeded (`SC_success == True`), caltables are applied to `CORRECTED_DATA`. Unsuccessful targets are left with standard-calibrated data in `CORRECTED_DATA` (from the initialization of the `CORRECTED_DATA` column).
-3. **Datatype Registration**: In the `merge_with_context()` class method, `_register_datatype()` registers `DataType.SELFCAL_*` on `CORRECTED_DATA` scoped strictly to the successful field and SPW combinations.
-4. **Target MS Persistence**: In ≥ PL2025, {meth}`~pipeline.domain.MeasurementSet.set_data_column` writes the updated dictionaries to the `HISTORY` table of the **split target MS** (`_targets.ms`).
+1. **Target MS Input**: `hif_selfcal` operates on `_targets.ms`, verifying `'DATA'` is registered as `DataType.REGCAL_CONTLINE_SCIENCE` or `DataType.REGCAL_CONT_SCIENCE` (matching `SelfcalInputs.processing_data_types`).
+2. **Solution Discovery**: `hif_selfcal` checks for `selfcal.json` in the current working directory, in `../products/`, or inside `auxproducts.tgz`. If found, it sideloads the solutions and skips the self-cal solver.
+3. **Selective Application**: For each target where self-calibration succeeded (`SC_success == True`), caltables are applied to `CORRECTED_DATA` in `_targets.ms` (and `_targets_line.ms` if present). Unsuccessful targets retain standard-calibrated data in `CORRECTED_DATA` (from the initialization of the `CORRECTED_DATA` column).
+4. **Datatype Registration**: In the `merge_with_context()` class method, `_register_datatype()` registers `DataType.SELFCAL_*` on `CORRECTED_DATA` scoped strictly to the successful field and SPW combinations.
+5. **Target MS Persistence**: In ≥ PL2025, {meth}`~pipeline.domain.MeasurementSet.set_data_column` writes the updated dictionaries to the `HISTORY` table of the **split target MS** (`_targets.ms`).
 
 ---
 

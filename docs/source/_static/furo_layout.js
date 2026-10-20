@@ -95,7 +95,7 @@
             // Dynamic intrinsic scaling:
             // Extract the diagram's designed width and height from its viewBox.
             // Small diagrams cap at their natural width so they don't blow up.
-            // Tall diagrams (flowchart TD) cap at 500px with proportional width so they don't dominate the page.
+            // Tall diagrams (flowchart TD) cap at 750px with proportional width so they don't dominate the page.
             // Wide diagrams (Gantt charts, sequence diagrams) expand naturally across the container.
             var vbWidth = 0;
             var vbHeight = 0;
@@ -115,10 +115,20 @@
 
             // Detect Gantt charts or dense timelines to preserve readability and prevent horizontal collapse
             var isGantt = svg.querySelector('.grid') || svg.querySelector('.task') || svg.querySelector('rect.task') || svg.classList.contains('gantt');
+            var isMultiColumn = vbWidth >= 1200;
             if (isGantt) {
                 svg.style.setProperty('min-width', '750px', 'important');
                 svg.style.setProperty('width', '100%', 'important');
                 svg.style.setProperty('max-width', '100%', 'important');
+                svg.style.removeProperty('max-height');
+            } else if (isMultiColumn) {
+                // Multi-column side-by-side diagrams (e.g. parallel subgraphs):
+                // Fit to the container width (the viewBox scales the content). A fixed min-width
+                // wider than the article column clips the right-hand subgraph; use the
+                // full-screen button to read the labels at native size.
+                svg.style.setProperty('max-width', '100%', 'important');
+                svg.style.setProperty('width', '100%', 'important');
+                svg.style.removeProperty('min-width');
                 svg.style.removeProperty('max-height');
             } else if (vbHeight > 750 && vbWidth > 0) {
                 // Tall diagrams (e.g. flowchart TD): clamp height to 750px and compute proportional width
