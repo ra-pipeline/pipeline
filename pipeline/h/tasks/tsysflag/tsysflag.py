@@ -765,7 +765,7 @@ class TsysflagView:
         self.ms = ms
 
         # Get the spws from the tsystable.
-        tsysspws = {row.get('SPECTRAL_WINDOW_ID') for row in tsystable.rows}
+        tsysspws = utils.deduplicate([row.get('SPECTRAL_WINDOW_ID') for row in tsystable.rows])
 
         # Get the Tsys spw map by retrieving it from the first tsys CalFrom
         # that is present in the callibrary. We need to know the Tsys mapping
@@ -806,6 +806,17 @@ class TsysflagView:
         # Compute the flagging view for every spw and every intent
         LOG.info('Computing flagging metrics for caltable {}'.format(table))
         for tsys_spw_id, intent_to_field_ids in tsys_spw_to_intent_to_field_ids.items():
+            # Edge channel detection is intent-independent; compute one view per spw using all fields.
+            if self.metric == 'edgechans':
+                all_field_ids = set().union(*intent_to_field_ids.values())
+                if not all_field_ids:
+                    LOG.warning('{} - no valid fields found for Tsys spw {}, unable to create'
+                                ' corresponding flagging views.'.format(ms.basename, tsys_spw_id))
+                else:
+                    self.calculate_median_channel_view(tsystable, tsys_spw_id,
+                                                       ','.join(intent_to_field_ids), all_field_ids)
+                continue
+
             for intent, field_ids in intent_to_field_ids.items():
                 # Warn if no fields were found for this Tsys spw and intent.
                 if not field_ids:
@@ -825,9 +836,6 @@ class TsysflagView:
 
                 elif self.metric == 'birdies':
                     self.calculate_antenna_diff_channel_view(tsystable, tsys_spw_id, intent, field_ids)
-
-                elif self.metric == 'edgechans':
-                    self.calculate_median_channel_view(tsystable, tsys_spw_id, intent, field_ids)
 
     @staticmethod
     def get_tsystable_data(tsystable, spwid, fieldids, antenna_names,
