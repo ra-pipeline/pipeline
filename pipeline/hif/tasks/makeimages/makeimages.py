@@ -175,9 +175,7 @@ class MakeImagesInputs(vdp.StandardInputs):
                 product retains the same name.  Additional products start
                 counting with 'v2', 'v3', etc.
 
-            vlass_plane_reject_im: Only used for the 'VLASS-SE-CUBE' imaging mode.
-
-                Default: True
+            vlass_plane_reject_im: Only used for the 'VLASS-SE-CUBE' imaging mode. Defaults to True.
 
                 If True, reject VLASS Coarse Cube planes with high flagging percentages or outlier beam sizes (see the heuristics details below)
 
