@@ -11,7 +11,7 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
                    hm_maxpsffraction=None, hm_weighting=None, hm_cleaning=None, tlimit=None, drcorrect=None, masklimit=None,
                    cleancontranges=None, calcsb=None, hm_mosweight=None, overwrite_on_export=None, vlass_plane_reject_im=None,
                    parallel=None):
-    """Create cleaned images from the target list populated by :func:`~pipeline.hif.cli.hif_makeimlist`.
+    r"""Create cleaned images from the target list populated by :func:`~pipeline.hif.cli.hif_makeimlist`.
 
     In standard ALMA interferometric recipes, this task is invoked multiple times for different imaging
     purposes. The scenarios include:
@@ -147,45 +147,106 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
       and recomputed thresholds if not found). This mask is only displayed in the Stokes I WebLog.
     
     - **Automatic Clean Boxes (Automasking)**
-      Images are deconvolved using ``tclean`` with the ``auto-multithresh`` auto-masking algorithm (Kepley et al. 2020),
-      which mimics interactive cleaning. The masking threshold is the greater of the values calculated based on the
-      residual rms noise and sidelobe levels. For continuum imaging, if the algorithm prunes all regions (which can
-      happen for compact, high-SNR emission), ``tclean`` is run again using a fallback clean mask corresponding to
-      the area above a fraction of the primary beam response (default 0.3). To save time, this fallback is not done
-      for cube imaging.
+      Images are deconvolved using :func:`~casatasks.imaging.tclean` with the ``auto-multithresh`` auto-masking algorithm
+      (:cite:`2020PASP..132b4505K`), which mimics interactive cleaning. The masking threshold is the greater of the values
+      calculated based on the residual rms noise and sidelobe levels. For continuum imaging, if the algorithm prunes all
+      regions (which can happen for compact, high-SNR emission), :func:`~casatasks.imaging.tclean` is run again using a
+      fallback clean mask corresponding to the area above a fraction of the primary beam response (default 0.3). To save
+      time, this fallback is not done for cube imaging.
       
       The auto-masking parameters vary based on the array and the 75th percentile baseline length (b75):
 
-      .. code-block:: text
+      .. list-table:: Auto-masking parameters by array configuration and baseline length
+         :header-rows: 1
 
-          Parameter          7m     12m b75<300m  12m b75=300-400m  12m b75>400m
-          noisethreshold    5.0       4.25           5.0              5.0
-          sidelobethreshold 1.25      2.0            2.0              2.5
-          lownoisethreshold 2.0       1.5            1.5              1.5
-          minbeamfrac       0.1       0.3            0.3              0.3
-          negativethreshold 0.0/15.0  0.0/7.0        0.0/7.0          0.0/7.0
-          fastnoise         False     False          False            True
+         * - Parameter
+           - 7-m
+           - | 12-m
+             | (b75 < 300 m)
+           - | 12-m
+             | (300 m ≤ b75 < 400 m)
+           - | 12-m
+             | (b75 ≥ 400 m)
+         * - noisethreshold
+           - 5.0
+           - 4.25
+           - 5.0
+           - 5.0
+         * - sidelobethreshold
+           - 1.25
+           - 2.0
+           - 2.0
+           - 2.5
+         * - lownoisethreshold
+           - 2.0
+           - 1.5
+           - 1.5
+           - 1.5
+         * - minbeamfrac
+           - 0.1
+           - 0.3
+           - 0.3
+           - 0.3
+         * - negativethreshold*
+           - 0.0 / 15.0
+           - 0.0 / 7.0
+           - 0.0 / 7.0
+           - 0.0 / 7.0
+         * - fastnoise**
+           - False
+           - False
+           - False
+           - True
 
-      *(Note: negativethreshold is 0.0 for continuum and the higher value for line imaging. fastnoise=True uses a simple median absolute deviation; fastnoise=False uses the Chauvenet method).*
+      .. note::
 
-    - **Cleaning Threshold and Dynamic Range**:
-      Images are cleaned to `2 x (predicted rms noise) x (dynamic range correction factor)`.
-      To prevent divergence, if on-source time < 60s and dirty DR > 30 for a cube image, it uses a factor of 5 instead of 2.
+         \* ``negativethreshold`` is 0.0 for continuum and the higher value for line imaging.
+
+         \*\* ``fastnoise=True`` uses a simple median absolute deviation; ``fastnoise=False`` uses the Chauvenet method.
+
+    - **Cleaning Threshold and Dynamic Range**
+      Images are cleaned to a threshold of `2 × (predicted rms noise) × (dynamic range correction factor)`. The dynamic
+      range correction factor accounts for the fact that sources with a high dynamic range will have larger imaging
+      artifacts, which cannot be fully cleaned. Because artifacts worsen with poorer UV coverage, separate
+      dynamic range (DR) correction factors are adopted for 12-m and 7-m array observations of calibrators and science targets according
+      to the tables below:
+
+      .. list-table:: Dynamic range correction factor (Calibrators)
+         :header-rows: 1
+
+         * - Array
+           - Calibrator Dynamic Range
+           - Correction Factor
+         * - 12-m
+           - ≤ 1000
+           - 1
+         * - 12-m
+           - 1000 – 3000
+           - DR / 1000
+         * - 12-m
+           - ≥ 3000
+           - DR / 3000
+         * - 7-m
+           - ≤ 200
+           - 1
+         * - 7-m
+           - ≥ 200
+           - DR / 200
 
       .. list-table:: 12-m array dynamic range correction factor (Science Targets)
          :header-rows: 1
 
          * - Source Dynamic Range
            - Correction Factor
-         * - <= 20
+         * - ≤ 20
            - 1
-         * - 20 -- 50
+         * - 20 – 50
            - 1.5
-         * - 50 -- 100
+         * - 50 – 100
            - 2
-         * - 100 -- 150
+         * - 100 – 150
            - 2.5
-         * - >= 150
+         * - ≥ 150
            - max(2.5, DR/150)
 
       .. list-table:: 7-m array dynamic range correction factor (Science Targets)
@@ -193,55 +254,39 @@ def hif_makeimages(vis=None, target_list=None, hm_masking=None,
 
          * - Source Dynamic Range
            - 1 EB
-           - >= 2 EBs
-         * - <= 4
+           - ≥ 2 EBs
+         * - ≤ 4
            - 1
            - 1
-         * - 4 -- 10
+         * - 4 – 10
            - 1.5
            - 1.5
-         * - 10 -- 20
+         * - 10 – 20
            - 2
            - 2
-         * - 20 -- 30
+         * - 20 – 30
            - 2.5
            - 2.5
-         * - 30 -- 55
+         * - 30 – 55
            - max(2.5, DR/30)
            - 2.5
-         * - 55 -- 75
+         * - 55 – 75
            - max(2.5, DR/30)
            - 3.0
-         * - >= 75
+         * - ≥ 75
            - max(2.5, DR/30)
            - max(3.5, DR/55)
 
-      .. list-table:: 12-m array dynamic range correction factor (Calibrators)
-         :header-rows: 1
+      In addition to this correction factor, to prevent divergence in cases of high dynamic range along with poor UV
+      coverage, when the on-source integration time is less than 60s and the dirty dynamic range of a spectral window
+      cube image is greater than 30, the clean threshold will instead be set to
+      `5 × (predicted rms noise) × (dynamic range correction factor)`.
 
-         * - Calibrator Dynamic Range
-           - Correction Factor
-         * - <= 1000
-           - 1
-         * - 1000 -- 3000
-           - DR / 1000
-         * - >= 3000
-           - DR / 3000
-
-      .. list-table:: 7-m array dynamic range correction factor (Calibrators, 1 EB)
-         :header-rows: 1
-
-         * - Calibrator Dynamic Range
-           - Correction Factor
-         * - <= 200
-           - 1
-         * - >= 200
-           - DR / 200
-
-      For images made with ``datatype='selfcal'`` (see the :func:`~pipeline.hif.cli.hif_makeimlist` ``datatype`` parameter), 
-      the dynamic range correction factor is set to `(final rms measured by` :func:`~pipeline.hif.cli.hif_selfcal` `) /
-      (predicted rms noise)`. If, however, prior ``datatype='regcal'`` imaging of the same target has been performed, the dynamic range 
-      correction factor is set to the minimum of the two values.
+      For ALMA aggregate continuum images made with ``datatype='selfcal'`` (see the :func:`~pipeline.hif.cli.hif_makeimlist`
+      ``datatype`` parameter) after a successful self-calibration, the dynamic range correction factor is set to
+      the ratio of the final RMS measured by :func:`~pipeline.hif.cli.hif_selfcal` to the predicted theoretical noise.
+      If prior ``datatype='regcal'`` continuum imaging of the same target has been performed, the resulting cleaning
+      threshold is capped so that it does not exceed the threshold used in the regular calibration image.
 
     Notes:
         The following base QA behavior applies to ALMA imaging:
