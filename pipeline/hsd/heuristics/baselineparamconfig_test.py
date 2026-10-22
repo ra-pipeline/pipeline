@@ -38,25 +38,39 @@ def heuristic_cspline():
 def test_as_maskstring(masklist, expected):
     assert as_maskstring(masklist) == expected
 
-
-def test_write_blparam():
+@pytest.mark.parametrize("func, npiece, nwave, expected", [
+    ("poly","", "", ["1", "0", "0~10", "poly", "1", "", ""]),
+    ("cspline", 3, "", ["1", "0", "0~10", "cspline", "1", "3", ""]),
+    ("sinusoid","", [2,4,6], ["1", "0", "0~10", "sinusoid", "1", "", "[2,4,6]"]),
+])
+def test_write_blparam(func, npiece, nwave, expected):
     fileobj = io.StringIO()
     param = {
         BLP.ROW: 1,
         BLP.POL: 0,
         BLP.MASK: "0~10",
-        BLP.FUNC: "poly",
-        BLP.ORDER: 1
+        BLP.FUNC: func,
+        BLP.ORDER: 1,
+        BLP.NPIECE: npiece,
+        BLP.NWAVE: nwave
     }
     write_blparam(fileobj, param)
     output = fileobj.getvalue().strip()
+    print(output)
     # Values: 1, 0, 0~10, , , , , , , , poly, 1, ,
     parts = output.split(',')
     assert parts[0] == "1"
     assert parts[1] == "0"
     assert parts[2] == "0~10"
-    assert parts[10] == "poly"
+    assert parts[10] == expected[3]
     assert parts[11] == "1"
+    assert parts[12] == expected[5]
+
+    if expected[6].__contains__("["):
+        assert ",".join(parts[13:16]) == expected[6]
+    else:
+        assert parts[13] == expected[6]
+
 
 
 def test_no_switching():
@@ -195,4 +209,4 @@ class TestBaselineFitParamConfig:
         assert hashlib.sha256(open('test.blparam','rb').read()).hexdigest() == expected_contents
 
         # Clean up the file.
-        pathlib.Path("test.blparam").unlink(missing_ok=True)
+        #pathlib.Path("test.blparam").unlink(missing_ok=True)
