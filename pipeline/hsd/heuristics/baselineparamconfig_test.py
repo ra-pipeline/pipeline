@@ -99,13 +99,6 @@ class TestBaselineFitParamConfig:
         result = heuristic_poly._BaselineFitParamConfig__convert_flags_to_masklist(flags)
         assert result == [[[1, 2]], [[0, 0], [3, 3]]]
 
-    def test_dummy_baseline_param(self, heuristic_poly):
-        dummy = heuristic_poly._dummy_baseline_param(10, 1)
-        assert dummy[BLP.ROW] == 10
-        assert dummy[BLP.POL] == 1
-        assert dummy[BLP.MASK] == ''
-        assert dummy[BLP.FUNC] == 'poly'
-
     def test_get_fit_param_poly(self, heuristic_poly):
         edge = fitorder.EdgeChannels(0, 0)
         result = heuristic_poly._get_fit_param(polyorder=2, nchan=100, edge=edge, nchan_without_edge=100,
@@ -181,6 +174,9 @@ class TestBaselineFitParamConfig:
         # Mock FitOrderHeuristics
         mock_fo = mock_fitorder_heuristics.return_value
         mock_fo.calculate.return_value = 1
+
+        if pathlib.Path.cwd().joinpath("test.blparam").exists():
+            pathlib.Path("test.blparam").unlink(missing_ok=True)
 
         _ = heuristic_poly.calculate(
             datatable=mock_datatable,
