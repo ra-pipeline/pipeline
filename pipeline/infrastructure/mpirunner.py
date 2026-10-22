@@ -1,5 +1,7 @@
 """Generic helpers for running callables in an MPI-enabled CASA subprocess."""
 
+from __future__ import annotations
+
 import functools
 import importlib
 import inspect
@@ -14,10 +16,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 import casaconfig.config
+
 # NOTE: ``import casatasks`` previously lived here.  It is only needed by
 # :func:`call_with_mpi` to format the launcher script; we defer it to that
 # call site to avoid CASA C++ startup at ``pipeline`` import time.
-
 from pipeline import infrastructure
 
 LOG = infrastructure.logging.get_logger(__name__)
@@ -70,8 +72,10 @@ def _nproc_from_dask(fallback: int = 4) -> int:
 
     # When pac-man/Parsl is orchestrating, derive nproc from tier0 worker count.
     try:
-        from pipeline.infrastructure import parslhelpers
         import parsl
+
+        from pipeline.infrastructure import parslhelpers
+
         if parslhelpers.is_parsl_ready():
             dfk = parsl.dfk()
             executor = dfk.executors.get('tier0_executor')
@@ -85,16 +89,15 @@ def _nproc_from_dask(fallback: int = 4) -> int:
     return fallback
 
 
-def run_in_mpicasa(fn: Callable[..., Any] | None = None, /, *args: Any,
-                   nproc: int | None = None, **kwargs: Any):
+def run_in_mpicasa(fn: Callable[..., Any] | None = None, /, *args: Any, nproc: int | None = None, **kwargs: Any):
     r"""Run a callable in an MPI-enabled CASA subprocess or decorate one to do so.
 
     Usages:
         1. Direct call:
            ``run_in_mpicasa(callable, *args, nproc=..., **kwargs)``
 
-        2. Decorator (no args):
-           ``@run_in_mpicasa``
+        2. Decorator (default settings):
+           ``@run_in_mpicasa()``
 
         3. Decorator (configured):
            ``@run_in_mpicasa(nproc=8)``
@@ -110,18 +113,18 @@ def run_in_mpicasa(fn: Callable[..., Any] | None = None, /, *args: Any,
     if fn is None:
         return _decorate
 
-    # @run_in_mpicasa without parameters: Python passes the function object and
-    # expects a wrapped callable back.
-    if callable(fn) and not args and not kwargs:
-        return _decorate(fn)
-
     # Direct execution path.
     return _run_in_mpicasa_call(fn, *args, nproc=nproc, **kwargs)
 
 
-def call_with_mpi(fn: Callable[..., Any] | None = None, /, *args: Any,
-                  nproc: int | None = None, parallel: bool | dict = True,
-                  **kwargs: Any):
+def call_with_mpi(
+    fn: Callable[..., Any] | None = None,
+    /,
+    *args: Any,
+    nproc: int | None = None,
+    parallel: bool | dict = True,
+    **kwargs: Any,
+):
     r"""Call *fn* with MPI parallelism, delegating to a subprocess when needed.
 
     Dispatches across three execution paths:
@@ -136,8 +139,8 @@ def call_with_mpi(fn: Callable[..., Any] | None = None, /, *args: Any,
         1. Direct call:
            ``call_with_mpi(callable, *args, parallel=..., nproc=..., **kwargs)``
 
-        2. Decorator (no args):
-           ``@call_with_mpi``
+        2. Decorator (default settings):
+           ``@call_with_mpi()``
 
         3. Decorator (configured):
            ``@call_with_mpi(nproc=8)`` or ``@call_with_mpi(parallel={'nproc': 8})``
@@ -165,18 +168,14 @@ def call_with_mpi(fn: Callable[..., Any] | None = None, /, *args: Any,
             # value over the decorator's closure default; this avoids a
             # "multiple values for parallel" TypeError on the forward call.
             parallel_arg = wrapped_kwargs.pop('parallel', parallel)
-            return _call_with_mpi_dispatch(target_fn, *wrapped_args, nproc=nproc,
-                                           parallel=parallel_arg, **wrapped_kwargs)
+            return _call_with_mpi_dispatch(
+                target_fn, *wrapped_args, nproc=nproc, parallel=parallel_arg, **wrapped_kwargs
+            )
 
         return _wrapped
 
     if fn is None:
         return _decorate
-
-    # @call_with_mpi without parameters: Python passes the function object and
-    # expects a wrapped callable back.
-    if callable(fn) and not args and not kwargs:
-        return _decorate(fn)
 
     # Direct execution path.
     return _call_with_mpi_dispatch(fn, *args, nproc=nproc, parallel=parallel, **kwargs)
@@ -191,9 +190,9 @@ def _accepts_parallel(fn: Callable[..., Any]) -> bool:
         return False
 
 
-def _call_with_mpi_dispatch(fn: Callable[..., Any], /, *args: Any,
-                             nproc: int | None = None, parallel: bool | dict = True,
-                             **kwargs: Any) -> Any:
+def _call_with_mpi_dispatch(
+    fn: Callable[..., Any], /, *args: Any, nproc: int | None = None, parallel: bool | dict = True, **kwargs: Any
+) -> Any:
     """Dispatch *fn* to in-process serial, in-process MPI, or MPI subprocess."""
     if parallel is False:
         return fn(*args, **kwargs)
@@ -215,6 +214,15 @@ def _call_with_mpi_dispatch(fn: Callable[..., Any], /, *args: Any,
 
 def _run_in_mpicasa_call(fn: Callable[..., Any], /, *args: Any, nproc: int | None = None, **kwargs: Any) -> Any:
     r"""Run *fn(\*args, \*\*kwargs)* inside a fresh MPI-enabled CASA subprocess."""
+    exe_dict = find_executable(Path(sys.executable).parent.as_posix())
+    # Prefer the CASA launcher over the modular environment's mpirun.
+    mpiexec = exe_dict.get('mpicasa') or exe_dict.get('mpirun')
+    if not mpiexec:
+        LOG.warning('No MPI launcher found; falling back to serial in-process execution.')
+        if _accepts_parallel(fn):
+            kwargs['parallel'] = False
+        return fn(*args, **kwargs)
+
     if nproc is None:
         nproc = _nproc_from_dask()
 
@@ -241,6 +249,7 @@ def _run_in_mpicasa_call(fn: Callable[..., Any], /, *args: Any, nproc: int | Non
     fn_bytes = None
     try:
         import cloudpickle as _cloudpickle
+
         if _fn_module_obj is not None:
             _cloudpickle.register_pickle_by_value(_fn_module_obj)
         try:
@@ -338,24 +347,16 @@ def _run_in_mpicasa_call(fn: Callable[..., Any], /, *args: Any, nproc: int | Non
             'KOKKOS_DISABLE_WARNINGS=1',
         ]
 
-        exe_dict = find_executable(Path(sys.executable).parent.as_posix())
-        # mpicasa (monolithic env) takes precedence over mpirun (modular env)
-        # note that shutil.which('mpirun') may also find a system-wide mpirun -- which usually does not work
-        mpiexec = exe_dict.get('mpicasa') or exe_dict.get('mpirun')
-        mpi_args = []
-        if mpiexec:
-            mpi_args = [
-                mpiexec,
-                '-display-allocation',
-                '-display-map',
-                '-report-bindings',
-                '--oversubscribe',
-            ]
-            for env_arg in env_args:
-                mpi_args += ['-x', env_arg.split('=', 1)[0]]
-            mpi_args += ['-n', str(nproc)]
-        else:
-            LOG.warning('No MPI launcher found; falling back to serial Python execution.')
+        mpi_args = [
+            mpiexec,
+            '-display-allocation',
+            '-display-map',
+            '-report-bindings',
+            '--oversubscribe',
+        ]
+        for env_arg in env_args:
+            mpi_args += ['-x', env_arg.split('=', 1)[0]]
+        mpi_args += ['-n', str(nproc)]
 
         cmd_args = xvfb_args + mpi_args + call_args
 
@@ -364,8 +365,11 @@ def _run_in_mpicasa_call(fn: Callable[..., Any], /, *args: Any, nproc: int | Non
         # the script size separately so debug output stays readable.
         try:
             _c_idx = cmd_args.index('-c')
-            LOG.debug('Executing command: %s (+ %d-byte inline -c script)',
-                      ' '.join(cmd_args[:_c_idx]), len(cmd_args[_c_idx + 1]))
+            LOG.debug(
+                'Executing command: %s (+ %d-byte inline -c script)',
+                ' '.join(cmd_args[:_c_idx]),
+                len(cmd_args[_c_idx + 1]),
+            )
         except ValueError:
             LOG.debug('Executing command: %s', ' '.join(cmd_args))
 
@@ -373,8 +377,13 @@ def _run_in_mpicasa_call(fn: Callable[..., Any], /, *args: Any, nproc: int | Non
         # Strip coverage env vars so the subprocess does not produce a .coverage
         # file with a different measurement mode (branch vs statement), which
         # would cause pytest-cov's combine step to fail with DataError.
-        for cov_var in ('COVERAGE_PROCESS_START', 'COVERAGE_FILE', 'COV_CORE_SOURCE',
-                        'COV_CORE_CONFIG', 'COV_CORE_DATAFILE'):
+        for cov_var in (
+            'COVERAGE_PROCESS_START',
+            'COVERAGE_FILE',
+            'COV_CORE_SOURCE',
+            'COV_CORE_CONFIG',
+            'COV_CORE_DATAFILE',
+        ):
             env_run.pop(cov_var, None)
         env_overrides: dict[str, str] = {}
         for env_arg in env_args:
@@ -388,9 +397,7 @@ def _run_in_mpicasa_call(fn: Callable[..., Any], /, *args: Any, nproc: int | Non
             subprocess.run(cmd_args, check=True, shell=False, capture_output=False, env=env_run)
         except subprocess.CalledProcessError as e:
             LOG.error('Subprocess failed; returncode=%s', e.returncode)
-            raise RuntimeError(
-                f'MPI subprocess execution of {fn_module}.{fn_qualname} failed'
-            ) from e
+            raise RuntimeError(f'MPI subprocess execution of {fn_module}.{fn_qualname} failed') from e
 
         try:
             with open(output_file, 'rb') as f:

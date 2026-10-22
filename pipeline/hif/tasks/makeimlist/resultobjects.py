@@ -33,8 +33,8 @@ class MakeImListResult(basetask.Results):
         # the target context. This helps keep the pickle size down.
         other_obsrun = context.observing_run
         for target in targets_copy:
-            h = target['heuristics']
-            if hasattr(h, 'observing_run'):
+            h = target.get('heuristics')
+            if h is not None and hasattr(h, 'observing_run'):
                 h.observing_run = other_obsrun
 
         if self.clearlist:

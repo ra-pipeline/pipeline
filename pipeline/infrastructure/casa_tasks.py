@@ -1,6 +1,6 @@
-"""
-This module contains a wrapper function for every CASA task. The signature of
-each methods exactly matches that of the CASA task it mirrors. However, rather
+"""Provide a JobRequest wrapper for every CASA task.
+
+The signature of each method matches that of the CASA task it mirrors. However, rather
 than executing the task directly when these methods are called,
 CASATaskJobGenerator returns a JobRequest for every invocation; these jobs
 then be examined and executed at a later date.
@@ -10,6 +10,9 @@ task attached to this class at runtime. The name and signature of each
 method will match those of the tasks in the CASA environment when this
 module was imported.
 """
+
+from __future__ import annotations
+
 import functools
 import inspect
 import shutil
@@ -209,7 +212,7 @@ def xvfb_plotms(self, *args, **kwargs):
     xvfb_run = shutil.which('xvfb-run')
     python = sys.executable
     cmd = [xvfb_run, '-a', python, '-c']
-    all_args = [f"{value!r}" for value in args] + [f"{name}={value!r}" for name, value in kwargs.items()]
+    all_args = [f'{value!r}' for value in args] + [f'{name}={value!r}' for name, value in kwargs.items()]
     py_cmds = ['from casaplotms import plotms', 'import numpy as np', 'plotms({})'.format(', '.join(all_args))]
     py_cmd = '; '.join(py_cmds)
     cmd.append(f'"{py_cmd}"')
@@ -218,9 +221,10 @@ def xvfb_plotms(self, *args, **kwargs):
         LOG.debug(f'subprocess-cmd: {cmd}')
         ret = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).decode().strip()
         LOG.debug(f'subprocess-ret: {ret}')
-    except (FileNotFoundError, subprocess.CalledProcessError) as ex:
-        ret = "error"
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        ret = 'error'
     return ret
+
 
 # copy the casa/plotms callable attribute to the wrapper function.
 xvfb_plotms.__name__ = 'plotms'
@@ -272,11 +276,9 @@ def statwt(*v, **k) -> JobRequest:
 
 def _with_tclean_signature(fn):
     """Replace fn's signature with casatasks.tclean's, swapping in a typed parallel param."""
+    fn.__name__ = 'tclean'
     try:
-        params = [
-            p for p in inspect.signature(casatasks.tclean).parameters.values()
-            if p.name != 'parallel'
-        ]
+        params = [p for p in inspect.signature(casatasks.tclean).parameters.values() if p.name != 'parallel']
         params.append(
             inspect.Parameter(
                 'parallel',
@@ -331,7 +333,7 @@ def rerefant(*v, **k) -> JobRequest:
 
 @register_task
 def sdatmcor(*v, **k) -> JobRequest:
-    """Wrap casatasks.sdatmcor
+    """Wrap casatasks.sdatmcor.
 
     Returns:
         JobRequest instance
@@ -416,12 +418,14 @@ class CasaTasks:
             @functools.wraps(fn)
             def func(*args, **kwargs):
                 return fn(*args, **kwargs).execute()
+
             return func
         else:
             # Executions will be logged in both casacalls-.txt and casa-command.txt
             @functools.wraps(fn)
             def func(*args, **kwargs):
                 return self._executor.execute(fn(*args, **kwargs))
+
             return func
 
 

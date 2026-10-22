@@ -1,3 +1,5 @@
+"""Dispatch pipeline work to Parsl workers and collect their results and logs."""
+
 from __future__ import annotations
 
 import os
@@ -19,6 +21,7 @@ __all__ = [
 try:
     import parsl
     from parsl import python_app
+
     PARSL_AVAILABLE = True
 except ImportError:
     PARSL_AVAILABLE = False
@@ -45,6 +48,7 @@ def is_parsl_worker() -> bool:
     if any(k in os.environ for k in ('PARSL_WORKER_RANK', 'PARSL_WORKER_POOL_ID', 'PARSL_WORKER_COUNT')):
         return True
     import sys
+
     if any('process_worker_pool' in arg for arg in sys.argv):
         return True
     return False
@@ -63,7 +67,9 @@ if PARSL_AVAILABLE:
 
         target_executors = ['tier0_executor'] if (dfk and 'tier0_executor' in dfk.executors) else 'all'
 
-        def parsl_exec(tier0_executable, working_dir: str, casalog_file: str | None = None, log2term: bool | None = None):
+        def parsl_exec(
+            tier0_executable, working_dir: str, casalog_file: str | None = None, log2term: bool | None = None
+        ):
             """Execute a pipeline tier0 task on a Parsl worker."""
             os.environ['PARSL_WORKER'] = '1'
             # Condor workers often start in scratch directories. We must explicitly change
@@ -73,6 +79,7 @@ if PARSL_AVAILABLE:
             if casalog_file or log2term is not None:
                 try:
                     from casaconfig import config
+
                     if casalog_file:
                         config.logfile = os.path.abspath(casalog_file)
                     if log2term is not None:
@@ -81,15 +88,12 @@ if PARSL_AVAILABLE:
                     pass
                 try:
                     import casatasks
+
                     if casalog_file:
+                        casalog_file = os.path.realpath(casalog_file)
                         last_logfile = casatasks.casalog.logfile()
-                        if casalog_file != last_logfile:
+                        if not last_logfile or casalog_file != os.path.realpath(last_logfile):
                             casatasks.casalog.setlogfile(casalog_file)
-                            if last_logfile and os.path.exists(last_logfile) and last_logfile != casalog_file:
-                                try:
-                                    os.remove(last_logfile)
-                                except OSError:
-                                    pass
                     if log2term is not None:
                         casatasks.casalog.showconsole(bool(log2term))
                 except Exception as e:
@@ -110,22 +114,26 @@ if PARSL_AVAILABLE:
 
         def __init__(self, executable):
             """Submits a tier0 executable to the Parsl engine."""
-            LOG.debug('submitting a ParslTask %s to the parsl engine: %s',
-                      executable, human_file_size(get_obj_size(executable)))
+            LOG.debug(
+                'submitting a ParslTask %s to the parsl engine: %s',
+                executable,
+                human_file_size(get_obj_size(executable)),
+            )
 
             task_cls = getattr(executable, 'task_cls', getattr(executable, '_Tier0PipelineTask__task_cls', None))
             if hasattr(executable, 'fn') and hasattr(executable.fn, '__name__'):
-                app_name = f"Tier0_{executable.fn.__name__}"
+                app_name = f'Tier0_{executable.fn.__name__}'
             elif task_cls and hasattr(task_cls, '__name__'):
-                app_name = f"Tier0_{task_cls.__name__}"
+                app_name = f'Tier0_{task_cls.__name__}'
             else:
-                app_name = f"Tier0_{executable.__class__.__name__}"
+                app_name = f'Tier0_{executable.__class__.__name__}'
 
             # Obtain client-side casalog file and log2term to propagate to the worker
             casalog_file = None
             log2term = None
             try:
                 from casaconfig import config
+
                 casalog_file = getattr(config, 'logfile', None)
                 log2term = getattr(config, 'log2term', None)
             except Exception:
@@ -133,6 +141,7 @@ if PARSL_AVAILABLE:
             if not casalog_file:
                 try:
                     import casatasks
+
                     casalog_file = casatasks.casalog.logfile()
                 except Exception:
                     pass
@@ -145,8 +154,11 @@ if PARSL_AVAILABLE:
             """Retrieves the result and merges CASA logs from the worker."""
             task_result, tier0_executable = self.future.result()
 
-            LOG.debug('Received task execution result (%s) from a parsl worker for %s',
-                      human_file_size(get_obj_size(task_result)), tier0_executable)
+            LOG.debug(
+                'Received task execution result (%s) from a parsl worker for %s',
+                human_file_size(get_obj_size(task_result)),
+                tier0_executable,
+            )
 
             self._merge_casa_commands(getattr(tier0_executable, 'logs', {}))
             return task_result
@@ -166,16 +178,22 @@ if PARSL_AVAILABLE:
                     os.remove(tier0_cmdfile)
             else:
                 LOG.debug('Cannot find Tier0 casa_commands.log; no merge needed')
+
 else:
     # Dummy fallbacks for when Parsl is not installed
     def get_parsl_exec(app_name: str):
-        raise NotImplementedError("Parsl is not installed in this environment.")
+        """Report that Parsl applications are unavailable."""
+        raise NotImplementedError('Parsl is not installed in this environment.')
 
     class ParslTask:
+        """Placeholder for task submission when Parsl is unavailable."""
+
         def __init__(self, executable):
-            raise NotImplementedError("Parsl is not installed in this environment.")
+            """Report that Parsl tasks are unavailable."""
+            raise NotImplementedError('Parsl is not installed in this environment.')
 
         def get_result(self):
+            """Return no result for an unavailable task."""
             pass
 
 
@@ -210,6 +228,7 @@ def parallel_map(fn, items: list) -> list:
     log2term = None
     try:
         from casaconfig import config as _cc
+
         casalog_file = getattr(_cc, 'logfile', None)
         log2term = getattr(_cc, 'log2term', None)
     except Exception:
@@ -217,6 +236,7 @@ def parallel_map(fn, items: list) -> list:
     if not casalog_file:
         try:
             import casatasks as _ct
+
             casalog_file = _ct.casalog.logfile()
         except Exception:
             pass
@@ -224,10 +244,12 @@ def parallel_map(fn, items: list) -> list:
     @python_app(executors=target_executors)
     def _parsl_apply(fn, item, casalog_file, log2term):
         import os as _os
+
         _os.environ['PARSL_WORKER'] = '1'
         if casalog_file or log2term is not None:
             try:
                 from casaconfig import config as _cc
+
                 if casalog_file:
                     _cc.logfile = _os.path.abspath(casalog_file)
                 if log2term is not None:

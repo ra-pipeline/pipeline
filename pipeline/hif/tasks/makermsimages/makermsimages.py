@@ -1,7 +1,7 @@
-import numpy as np
 import os
-from scipy.stats import median_abs_deviation
 
+import numpy as np
+from scipy.stats import median_abs_deviation
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -9,7 +9,8 @@ import pipeline.infrastructure.imagelibrary as imagelibrary
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
-from pipeline.infrastructure import daskhelpers, mpihelpers, parslhelpers, task_registry
+from pipeline.infrastructure import (casa_tasks, casa_tools, daskhelpers,
+                                     mpihelpers, parslhelpers, task_registry)
 
 LOG = infrastructure.get_logger(__name__)
 
