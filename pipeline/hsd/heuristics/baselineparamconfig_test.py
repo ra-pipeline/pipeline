@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import io
 import pathlib
-import shutil
-import unittest
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-from unittest.mock import MagicMock, patch, mock_open
 
+from pipeline.hsd.heuristics import fitorder
 from pipeline.hsd.heuristics.baselineparamconfig import (
     BaselineFitParamConfig,
     BaselineParamKeys as BLP,
@@ -17,7 +16,6 @@ from pipeline.hsd.heuristics.baselineparamconfig import (
     no_switching,
     do_switching
 )
-from pipeline.hsd.heuristics import fitorder
 
 
 @pytest.fixture
@@ -56,7 +54,7 @@ def test_write_blparam(func, npiece, nwave, expected):
     }
     write_blparam(fileobj, param)
     output = fileobj.getvalue().strip()
-    print(output)
+
     # Values: 1, 0, 0~10, , , , , , , , poly, 1, ,
     parts = output.split(',')
     assert parts[0] == "1"
@@ -68,6 +66,7 @@ def test_write_blparam(func, npiece, nwave, expected):
 
     if expected[6].__contains__("["):
         assert ",".join(parts[13:16]) == expected[6]
+
     else:
         assert parts[13] == expected[6]
 
@@ -209,4 +208,4 @@ class TestBaselineFitParamConfig:
         assert hashlib.sha256(open('test.blparam','rb').read()).hexdigest() == expected_contents
 
         # Clean up the file.
-        #pathlib.Path("test.blparam").unlink(missing_ok=True)
+        pathlib.Path("test.blparam").unlink(missing_ok=True)
