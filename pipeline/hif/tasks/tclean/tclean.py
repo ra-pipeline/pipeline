@@ -320,11 +320,6 @@ class Tclean(cleanbase.CleanBase):
         # Get the image parameter heuristics
         self.image_heuristics = inputs.image_heuristics
 
-        # Set initial masking limits
-        self.pblimit_image, self.pblimit_cleanmask = self.image_heuristics.pblimits(None, inputs.specmode)
-        if not inputs.pblimit:
-            inputs.pblimit = self.pblimit_image
-
         # Remove MSs that do not contain data for the given field(s)
         _, visindexlist = self.image_heuristics.get_scanidlist(inputs.vis, inputs.field, inputs.intent)
         filtered_vislist = [inputs.vis[i] for i in visindexlist]
@@ -335,14 +330,20 @@ class Tclean(cleanbase.CleanBase):
 
         # Generate the image name if one is not supplied.
         if inputs.imagename in (None, ''):
-            inputs.imagename = self.image_heuristics.imagename(intent=inputs.intent,
-                                                               field=inputs.field,
-                                                               spwspec=inputs.spw,
-                                                               specmode=inputs.specmode)
+            inputs.imagename = self.image_heuristics.imagename(
+                intent=inputs.intent, field=inputs.field, spwspec=inputs.spw, specmode=inputs.specmode
+            )
 
         # Determine the default gridder
         if inputs.gridder in (None, ''):
             inputs.gridder = self.image_heuristics.gridder(inputs.intent, inputs.field)
+
+        # Set initial masking limits
+        self.pblimit_image, self.pblimit_cleanmask = self.image_heuristics.pblimits(
+            None, specmode=inputs.specmode, gridder=inputs.gridder
+        )
+        if not inputs.pblimit:
+            inputs.pblimit = self.pblimit_image
 
         # Determine deconvolver
         if inputs.deconvolver in (None, ''):
@@ -609,8 +610,8 @@ class Tclean(cleanbase.CleanBase):
 
                 if inputs.intent == 'TARGET':
                     if (spwsel_spwid == 'NONE') and self.image_heuristics.warn_missing_cont_ranges():
-                        LOG.warning('No continuum frequency range information detected for %s, spw %s.' % (inputs.field,
-                                                                                                           spwid))
+                        LOG.warning('No continuum frequency range information detected for %s, spw %s.',
+                                    utils.condense_field_names(inputs.field), spwid)
 
                 if spwsel_spwid in ('ALL', 'ALLCONT', '', 'NONE'):
                     if self.image_heuristics.is_eph_obj(inputs.field):
@@ -1200,7 +1201,9 @@ class Tclean(cleanbase.CleanBase):
 
         # Determine masking limits depending on PB
         extension = '.tt0' if result.multiterm else ''
-        self.pblimit_image, self.pblimit_cleanmask = self.image_heuristics.pblimits(result.flux+extension, specmode=inputs.specmode)
+        self.pblimit_image, self.pblimit_cleanmask = self.image_heuristics.pblimits(
+            result.flux + extension, specmode=inputs.specmode, gridder=inputs.gridder
+        )
 
         # Keep pblimits for mom8_fc QA statistics and score (PIPE-704)
         result.set_pblimit_image(self.pblimit_image)
@@ -1902,9 +1905,12 @@ class Tclean(cleanbase.CleanBase):
             result.set_mom8_10_fc_histogram_asymmetry(maxiter, mom_8_10_histogram_asymmetry)
 
         else:
-            LOG.warning('Cannot create MOM0_FC / MOM8_FC / MOM10_FC images for intent "%s", '
-                        'field %s, spw %s, no continuum ranges found.' %
-                        (self.inputs.intent, self.inputs.field, self.inputs.spw))
+            LOG.warning(
+                'Cannot create MOM0_FC / MOM8_FC / MOM10_FC images for intent "%s", field %s, spw %s, no continuum ranges found.',
+                self.inputs.intent,
+                utils.condense_field_names(self.inputs.field),
+                self.inputs.spw,
+            )
 
     def _calc_mom0_8(self, result):
         """Generate integrated and peak flux maps.

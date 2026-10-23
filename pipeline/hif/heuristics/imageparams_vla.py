@@ -3,13 +3,13 @@ import re
 import traceback
 
 import numpy as np
-
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.filenamer as filenamer
+import pipeline.infrastructure.utils as utils
+from pipeline.hif.heuristics.mosaic_detection import MosaicDetectionHeuristics
 from pipeline.infrastructure import casa_tasks, casa_tools
 from pipeline.infrastructure.tablereader import find_EVLA_band
-import pipeline.infrastructure.utils as utils
 
 from .auto_selfcal.selfcal_helpers import estimate_near_field_SNR, estimate_SNR
 from .imageparams_base import ImageParamsHeuristics
@@ -24,6 +24,8 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         ImageParamsHeuristics.__init__(self, vislist, spw, observing_run, imagename_prefix, proj_params, contfile,
                                        linesfile, imaging_params, processing_intents)
         self.imaging_mode = 'VLA'
+        # Lazy-initialized cache for fields observed with current spws
+        self._fields_for_spws_cache = None
 
     def get_sourcename(
         self, vislist: list[str] | str, fieldlist: list[str] | str, intent: str, as_list: bool = False  # noqa: ARG002
@@ -200,18 +202,21 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             # Use complete uvrange
             return '>0.0klambda', ratio
 
-    def pblimits(self, pb: None | str, specmode: str | None = None):
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None):
         """PB gain level at which to cut off normalizations (tclean parameter).
-        See PIPE-674 and CASR-543
+        
+        See PIPE-674, CASR-543, and PIPE-684
         """
         # pblimits used in pipeline tclean._do_iterative_imaging() method (eventually in cleanbox.py) for
         # computing statistics on residual image products.
         if (pb not in [None, '']):
-            pblimit_image, pblimit_cleanmask = super().pblimits(pb, specmode=specmode)
+            pblimit_image, pblimit_cleanmask = super().pblimits(pb, specmode=specmode, gridder=gridder)
         # used for setting CASA tclean task pblimit parameter in pipeline tclean.prepare() method
         else:
             if specmode == 'cube':
                 pblimit_image = 0.2
+            elif gridder == 'mosaic':
+                pblimit_image = 0.1
             else:
                 pblimit_image = -0.1
             pblimit_cleanmask = 0.3
@@ -556,7 +561,8 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
         if intent:
             namer.intent(intent)
         if field:
-            namer.source(field)
+            fieldlist = field.split(",")
+            namer.source(fieldlist[0])
         if specmode != 'cont' and spwspec:
             # find all the spwids present in the list
             p = re.compile(r"[ ,]+(\d+)")
@@ -1046,3 +1052,124 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             LOG.info(ex)
 
         return good_restoringbeam, bad_psf_channels
+
+    def _get_fields_for_current_spws(self) -> set[str]:
+        """Get field names observed with the current spectral windows.
+
+        Directly uses the spw IDs in self.spwids to find which fields were observed,
+        avoiding the indirection of deriving band first.
+
+        Returns:
+            Set of field names observed with any of the current spws.
+        """
+        if self._fields_for_spws_cache is not None:
+            return self._fields_for_spws_cache
+
+        fields = set()
+        ref_ms = self.observing_run.get_ms(self.vislist[0])
+
+        # Get the set of spw IDs we're currently imaging
+        spw_ids = self.spwids
+
+        # Find all fields observed with any of these spws
+        for field in ref_ms.get_fields():
+            field_spw_ids = {spw.id for spw in field.valid_spws}
+            if spw_ids & field_spw_ids:  # Intersection: any overlap?
+                fields.add(field.name)
+
+        self._fields_for_spws_cache = fields
+        return fields
+
+    def field_intent_list(self, intent: str, field: str) -> set[tuple[str, str]]:
+        """Determine the list of (field, intent) tuples for VLA single field and mosaic imaging.
+
+        Detects mosaic observations by clustering overlapping pointings using spatial analysis.
+        For mosaics, returns comma-separated field names. For single fields, returns individual
+        field names.
+
+        Args:
+            intent: Observation intent to filter by.
+            field: Field selection (may be unused if auto-detecting from spws).
+
+        Returns:
+            Set of (field_names, intent) tuples where field_names may be comma-separated
+            for mosaic groups.
+        """
+        ms = self.observing_run.get_measurement_sets()[0]
+        ref_freqs = [
+            float(ms.get_spectral_window(spwid).ref_frequency.to_units(measures.FrequencyUnits.HERTZ))
+            for spwid in self.spwids
+            if ms.get_spectral_window(spwid) is not None
+        ]
+
+        if not ref_freqs:
+            return super().field_intent_list(intent=intent, field=field)
+
+        freq_hz = float(np.mean(ref_freqs))
+
+        # Get fields observed with current spws (direct spw→field relationship)
+        target_fields = self._get_fields_for_current_spws()
+
+        # If a field filter is specified, filter target_fields accordingly
+        if field and field.strip():
+            field_list = utils.safe_split(field)
+            selected_names = {utils.dequote(f.strip()) for f in field_list if f.strip()}
+
+            matching_fields = set()
+            ref_ms = self.observing_run.get_ms(self.vislist[0])
+            for fld in ref_ms.get_fields():
+                fld_name = utils.dequote(fld.name)
+                fld_source = utils.dequote(fld.source.name) if fld.source else ''
+                if fld_name in selected_names or str(fld.id) in selected_names or fld_source in selected_names:
+                    matching_fields.add(fld.name)
+                else:
+                    for sn in selected_names:
+                        if '*' in sn:
+                            pattern = sn.replace('*', '.*')
+                            if re.search(pattern, fld_name) or (fld_source and re.search(pattern, fld_source)):
+                                matching_fields.add(fld.name)
+                                break
+
+            target_fields = target_fields & matching_fields
+            if not target_fields:
+                return set()
+
+        # For VLA, hpbw (in arcseconds) = 42.0e9 / observing frequency in Hz * 60.0
+        hpbw = (42.0e9 / freq_hz) * 60.0  # hpbw in arcseconds
+
+        # Detect mosaics using spatial clustering
+        mosaic_fields, single_fields = MosaicDetectionHeuristics.check_targets_for_mosaic(
+            self.observing_run, self.vislist, target_fields, hpbw
+        )
+
+        # If no mosaics detected, use default behavior
+        if not mosaic_fields:
+            return super().field_intent_list(intent=intent, field=field)
+
+        # Collect all field-intent tuples from parent class
+        field_intent_list_temp = []
+
+        # Process mosaic clusters (comma-separated field names)
+        for mosaic_field in mosaic_fields.values():
+            for cluster in mosaic_field:
+                cluster_name = ','.join(cluster)
+                field_intent_list_temp.append(super().field_intent_list(intent=intent, field=cluster_name))
+
+        # Process single fields
+        for single_field in single_fields.values():
+            for f in single_field:
+                field_intent_list_temp.append(super().field_intent_list(intent=intent, field=f))
+
+        # Group field names by intent and create final set
+        mosaic_intent_list = set()
+        for element in field_intent_list_temp:
+            # Group names by intent within this set
+            intent_groups = {}
+            for name, grp_intent in element:
+                intent_groups.setdefault(grp_intent, []).append(name)
+            # Add each group as a tuple to output
+            for grp_intent, names in intent_groups.items():
+                names_str = ','.join(sorted(names))
+                mosaic_intent_list.add((names_str, grp_intent))
+
+        return mosaic_intent_list
