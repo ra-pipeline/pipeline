@@ -58,8 +58,21 @@ def find_executable(start_dir: str | None = None) -> dict[str, str | None]:
     return exe_dict
 
 
-def _nproc_from_dask(fallback: int = 4) -> int:
-    """Return the number of active Dask workers, active Parsl workers, or *fallback*."""
+def _infer_mpi_nproc(fallback: int = 4) -> int:
+    """Return a worker's CPU budget, active Dask workers plus a client, or a default.
+
+    Inside a Parsl worker, divide explicitly allocated block CPUs by its worker
+    count. One CPU selects serial execution; larger budgets include the MPI
+    client rank. The orchestrator never infers its budget from Parsl pool sizes.
+    """
+    try:
+        block_cores = int(os.environ.get('PARSL_CORES', '0'))
+        worker_count = int(os.environ.get('PARSL_WORKER_COUNT', '0'))
+        if block_cores > 0 and worker_count > 0:
+            return max(1, block_cores // worker_count)
+    except ValueError:
+        pass
+
     from pipeline.infrastructure import daskhelpers
 
     client = daskhelpers.daskclient
@@ -69,22 +82,6 @@ def _nproc_from_dask(fallback: int = 4) -> int:
             return n + 1 if n > 0 else fallback
         except Exception:
             pass
-
-    # When pac-man/Parsl is orchestrating, derive nproc from tier0 worker count.
-    try:
-        import parsl
-
-        from pipeline.infrastructure import parslhelpers
-
-        if parslhelpers.is_parsl_ready():
-            dfk = parsl.dfk()
-            executor = dfk.executors.get('tier0_executor')
-            if executor is not None:
-                n = getattr(executor, 'max_workers_per_node', None) or getattr(executor, 'max_workers', None)
-                if n:
-                    return int(n)
-    except Exception:
-        pass
 
     return fallback
 
@@ -149,7 +146,10 @@ def call_with_mpi(
         fn: Callable to invoke (e.g. ``casatasks.tclean``).
         *args: Positional arguments forwarded to *fn*.
         nproc: Number of MPI processes for the subprocess path.  If ``None``,
-            derived from the active Dask client worker count.
+            derived from an explicitly allocated Parsl worker CPU budget, then
+            the active Dask client worker count, otherwise defaults to four.
+            A one-CPU worker runs serially. MPI subprocess launches require at
+            least two ranks, including the client.
         parallel: Controls which path is taken.  ``False`` forces in-process
             serial execution.  ``True`` or a dict triggers MPI dispatch.
             A dict may contain ``{'nproc': N}`` to override *nproc*.
@@ -214,6 +214,13 @@ def _call_with_mpi_dispatch(
 
 def _run_in_mpicasa_call(fn: Callable[..., Any], /, *args: Any, nproc: int | None = None, **kwargs: Any) -> Any:
     r"""Run *fn(\*args, \*\*kwargs)* inside a fresh MPI-enabled CASA subprocess."""
+    if nproc is None:
+        nproc = _infer_mpi_nproc()
+        if nproc == 1:
+            if _accepts_parallel(fn):
+                kwargs['parallel'] = False
+            return fn(*args, **kwargs)
+
     exe_dict = find_executable(Path(sys.executable).parent.as_posix())
     # Prefer the CASA launcher over the modular environment's mpirun.
     mpiexec = exe_dict.get('mpicasa') or exe_dict.get('mpirun')
@@ -223,8 +230,8 @@ def _run_in_mpicasa_call(fn: Callable[..., Any], /, *args: Any, nproc: int | Non
             kwargs['parallel'] = False
         return fn(*args, **kwargs)
 
-    if nproc is None:
-        nproc = _nproc_from_dask()
+    if isinstance(nproc, bool) or not isinstance(nproc, int) or nproc < 2:
+        raise ValueError('nproc must be an integer of at least 2 (one CASA MPI client and at least one worker)')
 
     # Resolve the import-path for fn so the subprocess can reconstruct it.
     # __qualname__ is absent on CASA task objects (e.g. casatasks.tclean is a

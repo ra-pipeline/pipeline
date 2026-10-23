@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import inspect
+import pickle
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -11,7 +13,107 @@ from unittest.mock import Mock
 
 import pytest
 
-from pipeline.infrastructure import casa_tasks, mpihelpers, mpirunner, parslhelpers
+from pipeline.infrastructure import casa_tasks, daskhelpers, mpihelpers, mpirunner, parslhelpers
+
+
+@pytest.mark.parametrize(
+    'block_cores, workers, expected',
+    [('8', '1', 8), ('32', '4', 8), ('1', '1', 1), ('1', '2', 1), ('invalid', '1', 4), ('8', '0', 4)],
+)
+def test_parsl_worker_cpu_budget(
+    block_cores: str, workers: str, expected: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each worker can use its share of allocated CPUs without counting pool slots as ranks."""
+    monkeypatch.setattr(daskhelpers, 'daskclient', None)
+    monkeypatch.setenv('PARSL_CORES', block_cores)
+    monkeypatch.setenv('PARSL_WORKER_COUNT', workers)
+    assert mpirunner._infer_mpi_nproc() == expected
+
+
+def test_single_cpu_worker_runs_serially(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A one-CPU allocation must not launch an invalid or oversubscribed MPI job."""
+    monkeypatch.setenv('PARSL_CORES', '1')
+    monkeypatch.setenv('PARSL_WORKER_COUNT', '1')
+    monkeypatch.setattr(mpihelpers, 'MPIEnvironment', SimpleNamespace(is_mpi_enabled=False))
+    launch = Mock()
+    monkeypatch.setattr(mpirunner.subprocess, 'run', launch)
+
+    def fn(parallel: bool = True) -> bool:
+        return parallel
+
+    assert mpirunner.call_with_mpi(fn) is False
+    launch.assert_not_called()
+
+
+@pytest.mark.parametrize('nproc, expected', [(None, 8), (6, 6)])
+def test_multiple_cpu_worker_launches_with_its_budget(
+    nproc: int | None, expected: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Multicore workers use their CPU budget unless a caller explicitly overrides it."""
+    monkeypatch.setenv('PARSL_CORES', '32')
+    monkeypatch.setenv('PARSL_WORKER_COUNT', '4')
+    monkeypatch.setattr(mpirunner, 'find_executable', lambda *args: {'mpirun': '/synthetic/mpirun'})
+
+    def launch(cmd: list[str], **kwargs) -> None:
+        assert cmd[cmd.index('-n') + 1] == str(expected)
+        script = ast.parse(cmd[-1])
+        output_path = next(
+            node.args[0].value
+            for node in ast.walk(script)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == 'open'
+            and len(node.args) > 1
+            and isinstance(node.args[1], ast.Constant)
+            and node.args[1].value == 'wb'
+        )
+        Path(output_path).write_bytes(pickle.dumps({'success': True, 'result': 42}))
+
+    monkeypatch.setattr(mpirunner.subprocess, 'run', launch)
+    assert mpirunner.run_in_mpicasa(abs, -42, nproc=nproc) == 42
+
+
+@pytest.mark.parametrize('worker_limit', [1, 16])
+def test_mpi_rank_count_is_independent_of_parsl_blocks(worker_limit: int, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Parsl block sizing must not determine the size of a separate MPI launch."""
+    monkeypatch.setattr(daskhelpers, 'daskclient', None)
+    monkeypatch.setattr(parslhelpers, 'is_parsl_ready', lambda: True)
+    executor = SimpleNamespace(max_workers_per_node=worker_limit)
+    parsl = ModuleType('parsl')
+    parsl.dfk = lambda: SimpleNamespace(executors={'tier0_executor': executor})
+    monkeypatch.setitem(sys.modules, 'parsl', parsl)
+    assert mpirunner._infer_mpi_nproc() == 4
+    assert mpirunner._infer_mpi_nproc(fallback=8) == 8
+
+
+@pytest.mark.parametrize('workers, expected', [(0, 4), (1, 2), (3, 4)])
+def test_dask_rank_count_includes_client(workers: int, expected: int, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Active Dask workers retain one extra rank for the CASA MPI client."""
+    client = Mock()
+    client.scheduler_info.return_value = {'workers': dict.fromkeys(range(workers))}
+    monkeypatch.setattr(daskhelpers, 'daskclient', client)
+    assert mpirunner._infer_mpi_nproc() == expected
+
+
+@pytest.mark.parametrize('nproc', [0, 1, -1, True, 2.5])
+def test_invalid_mpi_rank_count_fails_before_launch(nproc: object, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Invalid MPI process counts fail before serializing work or launching a process."""
+    monkeypatch.setattr(mpirunner, 'find_executable', lambda *args: {'mpirun': '/synthetic/mpirun'})
+    launch = Mock()
+    monkeypatch.setattr(mpirunner.subprocess, 'run', launch)
+    with pytest.raises(ValueError, match='at least 2'):
+        mpirunner.run_in_mpicasa(lambda: 42, nproc=nproc)
+    launch.assert_not_called()
+
+
+def test_explicit_mpi_rank_count_is_forwarded(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Callers can choose MPI ranks independently of the configured Parsl pools."""
+    monkeypatch.setattr(mpihelpers, 'MPIEnvironment', SimpleNamespace(is_mpi_enabled=False))
+    launch = Mock(return_value=42)
+    monkeypatch.setattr(mpirunner, '_run_in_mpicasa_call', launch)
+    fn = Mock()
+    assert mpirunner.call_with_mpi(fn, nproc=8) == 42
+    launch.assert_called_once_with(fn, nproc=8)
 
 
 @pytest.mark.parametrize('helper_name', ['call_with_mpi', 'run_in_mpicasa'])
