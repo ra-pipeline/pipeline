@@ -21,13 +21,13 @@ class DataType(Enum):
         BASELINED: Data after spectral baseline subtraction.
         REGCAL_CONTLINE_SCIENCE: Regular calibrated data for target scans.
         SELFCAL_CONTLINE_SCIENCE: Self-calibrated data for target scans.
-        IM_CONTLINE_SCIENCE: Best calibrated, source frame, time binned data for imaging target scans.
+        IM_CONTLINE_SCIENCE: Best calibrated, source frame, optionally time-binned data for imaging target scans.
         REGCAL_CONT_SCIENCE: Regular calibrated continuum-only data for target scans.
         SELFCAL_CONT_SCIENCE: Self-calibrated continuum-only data for target scans.
         IM_CONT_SCIENCE: Best calibrated, source frame, time binned continuum-only data for imaging target scans.
         REGCAL_LINE_SCIENCE: Regular calibrated spectral line data.
         SELFCAL_LINE_SCIENCE: Self-calibrated spectral line data.
-        IM_LINE_SCIENCE: Best calibrated, source frame, time binned spectral line data for imaging target scans.
+        IM_LINE_SCIENCE: Best calibrated, source frame, optionally time-binned spectral line data for imaging target scans.
     """
     RAW = auto()
     REGCAL_CONTLINE_ALL = auto()

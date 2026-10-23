@@ -11,45 +11,33 @@ def hsd_tsysflag(vis=None, caltable=None,
                  flag_birdies=None, fb_sharps_limit=None,
                  flag_toomany=None, tmf1_limit=None, tmef1_limit=None,
                  metric_order=None, normalize_tsys=None, filetemplate=None):
-    """Flag deviant system temperature measurements.
+    """Flag deviant system temperature measurements for single-dish data.
 
-    Flag deviant system temperature measurements for single dish measurements. This is done by running a
-    sequence of flagging sub-tasks (tests), each looking for a different type of possible error.
+    Applies a sequence of heuristic flagging tests to the Tsys caltable. If a manual flagging
+    template is provided via ``filetemplate``, those flags are applied first. The WebLog shows the
+    Tsys spectra per spw per antenna after all flagging has been applied.
 
-    If a file with manual Tsys flags is provided with the 'filetemplate'
-    parameter, then these flags are applied prior to the evaluation of the
-    flagging heuristics listed below.
+    The flagging tests, applied in order, are:
 
-    The tests are:
-
-    1. Flag Tsys spectra with high median values
-
-    2. Flag Tsys spectra with high median derivatives. This is meant to spot
-      spectra that are 'ringing'.
-
-    3. Flag the edge channels of the Tsys spectra in each SpW.
-
-    4. Flag Tsys spectra whose shape is different from that associated with
-      the BANDPASS intent.
-
-    5. Flag 'birdies'.
-
-    6. Flag the Tsys spectra of all antennas in a timestamp and spw if
-      proportion of antennas already flagged in this timestamp and spw exceeds
-      a threshold, and flag Tsys spectra for all antennas and all timestamps
-      in a spw, if proportion of antennas that are already entirely flagged
-      in all timestamps exceeds a threshold.
-
-    Returns:
-        The results object for the pipeline task is returned.
+    1. **nmedian** (``flag_nmedian``): flag Tsys spectra whose median value is more than
+       ``fnm_limit`` (default 3.0) times the median of all spectra.
+    2. **derivative** (``flag_derivative``): flag spectra with a high median derivative
+       (``fd_max_limit``), targeting ``ringing`` spectra.
+    3. **edgechans** (``flag_edgechans``): flag the edge channels of each spw
+       (``fe_edge_limit``).
+    4. **fieldshape** (``flag_fieldshape``): flag spectra whose shape differs significantly
+       from the reference BANDPASS intent shape (``ff_max_limit``, ``ff_refintent``).
+    5. **birdies** (``flag_birdies``): flag narrow spectral features (``fb_sharps_limit``).
+    6. **toomany** (``flag_toomany``): flag all antennas in a timestamp/spw if the fraction
+       already flagged exceeds ``tmf1_limit``; flag all timestamps in a spw if the fraction
+       entirely flagged exceeds ``tmef1_limit``.
 
     Examples:
-        1. Flag Tsys measurements using currently recommended tests:
+        1. Flag Tsys measurements using all recommended tests:
 
         >>> hsd_tsysflag()
 
-        2. Flag Tsys measurements using all recommended tests apart from that
-        using the 'fieldshape' metric:
+        2. Flag using all tests except ``fieldshape``:
 
         >>> hsd_tsysflag(flag_fieldshape=False)
 

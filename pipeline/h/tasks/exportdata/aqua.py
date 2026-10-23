@@ -28,7 +28,7 @@ Issues with the Original Schema / Current Pipeline Design
     Stages which generate multiple scores / metrics and multiple
     ASDMs are currently dealt with on an ad hoc basis.
 
-    The scores and metrics are noew stored with the stage results.
+    The scores and metrics are now stored with the stage results.
 
     Metrics may have units information. They may be encoded as
     CASA quanta strings if appropriate.
@@ -39,7 +39,7 @@ Future Technical Solutions
     list of metrics for export. Pass these to the QA classes
     for scoring.
 
-    Add the euivalent of a  toAqua registration method similar to what is
+    Add the equivalent of a toAqua registration method similar to what is
     done with QA handlers already
 """
 from __future__ import annotations
@@ -200,6 +200,7 @@ class AquaXmlGenerator:
         for stage_result in ordered_results:
             # Create the generic stage element
             stage_name, representative_score, subscores = _get_pipeline_stage_and_scores(stage_result)
+            
             stage_element = ElementTree.Element('Stage',
                                                 Number=str(stage_result.stage_number),
                                                 Name=stage_name)
@@ -673,7 +674,7 @@ def xml_for_sensitivity(d, stage_name):
     qa = casa_tools.quanta
 
     def value(quanta):
-        return str(qa.getvalue(quanta)[0])
+        return str(qa.getvalue(quanta).item())
 
     try:
         if d['is_representative'] is None:
@@ -798,6 +799,8 @@ def xml_for_sensitivity(d, stage_name):
     except Exception:
         imagename = 'N/A'
 
+    stokes = d.get('stokes') or 'I'
+
     try:
         theoretical_sens_val = d['theoretical_sensitivity']['value']
         # Handle array-to-scalar conversion for NumPy 1.25+ compatibility
@@ -823,8 +826,9 @@ def xml_for_sensitivity(d, stage_name):
     except Exception:
         datatype = 'N/A'
 
-    xml = ElementTree.Element('Sensitivity',
+    attribs = dict(
         Array=d['array'],
+        Stokes=stokes,
         BandwidthHz=bandwidth_hz,
         EffectiveBandwidthHz=effective_bw_hz,
         BeamMajArcsec=major_arcsec,
@@ -853,7 +857,7 @@ def xml_for_sensitivity(d, stage_name):
         ImageMinJyPerBeam=image_min_jy_per_beam,
         ImageMaxJyPerBeam=image_max_jy_per_beam,
         ImageName=imagename,
-        DataType=datatype
-      )
+        DataType=datatype,
+    )
 
-    return xml
+    return ElementTree.Element('Sensitivity', **attribs)

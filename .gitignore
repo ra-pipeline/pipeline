@@ -52,6 +52,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+unit-results.xml
 
 # Translations
 *.mo
@@ -71,7 +72,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/**
+docs/_build*/**
 docs/source/_autosummary/**
 docs/source/_automodapi/**
 
@@ -166,7 +167,7 @@ tags
 # VSCode
 .vscode/
 
-# ignore _version.py, created by setup.py
+# auto-generated version files
 _version.py
 
 # auto-generated recipe scripts (any .py files except __init__.py and recipe_converter*.py)

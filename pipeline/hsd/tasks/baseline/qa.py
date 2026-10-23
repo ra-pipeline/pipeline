@@ -59,7 +59,7 @@ class SDBaselineQAHandler(pqa.QAPlugin):
                                                            qstat.spw, qstat.pol, qstat.stat))
 
         scores.extend(
-            qacalc.score_sd_line_detection(context.observing_run.ms_reduction_group, result)
+            qacalc.score_sd_line_detection(context, result)
         )
 
         # reformat the messages and append to result.qa.pool

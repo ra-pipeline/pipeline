@@ -6,13 +6,13 @@
    :maxdepth: 2
    :caption: Basics
 
-   develdocmd/ways_to_run_the_pipeline.md
-   develdocmd/recipes.md
-   dependencies
-   interface
+   overview
+   acknowledgement
    releases
-   timeline
-   
+   qa
+   references
+   Contributors <contributors>
+
 .. toctree::
    :hidden:
    :maxdepth: 3
@@ -20,36 +20,45 @@
 
    apisummary
 
+.. only:: internal
+
+   .. toctree::
+      :hidden:
+      :maxdepth: 3
+
+      inheritance
+
 .. toctree::
    :hidden:
    :maxdepth: 3
-   :caption: Developer Notes
+   :caption: User Guides
 
-   develdocmd/ALMA-Imaging-Workflow.md
-   develdocmd/VLA-Imaging-Workflow.md
-   develdocmd/VLASS-SE-CONT-Imaging-Workflow.md
-   develdocmd/VLASS-SE-CUBE-Imaging-Workflow.md
-   develdocmd/selfcal_workflow.md   
+   users_guide/index
+   users_guide/known_issues
+   VLA Pipeline User's Guide <https://science.nrao.edu/facilities/vla/data-processing>
+   VLA Pipeline Known Issues <https://science.nrao.edu/facilities/vla/data-processing/pipeline#autotoc-item-autotoc-32>
+   Nobeyama Pipeline User's Guide <https://www.nro.nao.ac.jp/projects/45m/data/otf/#casa>
 
-   develdocmd/comparing_pipeline_executions.md
-   develdocmd/building_the_pipeline.md
-   modular
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Developer Guide
 
-   testing_docs/index
-   develdocmd/pipeline_tests.md
-   develdocmd/DataType_Testing.md
-   develdocmd/QA_scores.md
-   develdocmd/DeveloperDocumentation.md
-   develdocmd/python3_conversion_notes.md
+   devel/setup/index
+   devel/usage/index
+   devel/codestyle/index
+   devel/testing/index
 
-   heuristics/field_parameter.md
-   heuristics/FlaggingTasks.md
+.. only:: internal
 
-   notebooks/context.ipynb
-   notebooks/tier0dask.ipynb  
+   .. toctree::
+      :hidden:
+      :maxdepth: 2
+      :caption: Developer Guide (Internal)
 
-Indices and tables
-==================
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+      timeline
+      devel/process/index
+      devel/reference/index
+      devel/misc/index
+
+

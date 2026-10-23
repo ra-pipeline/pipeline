@@ -39,9 +39,6 @@ def h_restoredata(vis=None, session=None, products_dir=None, copytoraw=None, raw
     output MS already exists in the output directory, then the importasdm
     conversion step is skipped, and the existing MS will be imported instead.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Restore the pipeline results for a single ASDM in a single session
 

@@ -35,7 +35,7 @@ class PolcalResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.infrastructure.api.Results.merge_with_context`
+        See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`
         """
         # Register results for each session into context.
         for session_results in self.session.values():
@@ -91,7 +91,7 @@ class PolcalSessionResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.infrastructure.api.Results.merge_with_context`
+        See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`
         """
         # Register all CalApplications from each session.
         for calapp in self.final:

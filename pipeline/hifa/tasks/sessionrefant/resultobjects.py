@@ -17,7 +17,7 @@ class SessionRefAntResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.api.Results.merge_with_context`
+        See :meth:`~pipeline.api.Results.merge_with_context`
         """
         # For each session, if a best refant was identified, then update the
         # refant lists for the corresponding measurement sets.

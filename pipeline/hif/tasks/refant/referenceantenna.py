@@ -97,10 +97,10 @@ class RefAntInputs(vdp.StandardInputs):
                 Example: 'DV05'
 
             geometry: Score antenna by proximity to the center of the array. This option is quick as only the ANTENNA table must be read.
-                Parameter is available when ``hm_refant``='automatic'.
+                Available when ``hm_refant`` is ``'automatic'``.
 
             flagging: Score antennas by percentage of unflagged data.  This option requires computing flagging statistics.
-                Parameter is available when ``hm_refant``='automatic'.
+                Available when ``hm_refant`` is ``'automatic'``.
 
             refantignore: string list to be ignored as reference antennas.
 

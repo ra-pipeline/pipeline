@@ -90,6 +90,7 @@ __all__ = [
     'remove_trailing_string',
     'string_to_val',
     'validate_url',
+    'wrap_long_str',
 ]
 
 # Import TypedDict definitions from centralized module for type checking only
@@ -503,22 +504,47 @@ def get_task_result_count(context: Context, taskname: str = 'hif_makeimages') ->
 
 
 def place_repr_source_first(itemlist: list[str] | list[tuple], repr_source: str) -> list[str] | list[tuple]:
+    """Reorder a list to place the representative source first.
+
+    Moves the representative source to the front of a list containing either source
+    names (strings) or tuples/lists with source name as the first element. If the
+    representative source is not found in the list, returns the list unchanged.
+
+    Args:
+        itemlist: List of source names or tuples with source name as first element.
+        repr_source: The source name to place first (may be quoted).
+
+    Returns:
+        Reordered list with representative source first, or original list if not found.
+
+    Raises:
+        TypeError: If list items are not strings, tuples, or lists.
+
+    Note:
+        Source names are compared after removing quotes via dequote() to handle
+        quoted source names properly.
     """
-    Place representative source first in a list of source names
-    or tuples with source name as first tuple element.
-    """
-    try:
-        itemtype = type(itemlist[0])
-        if itemtype is str:
-            repr_source_index = [dequote(item) for item in itemlist].index(dequote(repr_source))
-        elif itemtype is tuple or itemtype is list:
-            repr_source_index = [dequote(item[0]) for item in itemlist].index(dequote(repr_source))
-        else:
-            raise Exception('Cannot handle items of type {}'.format(itemtype))
-        repr_source_entry = itemlist.pop(repr_source_index)
-        itemlist = [repr_source_entry] + itemlist
-    except ValueError:
-        LOG.warning('Could not reorder field list to place representative source first')
+    if not itemlist:
+        return itemlist
+
+    if isinstance(itemlist[0], str):
+        dequoted_items = [dequote(item) for item in itemlist]
+    elif isinstance(itemlist[0], (tuple, list)):
+        dequoted_items = [dequote(item[0]) for item in itemlist]
+    else:
+        raise TypeError(f'Cannot handle items of type {type(itemlist[0])}')
+
+    dequoted_repr_source = dequote(repr_source)
+
+    # If repr_source is not in itemlist, return itemlist untouched
+    if dequoted_repr_source not in dequoted_items:
+        LOG.debug('Representative source %s not found in item list, returning list untouched', repr_source)
+        return itemlist
+
+    # Find and reorder
+    repr_source_index = dequoted_items.index(dequoted_repr_source)
+    repr_source_entry = itemlist.pop(repr_source_index)
+    itemlist = [repr_source_entry] + itemlist
 
     return itemlist
 
@@ -1114,6 +1140,46 @@ def list_to_str(value: list[Number | str] | NDArray) -> str:
     else:
         ret = str(value)
     return ret
+
+
+def wrap_long_str(item_str: str, length: int = 40, newline: str = '\n') -> str:
+    r"""Wraps a long string by inserting newline escape sequences.
+
+    Splits a comma-separated string into multiple lines when it exceeds
+    the specified length limit. Breaks before an item if adding it would
+    cause the current line to exceed the specified length.
+
+    Args:
+        item_str: Comma separated list of items.
+        length: Maximum number of characters in a text line.
+        newline: String to insert for line breaks (e.g., '\n' or '</br>').
+
+    Returns:
+        String with newlines inserted to respect line length limit.
+    """
+    if len(item_str) <= length:
+        return item_str
+
+    item_list = item_str.split(',')
+    wrapped_items = []
+    current_line_length = 0
+
+    for i, item in enumerate(item_list):
+        # Calculate what the line length would be after adding this item
+        # Account for the comma separator if this isn't the first item on the line
+        item_with_sep = (',' + item) if current_line_length > 0 else item
+        potential_length = current_line_length + len(item_with_sep)
+
+        if potential_length > length and current_line_length > 0:
+            # Adding this item would exceed the limit, start a new line
+            wrapped_items.append(f'{newline}{item}')
+            current_line_length = len(item)
+        else:
+            # Item fits on the current line
+            wrapped_items.append(item)
+            current_line_length = potential_length
+
+    return ','.join(wrapped_items)
 
 
 def validate_url(url: str) -> bool:

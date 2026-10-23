@@ -7,10 +7,10 @@ on:
     paths:
       - "docs/**"
       - "pipeline/**"
+      - "scripts/**"
       - ".github/workflows/**"
-      - "environment*.yml"
-      - "setup.py"
       - "pyproject.toml"
+      - "pixi.lock"
   # Allow manual triggering
   workflow_dispatch:
 
@@ -67,16 +67,23 @@ jobs:
     # Only deploy if the push came from the specific branch / ubuntu-latest
     if: github.ref == 'refs/heads/main'
     permissions:
-      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: documentation-ubuntu-latest
           path: site_content
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: site_content
+          path: site_content
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

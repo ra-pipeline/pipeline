@@ -41,7 +41,7 @@ class RenormResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.infrastructure.api.Results.merge_with_context`
+        See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`
         """
 
         if not self.calapps:
@@ -111,7 +111,7 @@ class RenormInputs(vdp.StandardInputs):
 
                 Examples:
 
-                - ``spw='11,13,15,17'`
+                - ``spw='11,13,15,17'``
                 - ``spw=['11,13,15,17', '5,7,11,13']``
 
             excludechan: Channels to exclude in either channel or frequency space

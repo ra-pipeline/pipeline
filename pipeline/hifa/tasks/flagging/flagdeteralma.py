@@ -486,9 +486,15 @@ class FlagDeterALMA(sessionutils.ParallelTemplate):
     Task = SerialFlagDeterALMA
 
 
-def load_partialpols_alma(ms):
+def load_partialpols_alma(ms: MeasurementSet) -> list[str]:
     """Retrieve the relevant data to extend partial polarization flagging to all the polarizations (see PIPE-1028).
+
     It returns the list of flagging commands required to flag the partial polarization.
+
+    This functions iterates through the SPWs, DDIs and scans, one triplet at a time, and filtering the relevant scan intents
+    (PIPE-1268). For performance (primarily memory use), the columns required to produce the flagging commands parameters
+    are not loaded, but rather a TaQL query is used to retrieve their values for the rows that require 'partialpol'
+    flagging (PIPE-3023).
 
     Args:
         ms: Measurement set to load.
@@ -517,57 +523,28 @@ def load_partialpols_alma(ms):
         # Run evaluation for each combination of SpW id (with corresponding
         # data_desc_id) and scan id.
         for spw, ddid, scan in spw_scan_selections:  # Iterate over relevant spws
-
-            # Create table selection for current spw and get flag column.
-            table_sel = table.query(f"DATA_DESC_ID == {ddid} && SCAN_NUMBER == {scan}")
-            flags = table_sel.getcol('FLAG')
-
-            # Number of polarisations present.
-            n_pol = len(flags)
-
-            # For multi-pol data, assess if there are any rows where part of
-            # the polarisation is flagged.
-            if n_pol > 1:
+            num_pols = _get_npols(ms, ddid)
+            # For multi-pol data, assess if there are any rows where part of the polarisation is flagged.
+            if num_pols > 1:
                 LOG.debug(f"Multiple polarization data found for DATA_DESC_IDs {ddid}, scan {scan}, checking if any"
                           f" polarization data are partially flagged.")
 
-                # Count how often no pols, some pols, and/or all pols are
-                # flagged.
-                npolflag = dict.fromkeys(range(n_pol + 1), 0)
-                for k, v in zip(*np.unique(np.count_nonzero(flags, axis=0), return_counts=True)):
-                    npolflag[k] = v
+                param_rows = find_partialpol_flag_cmd_params(ms, table, spw, ddid, scan)
 
-                # Report how often n number of pols are flagged, and assess
-                # if any there are any occurrences where polarisation data is
-                # partially flagged.
-                do_partial_pol = False
-                for nflag, n in npolflag.items():
-                    if nflag == 0:
-                        LOG.debug(f" Polarization data completely unflagged: N = {n}")
-                    elif nflag < n_pol:
-                        LOG.debug(f" Polarization data partially flagged - {nflag} out of {n_pol}: N = {n}")
-                        if n > 0:
-                            do_partial_pol = True
-                    else:
-                        LOG.debug(f" Polarization data completely flagged: N = {n}")
-
-                # Continue with actual flagging of partial polarization rows.
+                do_partial_pol = len(param_rows) > 0
+                # Continue with actual flagging of partial polarization param_rows.
                 if do_partial_pol:
-                    ant1 = table_sel.getcol('ANTENNA1')
-                    ant2 = table_sel.getcol('ANTENNA2')
-                    time = table_sel.getcol('TIME')
-                    interval = table_sel.getcol('INTERVAL')
-                    params_spw = get_partialpol_flag_cmd_params(flags, ant1, ant2, time, interval)
-                    # Add the spw and time_unit to the params
-                    time_unit = table_sel.getcolkeyword('TIME', 'QuantumUnits')[0]
-                    # Add the spw and time_unit to the dictionaries
-                    updated_params_spw = [{**d, "spw": spw, "time_unit": time_unit} for d in params_spw]
-                    params.extend(updated_params_spw)
+                    num_chans = _get_nchans(ms, spw)
+                    params_spw_ddi_scan = make_partialpol_flag_cmd_params(param_rows, num_chans)
+                    params.extend(params_spw_ddi_scan)
             else:
                 LOG.debug(f"No multiple polarization data found for DATA_DESC_IDs {ddid}, scan {scan}.")
 
-            # Free resources held by table selection.
-            table_sel.close()
+    num_overall_commands = len(params)
+    if num_overall_commands == 0:
+        LOG.info(f"No partial polarization flagging found in {ms.name}. No 'partialpol' flagging commands will be generated.")
+    else:
+        LOG.info(f"Found partial polarization flagging in {ms.name}. Generating {num_overall_commands} 'partialpol' flagging commands.")
 
     commands = convert_params_to_commands(ms, params)
     return commands
@@ -600,17 +577,47 @@ def get_partialpol_spws(ms_name):
     return list(spws), datadescids
 
 
-def get_partialpol_flag_cmd_params(flags, ant1, ant2, time, interval):
-    """Get the parameters that identify points where partial polarizations need to be flagged.
-    This function should be called only if the data presents more than one polarization.
-    At the moment it only handles data with 3 dimensions (n_pol, n_channels, n_params).
+def find_partialpol_flag_cmd_params(ms: MeasurementSet,
+                                    table: casa_tools.TableReader,
+                                    spw: int, ddid: int, scan_number: int) -> list[dict]:
+    """Generates parameters for 'partialpol' flagging commands if needed for the given ms (within the spw, ddid, scan).
+
+    Produces a list with an item for every row in the MS where partial polarization is found. The items contains the
+    values of the relevant MS columns for the flagging command: ANTENNA1, ANTENNA2, TIME, INTERVAL (+ spw + time units).
 
     Args:
-        flags: Numpy array with the flags with shape (n_pol, n_channels, n_params).
-        ant1: Numpy array with the antenna1s with shape (n_params,).
-        ant2: Numpy array with the antenna2s with shape (n_params,).
-        time: Numpy array with the times with shape (n_params,).
-        interval: Numpy array with the intervals with shape (n_params,).
+        ms: Measurement Set being checked
+        table: table reader that has opened the ms and applied selection by the given SPW, DDI, Scan.
+        spw: SPW selection, it is a pre-condition that the table object passed must have selected by this SPW.
+        ddid: DDI_ID selection, it is a pre-condition that the table object passed must have selected by this DDI.
+        scan_number: scan selection, it is a pre-condition that the table object passed must have selected by this scan.
+
+    Returns:
+        List of parameter dicts, with each list item defined as a dict containing the parameters for one flagging command.
+        If no partial flags along polarizations are found, it returns an empty list (no params / rows are needed =>
+        no 'partialpol' commands are needed).
+    """
+    num_pols = _get_npols(ms, ddid)
+    taql_query_partialpol = _make_taql_query_flags_partialpol(ms.name, ddid, scan_number, num_pols)
+
+    param_rows = _run_custom_taql_query_flag_params(table, taql_query_partialpol)
+
+    # Add the spw and time_unit to the dicts
+    time_unit = table.getcolkeyword('TIME', 'QuantumUnits')[0]
+    extended_param_rows = [{**d, "spw": spw, "time_unit": time_unit} for d in param_rows]
+
+    return extended_param_rows
+
+
+def make_partialpol_flag_cmd_params(param_rows: list[dict], num_chans: int) -> list[dict]:
+    """Get the parameters that identify points where partial polarizations need to be flagged.
+
+    The output of this function is ready to be passed to convert_params_to_commands().
+
+    Args:
+        param_rows: parameters for the rows where flagging commands are required, every item giving ANTENNA1, ANTENNA2, TIME,
+                    INTERVAL.
+        num_chans: number of channels of the SPW.
 
     Returns:
         List of dictionaries with the set of params to identify partial polarizations.
@@ -621,34 +628,79 @@ def get_partialpol_flag_cmd_params(flags, ant1, ant2, time, interval):
         * "interval" - Duration of the 'scan', and
         * "channels" - a list of numerical values of affected channels that can be compressed later.
     """
-    shape = np.shape(flags)
-    # Check: Is there any chance that there are data with only 2 dimensions?
-    if len(shape) != 3:
-        LOG.error("Partial Polarization flagging: Data with no channel information are not handled by the pipeline yet")
-    n_pol, n_channels, n_params = shape
-    # Create a table of shape (n_channels, n_params) with the number of pols flagged
-    folded_flags = np.sum(flags, axis=0)
-    # Identify where polarization data is partially flagged.
-    to_extend_idx = (folded_flags > 0) & (folded_flags < n_pol)
-    # Identify the sets of parameters that have partial polarizations for any
-    # of the channels.
-    param_sets_to_check = np.where(np.any(to_extend_idx, axis=0))[0]
     params = []
-    # Iterate only through the sets of parameters with partial polarizations
-    for param_set_idx in param_sets_to_check:
-        # Get the numerical values of the channels that have partial polarizations
-        channel_sel = list(np.where(to_extend_idx[:, param_set_idx])[0])
+    for row in param_rows:
         params.append({
-            "ant1": ant1[param_set_idx],
-            "ant2": ant2[param_set_idx],
-            "time": time[param_set_idx],
-            "interval": interval[param_set_idx],
-            "channels": channel_sel
+            "ant1": row["ANTENNA1"],
+            "ant2": row["ANTENNA2"],
+            "time": row["TIME"],
+            "interval": row["INTERVAL"],
+            "channels": np.arange(0, num_chans),
+            "spw": row["spw"],
+            "time_unit": row["time_unit"],
         })
     return params
 
 
-def convert_params_to_commands(ms, params, ant_id_map=None):
+def _make_taql_query_flags_partialpol(ms_path: str, ddid: int, scan_number: int, num_pols: int) -> str:
+    """Prepares the text for a TaQL query following the 'partialpol' logic to find rows that should be flagged.
+
+    The 'partialpol' logic is:
+           - if in an MS data row any channel has partial polarizations
+    Introduced in PIPE-3023 for performance reasons.
+
+    Args:
+        ms_path: path to the MS to which this query will be applied.
+        ddid: DDI_ID to which this query will be applied
+        scan_number: scan_number to which this query will be applied
+        num_pols: number of polarizations in this DDI
+
+    Returns:
+        TaQL query as a string, ready to be use for example in table_tool.taql().
+    """
+    taql_style_prefix = "USING STYLE PYTHON"   # To get timing info to stdout, prepend "TIME..."
+
+    taql_where_ddi_scan = f"DATA_DESC_ID == {ddid} && SCAN_NUMBER == {scan_number}"
+
+    taql_query_partialpol = f"""{taql_style_prefix}
+    WITH [SELECT ANTENNA1, ANTENNA2, TIME, INTERVAL, NTRUES(FLAG,1) as POL_AGGREGATED_FLAGS FROM {ms_path} WHERE
+    {taql_where_ddi_scan}] as query_chan_flags
+       SELECT ANTENNA1, ANTENNA2, TIME, INTERVAL FROM query_chan_flags WHERE
+          ANY(POL_AGGREGATED_FLAGS > 0 && POL_AGGREGATED_FLAGS < {num_pols})"""
+
+    return taql_query_partialpol
+
+
+def _run_custom_taql_query_flag_params(tbt: casa_tools.TableReader, taql_query_flag_params: str) -> list[dict]:
+    """Runs a custom TaQL query, using the table tool taql function to retrieve parameters for 'partialpol' commands.
+
+    The assumption is that from this query we are interested in the values of "ANTENNA1", "ANTENNA2", "TIME", "INTERVAL".
+    These will be used in the parameters of flagging commands.
+
+    Args:
+        tbt: an instance of a casatools TableReader, assumed to have an already opened and selected MS.
+        taql_query_flag_params: TaQL query as a string.
+
+    Returns:
+        List of dicts where every dict has the entries for the ANTENNA1, ANTENNA2, TIME, INTERVAL values for every MS
+        row where the condition(s) defined in the query hold.
+    """
+    flag_params = []
+    query_result = tbt.taql(taql_query_flag_params)
+    try:
+        # Note: in this type of TaQL queries, ANTENNA1 will get type 'int64', which makes the CASA table tool choke in calls
+        # like getcol ("Unknown CASA type")
+        # The tablerow approach is more convenient for this case (produces a list ready for the next steps) and avoids
+        # that issue.
+        flag_params = query_result.row(columnnames=["ANTENNA1", "ANTENNA2", "TIME", "INTERVAL"])[:]
+
+    finally:
+        query_result.done()
+
+    return flag_params
+
+
+def convert_params_to_commands(ms, params, ant_id_map=None) -> list[str]:
     """Convert the identified partial polarization parameters to flagging commands.
 
     Args:
@@ -776,7 +828,7 @@ def lowtrans_alma(ms: MeasurementSet, mintransrepspw: float, mintransnonrepspws:
             LOG.info(
                 f"{ms.basename}, SpW {spw.id}: fraction of data with low transmission = {n_low_trans} / {transm.size} ="
                 f" {frac_below_thresh:.2f}; this is below the max fraction of {max_frac_low_trans}, therefore"
-                f" therefore this SpW will not be flagged.")
+                f" this SpW will not be flagged.")
 
     return commands
 
@@ -822,3 +874,33 @@ def get_airmass_for_alma_scan(scan):
     start_airmass = atmutil.calc_airmass(start_elevation.deg)
     end_airmass = atmutil.calc_airmass(end_elevation.deg)
     return (start_airmass + end_airmass)/2.
+
+
+def _get_nchans(ms: MeasurementSet, spw: int) -> int:
+    """Retrieves from the MS domain object the number of channels defined for an SPW.
+
+    Args:
+        ms: MS object form the domain.
+        spw: get the number of channels of this SPW.
+
+    Returns:
+        number of channels.
+    """
+    spw = ms.get_spectral_window(spw)
+    num_chans = spw.num_channels
+    return num_chans
+
+
+def _get_npols(ms: MeasurementSet, ddid: int) -> int:
+    """Retrieves from the MS domain object the number of polarizations defined for a Data Description ID.
+
+    Args:
+        ms: MS object form the domain.
+        ddid: find the number of polarizations of this data description.
+
+    Returns:
+        Number of polarizations.
+    """
+    data_description = ms.get_data_description(id=ddid)
+    num_pols = data_description.num_polarizations
+    return num_pols

@@ -214,7 +214,11 @@ def fm_reason(slib):
       %endfor
       </tbody>
     </table>      
-    </div>      
+    </div>
+
+    <p>
+    Note: white translucent contours show the outline of the tclean mask, but because they scale with image pixel size they may appear unusually thick in some cases.
+    </p>
     
     % if show_sol_summary :
     <div class="table-responsive collapse multi-collapse in" id="${id_name}_persol">

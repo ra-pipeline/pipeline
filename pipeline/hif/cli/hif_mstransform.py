@@ -5,28 +5,37 @@ import pipeline.h.cli.utils as utils
 @utils.cli_wrapper
 def hif_mstransform(vis=None, outputvis=None, field=None, intent=None, spw=None, chanbin=None, timebin=None,
                     per_spw=None, parallel=None):
-    """Create new MeasurementSets for science target self-calibration and imaging.
+    """Transform selected calibrated data into new MeasurementSets.
 
-    Create new MeasurementSets for self-calibration from the corrected column of the
-    input MeasurementSet or from the data column of the self-calibrated MeasurementSet
-    via a single call to mstransform with all data selection parameters.
-    By default, all science target data is copied to the new MS. The
-    new MeasurementSets are not re-indexed to the selected data and the new MSes will
-    have the same source, field, and spw names and ids as it does in the parent MSes.
-    The imaging MSes are re-gridded to the source native frequency frame (currently
-    only for LSRK).
+    For each execution block, calibrated visibilities are transformed from the
+    data column associated with the selected pipeline data type using the
+    :func:`~casatasks.manipulation.mstransform` CASA task.
 
-    Returns:
-        The results object for the pipeline task is returned.
+    When the input contains regular-calibrated data for all scans, the output
+    MS is named ``*_targets.ms`` and is listed on the front WebLog page. At
+    this stage the target MS contains only the calibrated continuum and line
+    emission data (no continuum subtraction yet). By default, all science
+    target data are copied to the new MS.
+
+    When the input contains regular- or self-calibrated science-only data, the
+    task creates ``*_imaging.ms`` for continuum-plus-line data or
+    ``*_imaging_line.ms`` for continuum-subtracted data. These imaging-ready
+    MSes are regridded to LSRK for supported non-ephemeris data and are listed
+    on the front WebLog page.
+
+    The new MSes are not re-indexed: source, field, and spw names and IDs match
+    the parent MS.
+
+    Notes:
+        QA = 1.0 if the new MS is successfully created; 0.0 otherwise.
 
     Examples:
-        1. Create a science target MS from the corrected column in the input MS.
+        1. Split all science target data:
 
         >>> hif_mstransform()
 
-        2. Make a phase and bandpass calibrator targets MS from the corrected
-        column in the input MS.
+        2. Transform a selected science target and spectral windows:
 
-        >>> hif_mstransform(intent='PHASE,BANDPASS')
+        >>> hif_mstransform(field='my_target', spw='0,1')
 
     """
