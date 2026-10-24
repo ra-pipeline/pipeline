@@ -162,6 +162,7 @@ class ImportDataResults(basetask.Results):
         self.mses = [] if mses is None else mses
         self.setjy_results = setjy_results
         self.origin = {}
+        self.flagdata_summaries: dict[str, dict] | None = None
 
         # Flux service query is None (dbservice=False), FIRSTURL, BACKUPURL, or FAIL
         self.fluxservice = None
@@ -185,6 +186,12 @@ class ImportDataResults(basetask.Results):
     def __repr__(self) -> str:
         return 'ImportDataResults:\n\t{0}'.format(
             '\n\t'.join([ms.name for ms in self.mses]))
+
+
+def _flagdata_summary(ms_name: str) -> dict:
+    """Execute flagdata mode='summary' for a single MeasurementSet."""
+    from pipeline.infrastructure import casa_tasks
+    return casa_tasks.flagdata(vis=ms_name, mode='summary').execute()
 
 
 @task_registry.set_equivalent_casa_task('h_importdata')
@@ -428,6 +435,22 @@ class ImportData(basetask.StandardTaskTemplate):
         results.setjy_results = combined_results
         results.fluxservice = fluxservice
         results.qastatus = qastatus
+
+        # Pre-compute baseline flagdata summaries across all imported MSes (in parallel via Parsl when available)
+        ms_names = [ms.name for ms in observing_run.measurement_sets]
+        if ms_names:
+            try:
+                from pipeline.infrastructure import parslhelpers
+                summaries = parslhelpers.parallel_map(_flagdata_summary, ms_names)
+                flagdata_summaries = {}
+                for ms, summary in zip(observing_run.measurement_sets, summaries):
+                    flagdata_summaries[ms.name] = summary
+                    if ms.basename != ms.name:
+                        flagdata_summaries[ms.basename] = summary
+                results.flagdata_summaries = flagdata_summaries
+            except Exception as e:
+                LOG.warning('Could not generate pre-sampled flagdata summaries: %s', e)
+                results.flagdata_summaries = None
 
         return results
 

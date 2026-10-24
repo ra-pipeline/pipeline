@@ -183,6 +183,7 @@ def test_results_accept_respects_disable_qa(disable_qa, should_call, monkeypatch
         ),
         patch('pipeline.infrastructure.basetask.write_pipeline_casa_tasks'),
         patch('pipeline.infrastructure.eventbus.send_message'),
+        patch.object(basetask.pickle, 'dump'),
     ):
         results.accept(context)
         if should_call:

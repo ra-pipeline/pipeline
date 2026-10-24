@@ -25,8 +25,8 @@ class ImportDataQAHandler(pqa.QAPlugin):
                                   metric_units='Measure of missing scan intents')
         score1.origin = new_origin
 
-        self._check_flagged_calibrator_data(result.mses)
-        score3 = self._check_model_data_column(result.mses)
+        self._check_flagged_calibrator_data(result.mses, flagdata_summaries=getattr(result, 'flagdata_summaries', None))
+        score3 = self._check_model_data_column(result.mses, model_data_columns=getattr(result, 'model_data_columns', None))
         score4 = self._check_history_column(result.mses, result.inputs)
 
         LOG.todo('How long can MSes be separated and still be considered '
@@ -57,17 +57,22 @@ class ImportDataQAHandler(pqa.QAPlugin):
         return qacalc.score_contiguous_session(mses, tolerance=tolerance)
 
     @staticmethod
-    def _check_model_data_column(mses):
+    def _check_model_data_column(mses, model_data_columns=None):
         """
         Check whether any of the measurement sets contain a MODEL_DATA column,
         complaining if present, and returning an appropriate QA score.
         """
         bad_mses = []
 
-        for ms in mses:
-            with casa_tools.TableReader(ms.name) as table:
-                if 'MODEL_DATA' in table.colnames():
+        if model_data_columns is not None:
+            for ms in mses:
+                if model_data_columns.get(ms.name, model_data_columns.get(ms.basename, False)):
                     bad_mses.append(ms)
+        else:
+            for ms in mses:
+                with casa_tools.TableReader(ms.name) as table:
+                    if 'MODEL_DATA' in table.colnames():
+                        bad_mses.append(ms)
 
         return qacalc.score_ms_model_data_column_present(mses, bad_mses)
 
@@ -103,7 +108,7 @@ class ImportDataQAHandler(pqa.QAPlugin):
         return qacalc.score_ms_history_entries_present(mses, bad_mses)
 
     @staticmethod
-    def _check_flagged_calibrator_data(mses):
+    def _check_flagged_calibrator_data(mses, flagdata_summaries=None):
         """
         Check how much calibrator data has been flagged in the given measurement
         sets, complaining if the fraction of flagged data exceeds a threshold.
@@ -122,8 +127,11 @@ class ImportDataQAHandler(pqa.QAPlugin):
 
             # inspect each MS with flagdata, capturing the dictionary
             # describing the number of flagged rows
-            flagdata_task = casa_tasks.flagdata(vis=ms.name, mode='summary')
-            flagdata_result = flagdata_task.execute()
+            if flagdata_summaries is not None:
+                flagdata_result = flagdata_summaries.get(ms.name, flagdata_summaries.get(ms.basename, {}))
+            else:
+                flagdata_task = casa_tasks.flagdata(vis=ms.name, mode='summary')
+                flagdata_result = flagdata_task.execute()
 
             for intent in calibrator_intents:
                 # collect scans with the calibrator intent
