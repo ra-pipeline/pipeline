@@ -225,7 +225,7 @@ channels = ["conda-forge"]
 # Ref: https://pixi.sh/latest/features/rich-platforms/
 platforms = ["linux-64", { platform = "osx-arm64", osx = "15.0" }]
 
-# Common dependencies (shared by ALL environments via solve-groups)
+# Common dependencies inherited by all environments through the default feature
 
 [tool.pixi.dependencies]
 conda-ecosystem-user-package-isolation = "*"
@@ -239,6 +239,13 @@ certifi = "*"
 poppler = "*"            # required by Pipeline
 imagemagick = "*"        # required by Pipeline (Jupyter notebook → RST conversion)
 
+[tool.pixi.pypi-options]
+extra-index-urls = [
+    "https://casa-pip.nrao.edu/repository/pypi-qt6/simple",
+    "https://casa-pip.nrao.edu/repository/pypi-qt5/simple",
+    "https://casa-pip.nrao.edu/repository/pypi-group/simple",
+]
+index-strategy = "unsafe-best-match"
 
 [tool.pixi.pypi-dependencies]
 # Install the current project in editable mode with 'dev' extras
@@ -247,11 +254,13 @@ pipeline = { path = ".", editable = true, extras = ["dev"] }
 protobuf = "==3.20.*" # casaplotms still requires ver<=3.20
 grpcio = ">=1.62"
 
-casampi = { version = ">=0.5.5", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-casaplotms = { version = ">=2.5.3", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-casatasks = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-casatools = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casampi = ">=0.5.5"
+casaplotms = ">=2.5.3"
+casatasks = ">=6.7.4.2"
+casatools = ">=6.7.4.2"
 
+[tool.pixi.activation.env]
+PYTHONWARNINGS = "ignore::SyntaxWarning"
 
 [tool.pixi.tasks]
 
@@ -313,7 +322,6 @@ cd "${INIT_CWD:-.}" && exec python -m casashell "$@"' _\
 """
 
 [tool.pixi.tasks.casa.env]
-PYTHONWARNINGS = "ignore::SyntaxWarning"
 OMP_PLACES = "threads"
 OMP_PROC_BIND = "false"
 PYTHONNOUSERSITE = "1"
@@ -332,7 +340,6 @@ python -m casashell "$@"' _\
 """
 
 [tool.pixi.tasks.casampi.env]
-PYTHONWARNINGS = "ignore::SyntaxWarning"
 FI_PROVIDER = "^psm3"
 PMIX_MCA_pcompress_base_silence_warning = "1"
 OMP_PLACES = "threads"
@@ -342,68 +349,23 @@ OPENBLAS_NUM_THREADS = "1"
 PYTHONNOUSERSITE = "1"
 PYTHONPATH = "$PIXI_PROJECT_ROOT/scripts/stubs"
 
-# --------------------------------------------------------------------------
-# Feature: CASA ver6.7.4 (PL2026-CASA branch) — Python 3.12
-# casatools/casatasks/numpy etc. will be installed as indirect dependencies
-# of casashell; no need to specify them here.
-# --------------------------------------------------------------------------
-
-[tool.pixi.feature.casa674-py312]
-
-[tool.pixi.feature.casa674-py312.dependencies]
+# Python versions and CASA branches are composed in the environments below.
+[tool.pixi.feature.py312.dependencies]
 python = "3.12.*"
 
-[tool.pixi.feature.casa674-py312.pypi-dependencies]
-casashell = { version = "==6.7.4.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-
-# --------------------------------------------------------------------------
-# Feature: CASA ver6.7.6 (latest release branch) — Python 3.12/3.13
-# --------------------------------------------------------------------------
-
-[tool.pixi.feature.casa676-py312]
-
-[tool.pixi.feature.casa676-py312.dependencies]
-python = "3.12.*"
-
-[tool.pixi.feature.casa676-py312.pypi-dependencies]
-casashell = { version = "==6.7.6.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-
-[tool.pixi.feature.casa676-py313]
-# Note: bdsf is not available on osx-arm64 for cp313; skipped via requirements.txt marker
-
-[tool.pixi.feature.casa676-py313.dependencies]
+[tool.pixi.feature.py313.dependencies]
 python = "3.13.*"
 
-[tool.pixi.feature.casa676-py313.pypi-dependencies]
-casashell = { version = "==6.7.6.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+[tool.pixi.feature.casa674.pypi-dependencies]
+casashell = "==6.7.4.*"
 
-# --------------------------------------------------------------------------
-# Feature: CASA ver6.7.7.* (master branch) — Python 3.12/3.13
-# --------------------------------------------------------------------------
+[tool.pixi.feature.casa676.pypi-dependencies]
+casashell = "==6.7.6.*"
 
-[tool.pixi.feature.casa677-py312]
+[tool.pixi.feature.casa677.pypi-dependencies]
+casashell = "==6.7.7.*"
 
-[tool.pixi.feature.casa677-py312.dependencies]
-python = "3.12.*"
-
-[tool.pixi.feature.casa677-py312.pypi-dependencies]
-casashell = { version = "==6.7.7.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-
-[tool.pixi.feature.casa677-py313]
-# Note: bdsf is not available on osx-arm64 for cp313; skipped via requirements.txt marker
-
-[tool.pixi.feature.casa677-py313.dependencies]
-python = "3.13.*"
-
-[tool.pixi.feature.casa677-py313.pypi-dependencies]
-casashell = { version = "==6.7.7.*", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
-
-# --------------------------------------------------------------------------
-# Feature: Docs build extras
-# --------------------------------------------------------------------------
-
-[tool.pixi.feature.docs]
-
+# Docs build extras
 [tool.pixi.feature.docs.dependencies]
 python = "3.12.*"
 pandoc = "*"      # required by nbsphinx (Jupyter notebook → RST conversion)
@@ -423,14 +385,14 @@ build-pdf-taskdocs = { cmd = "make latex && cd _build/latex && make taskdocs.pdf
 # Build User Guide PDF
 build-pdf-userguide = { cmd = "make latex && cd _build/latex && make users_guide.pdf", cwd = "docs" }
 # Update BibTeX references from NASA SciX (ADS) public library
-update-references = { cmd = "python scripts/update_references.py" }
+update-references = "python scripts/update_references.py"
 
 [tool.pixi.environments]
 # default + docs share a solve-group so the docs build always uses the same locked deps as the default runtime
-default = { features = ["casa674-py312"], solve-group = "casa674-py312" }
+default = { features = ["casa674", "py312"], solve-group = "casa674-py312" }
 docs = { features = ["docs"], solve-group = "casa674-py312" }
-casa674-py312 = { features = ["casa674-py312"] }
-casa676-py312 = { features = ["casa676-py312"] }
-casa676-py313 = { features = ["casa676-py313"] }
-casa677-py312 = { features = ["casa677-py312"] }
-casa677-py313 = { features = ["casa677-py313"] }
+casa674-py312 = ["casa674", "py312"]
+casa676-py312 = ["casa676", "py312"]
+casa676-py313 = ["casa676", "py313"]
+casa677-py312 = ["casa677", "py312"]
+casa677-py313 = ["casa677", "py313"]
