@@ -465,7 +465,10 @@ class SDImaging(basetask.StandardTaskTemplate):
             restfreq_list=self.inputs.restfreq,
             ms_list=self.inputs.ms,
             ms_names=[msobj.name for msobj in self.inputs.ms],
-            session_names=[msobj.session for msobj in self.inputs.ms],
+            session_names=[
+                self.inputs.context.observing_run.get_ms(name).session
+                for name in utils.deduplicate([x.origin_ms for x in self.inputs.ms])
+            ],
             args_spw=sdutils.convert_spw_virtual2real(self.inputs.context, self.inputs.spw),
             in_field=self.inputs.field,
             imagemode=self.inputs.mode.upper(),
