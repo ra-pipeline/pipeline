@@ -22,4 +22,5 @@ selfcal_workflow
 VLASS-SE-CONT-Imaging-Workflow
 VLASS-SE-CUBE-Imaging-Workflow
 VLASS_fits_header_keywords
+alt_deployment
 ```

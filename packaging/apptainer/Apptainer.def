@@ -1,0 +1,30 @@
+Bootstrap: docker
+From: almalinux:9-minimal
+
+%labels
+    Maintainer NRAO Science Data Processing Pipeline
+    Description CASA and Pipeline Operational Container
+
+%files
+    pyproject.toml /app/pyproject.toml
+    pixi.lock /app/pixi.lock
+    dist/*.whl /app/dist/
+    packaging/container/setup.sh /app/setup.sh
+
+%environment
+    export LC_ALL=C.UTF-8
+    export PYTHONNOUSERSITE=1
+    export PYTHONWARNINGS=ignore::SyntaxWarning
+    export OMP_PLACES=threads
+    export OMP_PROC_BIND=false
+    export OMP_NUM_THREADS=4
+    export OPENBLAS_NUM_THREADS=4
+    export FI_PROVIDER=^psm3
+    export PATH=/app/.pixi/envs/default/bin:$PATH
+
+%post
+    bash /app/setup.sh
+    rm -f /app/setup.sh
+
+%runscript
+    exec /app/.pixi/envs/default/bin/python -m casashell "$@"
