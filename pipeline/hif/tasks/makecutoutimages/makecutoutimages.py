@@ -46,7 +46,7 @@ class MakecutoutimagesResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.infrastructure.api.Results.merge_with_context`
+        See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`
         """
 
         # subimagelist is a list of dictionaries
@@ -62,7 +62,8 @@ class MakecutoutimagesResults(basetask.Results):
                     datatype=subitem['datatype'],
                     multiterm=subitem['multiterm'],
                     metadata=subitem['metadata'],
-                    imageplot=subitem['imageplot'])
+                    imageplot=subitem['imageplot'],
+                    imagename_prefix=subitem.get('imagename_prefix'))
                 if 'TARGET' in subitem['sourcetype']:
                     context.subimlist.add_item(imageitem)
             except:
@@ -74,7 +75,7 @@ class MakecutoutimagesResults(basetask.Results):
 
 class MakecutoutimagesInputs(vdp.StandardInputs):
 
-    processing_data_type = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     @vdp.VisDependentProperty
     def offsetblc(self):
@@ -388,7 +389,7 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
                         # low-amp pixels at the edge below pblimit (CAS-13818), we use a PB-based mask when run imstats().
                         pbname = subimagename.replace('.image.', '.pb.')
                         item_stats = imstat_items(
-                            image, items=['peak', 'madrms', 'max/madrms'], mask=f'mask("{pbname}")')
+                            image, items=['peak', 'madrms', 'peak/madrms'], mask=f'mask("{pbname}")')
                         stats[virtspw]['image'] = item_stats
                         # additional non-stats image properties are extracted here.
                         beam = image.restoringbeam(channel=0, polarization=0)
@@ -403,7 +404,7 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
                     if '.tt1.' not in subimagename:
                         pbname = subimagename.replace('.residual.', '.pb.')
                         item_stats = imstat_items(
-                            image, items=['peak', 'madrms', 'max/madrms'], mask=f'mask("{pbname}")')
+                            image, items=['peak', 'madrms', 'peak/madrms'], mask=f'mask("{pbname}")')
                         stats[virtspw]['residual'] = item_stats
                 elif '.image.pbcor.' in subimagename and '.rms.' not in subimagename:
                     pass

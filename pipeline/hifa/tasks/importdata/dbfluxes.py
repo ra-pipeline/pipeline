@@ -159,28 +159,32 @@ def fluxservice(
         LOG.warning('Could not parse source catalogue response')
         raise
 
+    fields = dom.getElementsByTagName('FIELD')
+    field_names = [field.getAttribute('name') for field in fields]
+    output_fields = {
+        'statuscode': 'StatusCode',
+        'sourcename': 'SourceName',
+        'dbfrequency': 'Frequency',
+        'date': 'Date',
+        'fluxdensity': 'FluxDensity',
+        'fluxdensityerror': 'FluxDensityError',
+        'spectralindex': 'SpectralIndex',
+        'spectralindexerror': 'SpectralIndexError',
+        'dataconditions': 'DataConditions',
+        'ageOfNearestMonitorPoint': 'Nearest Measurement Date',
+        'version': 'Version',
+        'clarification': 'Clarification',
+    }
+
     rowdict = {}
     for node in dom.getElementsByTagName('TR'):
         row = node.getElementsByTagName('TD')
-        rl = len(row)
-        rowdict['statuscode'] = row[0].childNodes[0].nodeValue
-        if rl == 13:
-            try:
-                rowdict['clarification'] = row[1].childNodes[0].nodeValue
-            except IndexError:
-                rowdict['clarification'] = None
-        else:
-            rowdict['clarification'] = None
-        rowdict['sourcename'] = row[rl-11].childNodes[0].nodeValue
-        rowdict['dbfrequency'] = row[rl-10].childNodes[0].nodeValue
-        rowdict['date'] = row[rl-9].childNodes[0].nodeValue
-        rowdict['fluxdensity'] = row[rl-8].childNodes[0].nodeValue
-        rowdict['fluxdensityerror'] = row[rl-7].childNodes[0].nodeValue
-        rowdict['spectralindex'] = row[rl-6].childNodes[0].nodeValue
-        rowdict['spectralindexerror'] = row[rl-5].childNodes[0].nodeValue
-        rowdict['dataconditions'] = row[rl-4].childNodes[0].nodeValue
-        rowdict['ageOfNearestMonitorPoint'] = row[rl-3].childNodes[0].nodeValue
-        rowdict['version'] = row[rl-1].childNodes[0].nodeValue
+        row_values = {
+            field_name: cell.childNodes[0].nodeValue if cell.childNodes else None
+            for field_name, cell in zip(field_names, row)
+        }
+        for output_key, field_name in output_fields.items():
+            rowdict[output_key] = row_values.get(field_name)
         rowdict['url'] = url
 
     return rowdict
@@ -348,7 +352,12 @@ def log_result(
     codedict[3] = "Fallback algorithm used, went outside the window"
     codedict[4] = "No valid flux density could be calculated"
 
-    # "dual-band data? " yes/no; "measurements bracketed in time? " yes/no.
+    # DataConditions breakdown (3 digits historically, expanded to 4 digits in OFFLINE-2026AUG):
+    # value[0]: number of available measurements used, where 9 means 9 or more
+    # value[1]: 1 if measurements exist from at least two distinct bands, 0 otherwise
+    # value[2]: 1 if there is at least one measurement on either side of the selected date, 0 otherwise
+    # value[3]: for spectral index, 1 if a measurement in a band is bracketed in time by measurements in another
+    #           band, 0 otherwise (see ICT-26895/ICT-27420)
     decision = {'0': 'No', '1': 'Yes'}
 
     LOG.info('Source: %s spw: %s    ASDM flux: %s    Catalogue flux: %s', source.name, spw.id, asdm_I, catalogue_I)
@@ -356,13 +365,20 @@ def log_result(
     LOG.info('         ageOfNearestMonitorPoint: %s', age)
     LOG.info('         %s', codedict[int(status_code)])
     if data_conditions:
-        LOG.info('         Number of measurements = %s', str(data_conditions)[0])
-        LOG.info('         Dual-band data? %s', decision[str(data_conditions)[1]])
-        LOG.info('         Measurements bracketed in time? %s', decision[str(data_conditions)[2]])
+        dc_str = str(data_conditions)
+        n_meas = '>= 9' if dc_str[0] == '9' else dc_str[0]
+        multi_band = decision.get(dc_str[1], 'N/A') if len(dc_str) > 1 else 'N/A'
+        date_bracketed = decision.get(dc_str[2], 'N/A') if len(dc_str) > 2 else 'N/A'
+        spix_bracketed = decision.get(dc_str[3], 'N/A') if len(dc_str) > 3 else 'N/A'
+        LOG.info('         Number of measurements = %s', n_meas)
+        LOG.info('         Measurements in >= 2 distinct bands? %s', multi_band)
+        LOG.info('         Observation date bracketed in time? %s', date_bracketed)
+        LOG.info('         Spectral index cross-band bracketed in time? %s', spix_bracketed)
     else:
         LOG.info('         Number of measurements = N/A')
-        LOG.info('         Dual-band data? N/A')
-        LOG.info('         Measurements bracketed in time? N/A')
+        LOG.info('         Measurements in >= 2 distinct bands? N/A')
+        LOG.info('         Observation date bracketed in time? N/A')
+        LOG.info('         Spectral index cross-band bracketed in time? N/A')
 
     LOG.info('         URL: %s', url)
     LOG.info('         Version: %s', version)

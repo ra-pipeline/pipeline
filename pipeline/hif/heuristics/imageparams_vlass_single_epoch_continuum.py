@@ -32,17 +32,17 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         # Value is None or float.
         self.user_cycleniter_final_image_nomask = None
 
-    def calc_topo_ranges(self, inputs):
-        """Calculate TOPO ranges for hif_tclean inputs.
+    def calc_ms_frame_ranges(self, inputs):
+        """Calculate MS native frequency frame ranges for hif_tclean inputs.
 
         Note: we might consider consolidating this with the similar code in contfilehelper.
         """
-        spw_topo_freq_param_lists = []
-        spw_topo_chan_param_lists = []
-        spw_topo_freq_param_dict = collections.defaultdict(dict)
-        spw_topo_chan_param_dict = collections.defaultdict(dict)
-        total_topo_freq_ranges = []
-        topo_freq_ranges = []
+        spw_ms_frame_freq_param_lists = []
+        spw_ms_frame_chan_param_lists = []
+        spw_ms_frame_freq_param_dict = collections.defaultdict(dict)
+        spw_ms_frame_chan_param_dict = collections.defaultdict(dict)
+        total_ms_frame_freq_ranges = []
+        ms_frame_freq_ranges = []
         num_channels = []
 
         qaTool = casa_tools.quanta
@@ -61,15 +61,15 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
                 max_frequency = float(spw_info.max_frequency.to_units(measures.FrequencyUnits.GIGAHERTZ))
 
                 # Save spw width
-                total_topo_freq_ranges.append((min_frequency, max_frequency))
+                total_ms_frame_freq_ranges.append((min_frequency, max_frequency))
 
                 if 'spw%s' % (spwid) in inputs.spwsel_lsrk:
-                    spw_topo_freq_param_lists.append([spwid] * len(inputs.vis))
-                    spw_topo_chan_param_lists.append([spwid] * len(inputs.vis))
+                    spw_ms_frame_freq_param_lists.append([spwid] * len(inputs.vis))
+                    spw_ms_frame_chan_param_lists.append([spwid] * len(inputs.vis))
                     for msname in inputs.vis:
-                        spw_topo_freq_param_dict[os.path.basename(msname)][spwid] = ''
-                        spw_topo_chan_param_dict[os.path.basename(msname)][spwid] = ''
-                    topo_freq_ranges.append((min_frequency, max_frequency))
+                        spw_ms_frame_freq_param_dict[os.path.basename(msname)][spwid] = ''
+                        spw_ms_frame_chan_param_dict[os.path.basename(msname)][spwid] = ''
+                    ms_frame_freq_ranges.append((min_frequency, max_frequency))
                     aggregate_spw_lsrk_bw = '%.10fGHz' % (max_frequency - min_frequency)
                     if (
                         (inputs.spwsel_lsrk['spw%s' % (spwid)] not in ('ALL', 'ALLCONT'))
@@ -80,12 +80,12 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
                             'No continuum frequency selection for Target Field %s SPW %s' % (inputs.field, spwid)
                         )
                 else:
-                    spw_topo_freq_param_lists.append([spwid] * len(inputs.vis))
-                    spw_topo_chan_param_lists.append([spwid] * len(inputs.vis))
+                    spw_ms_frame_freq_param_lists.append([spwid] * len(inputs.vis))
+                    spw_ms_frame_chan_param_lists.append([spwid] * len(inputs.vis))
                     for msname in inputs.vis:
-                        spw_topo_freq_param_dict[os.path.basename(msname)][spwid] = ''
-                        spw_topo_chan_param_dict[os.path.basename(msname)][spwid] = ''
-                    topo_freq_ranges.append((min_frequency, max_frequency))
+                        spw_ms_frame_freq_param_dict[os.path.basename(msname)][spwid] = ''
+                        spw_ms_frame_chan_param_dict[os.path.basename(msname)][spwid] = ''
+                    ms_frame_freq_ranges.append((min_frequency, max_frequency))
                     aggregate_spw_lsrk_bw = '%.10fGHz' % (max_frequency - min_frequency)
                     if (inputs.intent == 'TARGET') and (
                         inputs.specmode in ('mfs', 'cont') and self.warn_missing_cont_ranges()
@@ -98,46 +98,46 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
 
             aggregate_lsrk_bw = qaTool.add(aggregate_lsrk_bw, aggregate_spw_lsrk_bw)
 
-        spw_topo_freq_param = [
+        spw_ms_frame_freq_param = [
             ','.join(spwsel_per_ms)
             for spwsel_per_ms in [
-                [spw_topo_freq_param_list_per_ms[i] for spw_topo_freq_param_list_per_ms in spw_topo_freq_param_lists]
+                [spw_ms_frame_freq_param_list_per_ms[i] for spw_ms_frame_freq_param_list_per_ms in spw_ms_frame_freq_param_lists]
                 for i in range(len(inputs.vis))
             ]
         ]
-        spw_topo_chan_param = [
+        spw_ms_frame_chan_param = [
             ','.join(spwsel_per_ms)
             for spwsel_per_ms in [
-                [spw_topo_chan_param_list_per_ms[i] for spw_topo_chan_param_list_per_ms in spw_topo_chan_param_lists]
+                [spw_ms_frame_chan_param_list_per_ms[i] for spw_ms_frame_chan_param_list_per_ms in spw_ms_frame_chan_param_lists]
                 for i in range(len(inputs.vis))
             ]
         ]
 
         # Calculate total bandwidth
-        total_topo_bw = '0.0GHz'
-        for total_topo_freq_range in utils.merge_ranges(total_topo_freq_ranges):
-            total_topo_bw = qaTool.add(
-                total_topo_bw,
+        total_ms_frame_bw = '0.0GHz'
+        for total_ms_frame_freq_range in utils.merge_ranges(total_ms_frame_freq_ranges):
+            total_ms_frame_bw = qaTool.add(
+                total_ms_frame_bw,
                 qaTool.sub(
-                    '%.10fGHz' % (float(total_topo_freq_range[1])), '%.10fGHz' % (float(total_topo_freq_range[0]))
+                    '%.10fGHz' % (float(total_ms_frame_freq_range[1])), '%.10fGHz' % (float(total_ms_frame_freq_range[0]))
                 ),
             )
 
         # Calculate aggregate selected bandwidth
-        aggregate_topo_bw = '0.0GHz'
-        for topo_freq_range in utils.merge_ranges(topo_freq_ranges):
-            aggregate_topo_bw = qaTool.add(
-                aggregate_topo_bw,
-                qaTool.sub('%.10fGHz' % (float(topo_freq_range[1])), '%.10fGHz' % (float(topo_freq_range[0]))),
+        aggregate_ms_frame_bw = '0.0GHz'
+        for ms_frame_freq_range in utils.merge_ranges(ms_frame_freq_ranges):
+            aggregate_ms_frame_bw = qaTool.add(
+                aggregate_ms_frame_bw,
+                qaTool.sub('%.10fGHz' % (float(ms_frame_freq_range[1])), '%.10fGHz' % (float(ms_frame_freq_range[0]))),
             )
 
         return (
-            spw_topo_freq_param,
-            spw_topo_chan_param,
-            spw_topo_freq_param_dict,
-            spw_topo_chan_param_dict,
-            total_topo_bw,
-            aggregate_topo_bw,
+            spw_ms_frame_freq_param,
+            spw_ms_frame_chan_param,
+            spw_ms_frame_freq_param_dict,
+            spw_ms_frame_chan_param_dict,
+            total_ms_frame_bw,
+            aggregate_ms_frame_bw,
             aggregate_lsrk_bw,
         )
 
@@ -186,7 +186,7 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         """Tclean cell parameter heuristics."""
         return ['0.6arcsec']
 
-    def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
+    def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, min_pixels=None, centreonly=None,
                vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> list | int:
         """Tclean imsize parameter heuristics."""
         return [16384, 16384]
@@ -302,10 +302,10 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
     def pb_correction(self) -> bool:
         return False
 
-    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
 
-        pblimit_image, pblimit_cleanmask = super().pblimits(pb)
+        _, pblimit_cleanmask = super().pblimits(pb)
 
         # Overwrite pblimit_image (to be used in tclean as pblimit parameter) with
         # the VLASS-SE-CONT-MOSAIC specific value.
@@ -587,6 +587,15 @@ class ImageParamsHeuristicsVlassSeCont(ImageParamsHeuristics):
         qaTool = casa_tools.quanta
         do_parallel = mpihelpers.parse_mpi_input_parameter(parallel)
 
+        # Fallback to serial mode if parallel was requested but MPI is not available
+        if do_parallel and not mpihelpers.is_mpi_ready():
+            LOG.warning(
+                'Parallel synthesis imaging was requested (parallel=%s) but no CASA MPI session is active. '
+                'Falling back to serial imager (PySynthesisImager).',
+                parallel,
+            )
+            do_parallel = False
+
         if not phasecenter:
             LOG.error(f"No phasecenter is provided.")
 
@@ -742,7 +751,7 @@ class ImageParamsHeuristicsVlassSeContAWP2(ImageParamsHeuristicsVlassSeCont):
         """Tclean gridder parameter heuristics."""
         return 'awp2'
 
-    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -770,7 +779,7 @@ class ImageParamsHeuristicsVlassSeContAWP2P001(ImageParamsHeuristicsVlassSeCont)
         """Tclean wprojplanes parameter heuristics."""
         return 1
 
-    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -794,7 +803,7 @@ class ImageParamsHeuristicsVlassSeContAWPHPG(ImageParamsHeuristicsVlassSeCont):
         """Tclean gridder parameter heuristics."""
         return 'awphpg'
 
-    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -822,7 +831,7 @@ class ImageParamsHeuristicsVlassSeContAWPHPGP001(ImageParamsHeuristicsVlassSeCon
         """Tclean wprojplanes parameter heuristics."""
         return 1
 
-    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 
@@ -846,7 +855,7 @@ class ImageParamsHeuristicsVlassSeContMosaic(ImageParamsHeuristicsVlassSeCont):
         self.vlass_stage = 0
         self.user_cycleniter_final_image_nomask = None
 
-    def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, centreonly=None,
+    def imsize(self, fields=None, cell=None, primary_beam=None, sfpblimit=None, max_pixels=None, min_pixels=None, centreonly=None,
                vislist=None, spwspec=None, intent: str = '', joint_intents: str = '', specmode=None) -> list | int:
         """Tclean imsize parameter heuristics."""
         return [12500, 12500]
@@ -887,7 +896,7 @@ class ImageParamsHeuristicsVlassSeContMosaic(ImageParamsHeuristicsVlassSeCont):
         # Might change to True based on stackholder feedback
         return False
 
-    def pblimits(self, pb: None | str, specmode: str | None = None) -> tuple[float, float]:
+    def pblimits(self, pb: None | str, specmode: str | None = None, gridder: str | None = None) -> tuple[float, float]:
         """Tclean pblimit parameter and cleanmask pblimit heuristics."""
         _, pblimit_cleanmask = super().pblimits(pb)
 

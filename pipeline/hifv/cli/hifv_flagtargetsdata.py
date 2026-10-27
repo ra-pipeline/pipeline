@@ -6,9 +6,6 @@ import pipeline.h.cli.utils as utils
 def hifv_flagtargetsdata(vis=None, template=None, filetemplate=None, flagbackup=None):
     """Apply a flagtemplate to target data prior to running imaging pipeline tasks.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Basic flagtargetsdata task:
 

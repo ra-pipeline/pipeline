@@ -10,9 +10,6 @@ def hifv_rqcal(vis=None, caltable=None):
 
         caltable: String name of caltable.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Load an ASDM list in the ../rawdata subdirectory into the context:
 

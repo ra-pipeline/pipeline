@@ -13,7 +13,7 @@ LOG = infrastructure.get_logger(__name__)
 
 class CheckProductSizeInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     parallel = vdp.VisDependentProperty(default='automatic')
 
@@ -63,7 +63,10 @@ class CheckProductSizeInputs(vdp.StandardInputs):
 
             calcsb: Force (re-)calculation of sensitivities and beams
 
-            parallel: Use the CASA imager parallelization when possible.
+            parallel: Turn on CASA MPI parallel synthesis imaging (``PyParallelContSynthesisImager``).
+                If ``'automatic'``, parallel imaging is enabled only when running inside an active ``mpicasa`` session.
+                If ``True`` or ``'true'``, parallel imaging is requested; if no active ``mpicasa`` session is detected,
+                a warning is logged and execution automatically falls back to serial mode (``PySynthesisImager``).
 
                 Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
 
@@ -228,10 +231,12 @@ class CheckProductSize(basetask.StandardTaskTemplate):
         Note: this is only relevant for VLA to detect if we can proceed with VLA cube imaging
         """
         cube_imaging_datatypes = [
-            DataType.SELFCAL_LINE_SCIENCE,
-            DataType.REGCAL_LINE_SCIENCE,
+            DataType.IM_CONTLINE_SCIENCE,
+            DataType.IM_LINE_SCIENCE,
             DataType.SELFCAL_CONTLINE_SCIENCE,
+            DataType.SELFCAL_LINE_SCIENCE,
             DataType.REGCAL_CONTLINE_SCIENCE,
+            DataType.REGCAL_LINE_SCIENCE
         ]
         ms_list = self.inputs.context.observing_run.get_measurement_sets_of_type(cube_imaging_datatypes, msonly=True)
         telescope = self.inputs.context.project_summary.telescope

@@ -41,7 +41,7 @@ class BaselineSubtractionWorkerInputs(vdp.StandardInputs):
                   'FLOAT_DATA': 'float_data'}
 
     # Search order of input vis
-    processing_data_type = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.ATMCORR, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     parallel = sessionutils.parallel_inputs_impl()
 

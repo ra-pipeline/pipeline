@@ -29,6 +29,9 @@ else:
     # Use the ancestry path if "pipeline_src" is not set.
     sys.path.insert(0, os.path.abspath('../../'))
 
+# Make local extensions importable.
+sys.path.insert(0, os.path.abspath('_extension'))
+
 try:
     import pipeline
     from pipeline.h.tasks import ImportData
@@ -66,6 +69,27 @@ except ImportError as error:
     print(error.__class__.__name__ + ': ' + error.message)
     pass
 
+
+def setup(app):
+    # Raise docutils substitution line-length limit (default 10 000) so that
+    # the Task inheritance diagram substitution (~14 500 chars) is not dropped.
+    app.connect('builder-inited', lambda app: app.env.settings.update({'line_length_limit': 20_000}))
+
+    # PIPE-3252: Include ALMA tasks reference in User's Guide only for LaTeX (PDF)
+    # to enable internal hyperlinks, while omitting it from HTML to avoid duplicating
+    # the top-level API Reference section.
+    def on_builder_inited(app):
+        if app.builder.name != 'latex':
+            app.config.exclude_patterns.append('users_guide/alma_tasks.rst')
+
+    def on_source_read(app, docname, source):
+        if docname == 'users_guide/index' and app.builder.name == 'latex':
+            source[0] += '\n\n```{toctree}\n:maxdepth: 2\n\nalma_tasks\n```\n'
+
+    app.connect('builder-inited', on_builder_inited)
+    app.connect('source-read', on_source_read)
+
+
 # -- General configuration ---------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -78,9 +102,9 @@ extensions = [
     # --------
     # https://docs.readthedocs.io/en/stable/guides/jupyter.html#using-notebooks-in-other-formats
     # option 1 # better integration with intersphinx
-    'myst_nb',
+    'myst_nb',  # Handles both notebooks and plain markdown files
     # option 2 # https://github.com/executablebooks/MyST-NB/issues/421
-    # 'myst_parser',
+    # 'myst_parser',  # Not needed with myst_nb
     # 'nbsphinx',
     # ---------
     'sphinx.ext.autodoc',
@@ -94,9 +118,8 @@ extensions = [
     'sphinxcontrib.mermaid',
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
-    'sphinx.ext.coverage',
     'sphinx.ext.githubpages',
-    # 'sphinx.ext.intersphinx',
+    'sphinx.ext.intersphinx',
     'sphinx.ext.inheritance_diagram',
     'sphinx_automodapi.automodapi',
     'sphinx_automodapi.smart_resolver',
@@ -107,9 +130,14 @@ extensions = [
     'sphinx_copybutton',
     'IPython.sphinxext.ipython_console_highlighting',
     'IPython.sphinxext.ipython_directive',
+    'cli_function_stubs',
+    'parameter_linking',
+    'toc_sections',
+    'jira_links',
 ]
 
 add_module_names = False
+autosectionlabel_prefix_document = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -118,8 +146,8 @@ templates_path = ['_templates']
 smartquotes = False
 
 # The suffix(es) of source filenames.
-# You can specify multiple suffix as a list of string:
-
+# MyST parser handles both .rst and .md files automatically when enabled
+# (myst_nb and myst_parser both register .md suffix)
 # source_suffix = {
 #    '.rst': 'restructuredtext',
 #    '.md': 'markdown',
@@ -139,16 +167,25 @@ smartquotes = False
 master_doc = 'index'
 
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-release
-release = build_version = pipeline.environment.pipeline_revision  # used on the PDF cover
+# `build_version`: The raw, full pipeline revision (e.g. "2026.2.1.16+g64967c159-detached")
+build_version = pipeline.environment.pipeline_revision
+
+# `version`: The base short string (e.g. "2026.2.1.16").
+# Replaces |version| in texts. Used below for the HTML navbar (`project`) and browser tab (`html_title`).
 version = build_version.split('+')[0]
 
-# remove -detached suffix as readthedocs always uses git checkout --force to create a
-# detached state
-build_version_short = build_version.removesuffix('-detached')
+# `release`: Replaces |release| in texts. Crucially, the LaTeX builder injects this exactly onto the PDF Cover Page.
+# We set it to `version` so the PDF cover gets the clean, short string without messy git hashes.
+release = version
+
+# `build_version_short`: Removes -detached suffix (as RTD uses `git checkout --force`).
+# Used exclusively for the `copyright` string below, which appears in the footer of every HTML page.
+build_version_short = build_version.removesuffix('-detached').removesuffix('-dirty')
 
 # General information about the project.
-project = f'Pipeline \n ({version})'
-author = 'Pipeline Dev. Team'
+project = f'Pipeline ({version})'
+html_title = f'Pipeline ({version})'
+author = 'Pipeline Contributors'
 copyright = f'2020–{datetime.now(timezone.utc).year}, {author}, build: {build_version_short}'
 
 # The version info for the project you're documenting, acts as replacement
@@ -170,7 +207,33 @@ language = 'en'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
+# Default behavior
 exclude_patterns = ['_build', '**.ipynb_checkpoints', 'Thumbs.db', '.DS_Store']
+
+if os.environ.get('BUILD_INTERNAL_DOCS') == '1':
+    tags.add('internal')
+    project = project + ' (INTERNAL)'
+    # Prevent search engines and crawlers from indexing internal pages
+    html_meta = {
+        'robots': 'noindex, nofollow, noarchive, nosnippet',
+        'googlebot': 'noindex, nofollow, noarchive, nosnippet',
+    }
+else:
+    # PUBLIC BUILD: Exclude developer-only and internal files/folders
+    # IMPORTANT: If you add a new internal devel/ subfolder (e.g., devel/new_section/),
+    # you must also add 'devel/new_section/*' here so it is excluded from public builds.
+    exclude_patterns.extend([
+        'internal_notes/*',
+        'inheritance.rst',
+        'timeline*',
+        'devel/process/*',
+        'devel/reference/*',
+        'devel/misc/*',
+    ])
+
+# Note: Builder-specific exclusions (e.g., excluding 'users_guide/alma_tasks.rst'
+# for HTML builds while keeping it for LaTeX) are dynamically appended in setup(app)
+# via the 'builder-inited' event because app.builder.name is only available at that stage.
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'default'  # 'sphinx', 'github-dark', ' default'
@@ -184,34 +247,18 @@ copybutton_prompt_is_regexp = True
 copybutton_remove_prompts = True
 copybutton_copy_empty_lines = False
 copybutton_only_copy_prompt_lines = True
+copybutton_exclude = ".linenos, .gp, .go, pre.mermaid, div.mermaid, .mermaid"
 
 # -- Options for HTML output -------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'
+html_theme = 'furo'
 
-# Theme options are theme-specific and customize the look and feel of a
-# theme further.  For a list of options available for each theme, see the
-# documentation.
-#
+# Theme options for furo; empty dict means all defaults (including default fonts).
 html_theme_options = {
-    'logo_only': False,
-    'prev_next_buttons_location': 'bottom',
-    'style_external_links': False,
-    'vcs_pageview_mode': '',
-    'style_nav_header_background': 'gray',
-    'flyout_display': 'attached',
-    'version_selector': True,
-    'language_selector': True,
-    # 'display_version': True, # deprecated
-    # Toc options
-    'collapse_navigation': True,
-    'sticky_navigation': True,
-    'navigation_depth': 4,
-    'includehidden': True,
-    'titles_only': False,
+    'footer_icons': [],
 }
 # html_logo = "_static/favicon.ico"
 html_favicon = '_static/favicon-16x16.png'
@@ -219,11 +266,26 @@ html_favicon = '_static/favicon-16x16.png'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will override the builtin "default.css".
 html_static_path = ['_static']
-html_css_files = ['custom_theme.css']
+html_css_files = [
+    'custom_theme.css',          # Custom theme overrides (loads last for CSS cascade priority)
+    'viewerjs/viewer.min.css',   # Viewer.js stylesheet (MIT)
+]
+html_js_files = [
+    'viewerjs/viewer.min.js',    # Viewer.js image viewer & inspection library (MIT)
+    'viewer_init.js',            # Auto-binds Viewer.js to all documentation figures/images
+    'furo_layout.js',            # Theme layout enhancements (TOC drawer toggle, Mermaid reset)
+]
 
 # -- Options for Mermaid output ---------------------------------------
 
 mermaid_d3_zoom = True
+mermaid_include_elk = False
+# mermaid_elk_version = '0.2.3'
+mermaid_include_zenuml = False
+mermaid_height = 'auto'
+mermaid_version = '12.2.0'
+# mermaid_light_theme = 'neutral'
+myst_fence_as_directive = ['mermaid']
 
 # -- Options for HTMLHelp output ---------------------------------------
 
@@ -242,6 +304,10 @@ latex_elements = {
     'geometry': r'\usepackage[top=1.0in, bottom=1.0in, left=0.5in, right=0.5in]{geometry}',
     'preamble': r"""
   \usepackage{hyperref}
+  \usepackage{amssymb}
+  \DeclareUnicodeCharacter{2264}{\ensuremath{\le}}
+  \DeclareUnicodeCharacter{2265}{\ensuremath{\ge}}
+  \DeclareUnicodeCharacter{2273}{\ensuremath{\gtrsim}}
   % \usepackage{extsizes} % required to use font sizes other than 10, 11, or 12pt
   \usepackage{longtable}
   \setcounter{tocdepth}{1}
@@ -275,7 +341,10 @@ latex_use_modindex = False
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass
 # [howto, manual, or own class]).
-latex_documents = [('latex', 'taskdocs.tex', 'Pipeline Tasks Reference Manual', 'pipeline team', 'manual')]
+latex_documents = [
+    ('task_reference', 'taskdocs.tex', r'Task Reference Manual \\[2ex] {\LARGE ALMA/VLA/NRO Pipeline}', 'Pipeline Contributors', 'manual'),
+    ('users_guide/index', 'users_guide.tex', 'ALMA Science Pipeline User’s Guide', 'Pipeline Contributors', 'manual'),
+]
 
 
 # -- Options for manual page output ------------------------------------
@@ -296,12 +365,8 @@ texinfo_documents = [
 
 # -- Sidebars
 
-html_sidebars = {
-    '**': ['localtoc.html'],  # not allowed if using the 'furo' theme
-    'search': [],
-    'genindex': [],
-    'py-modindex': [],
-}
+# furo provides its own sidebar; custom per-page sidebars are not supported
+html_sidebars = {}
 
 # -- napoleon
 
@@ -315,24 +380,41 @@ napoleon_use_admonition_for_notes = False
 napoleon_use_admonition_for_references = False
 napoleon_use_ivar = False
 napoleon_use_param = True
-napoleon_use_rtype = True
+napoleon_use_rtype = False
 napoleon_attr_annotations = True
 
 
 verbatimwrapslines = False
 html_show_sourcelink = True
 autosummary_generate = True
-autosummary_generate_overwrite = autosummary_generate
+autosummary_generate_overwrite = False  # only write stubs that don't exist yet; speeds up incremental builds
 
 # https://www.sphinx-doc.org/en/master/usage/extensions/autosummary.html#confval-autosummary_ignore_module_all
-autosummary_imported_members = True
-autosummary_ignore_module_all = False  # respect `__alll__` in autosummary to get clean output
+# Avoid documenting re-imported names (typing.Any, datatype.DataType, domain.MeasurementSet, ...) as
+# attributes of every module that does `from ... import X`. Without this, each `from typing import Any`
+# registers `pipeline.<pkg>.Any` as a documented attribute, producing dozens of ambiguous cross-reference
+# targets and a huge slow-down of the `writing output...` phase. Re-exports listed in a module's __all__
+# are still emitted because `autosummary_ignore_module_all = False`.
+autosummary_imported_members = False
+autosummary_ignore_module_all = False  # respect `__all__` in autosummary to get clean output
 
-# autodoc_mock_imports = ["pipeline"]
+# Suppress duplicate-target warnings from the python domain. The pipeline package legitimately re-exports
+# many classes (Context, MeasurementSet, SpectralWindow, Field, Source, Antenna, DataType, ...) at both
+# the package and submodule level. Sphinx still resolves these refs (smart_resolver picks one), but
+# rendering the multi-KB warning text once per occurrence dominated wall time during `writing output...`.
+suppress_warnings = ['ref.python']
+
+autodoc_mock_imports = [
+    "casaconfig",
+    "casaplotms",
+    "casashell",
+    "casatasks",
+    "casatools",
+]
 # autodoc_default_options = ['members']
 
-# Optionally, could disable type hints for the cleaner-look task refernece PDF
-autodoc_typehints = 'signature'  # 'none'
+# Move type hints from signature to parameter descriptions for cleaner display
+autodoc_typehints = 'description'  # 'signature' or 'none'
 
 autodoc_default_options = {
     # other options
@@ -347,18 +429,19 @@ automodsumm_inherited_members = False
 
 # -- intersphinx
 
-# intersphinx_mapping = {
-#     'python': ('https://docs.python.org/3',(None, 'python-inv.txt')),
-#     'astropy': ('http://docs.astropy.org/en/latest/', None),
-#     'pyerfa': ('https://pyerfa.readthedocs.io/en/stable/', None),
-#     'pytest': ('https://pytest.readthedocs.io/en/stable/', None),
-#     'ipython': ('https://ipython.readthedocs.io/en/stable/', None),
-#     'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
-#     'sphinx_automodapi': ('https://sphinx-automodapi.readthedocs.io/en/stable/', None),
-#     'packagetemplate': ('http://docs.astropy.org/projects/package-template/en/latest/', None),
-#     'h5py': ('http://docs.h5py.org/en/stable/', None),
-#     "sphinx": ("https://www.sphinx-doc.org/en/master/", None),
-# }
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', (None, 'python-inv.txt')),
+    'casadocs': ('https://casadocs.readthedocs.io/en/stable/', None),
+    # 'astropy': ('http://docs.astropy.org/en/latest/', None),
+    # 'pyerfa': ('https://pyerfa.readthedocs.io/en/stable/', None),
+    # 'pytest': ('https://pytest.readthedocs.io/en/stable/', None),
+    # 'ipython': ('https://ipython.readthedocs.io/en/stable/', None),
+    # 'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+    # 'sphinx_automodapi': ('https://sphinx-automodapi.readthedocs.io/en/stable/', None),
+    # 'packagetemplate': ('http://docs.astropy.org/projects/package-template/en/latest/', None),
+    # 'h5py': ('http://docs.h5py.org/en/stable/', None),
+    # "sphinx": ("https://www.sphinx-doc.org/en/master/\", None),
+}
 # intersphinx_disabled_reftypes = ["*"]
 
 # sphinxcontrib.bibtex/sphinx-astrorefs
@@ -416,7 +499,7 @@ nbsphinx_prolog = r"""
 
         .. _nbsphinx: https://nbsphinx.readthedocs.io/
         .. _Jupyter: https://jupyter.org/
-        .. _{{ docname }}: https://github.com/r-xue/pipeline/blob/gh-pages/html/{{ docname }}
+        .. _{{ docname }}: https://github.com/ra-pipeline/pipeline/blob/gh-pages/html/{{ docname }}
     
 
 .. raw:: latex
@@ -451,3 +534,6 @@ myst_linkify_fuzzy_links = False
 # myst-NB
 
 nb_execution_mode = 'off'
+
+# Disable appending parentheses to functions and methods cross-references
+add_function_parentheses = False

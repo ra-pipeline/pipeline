@@ -349,8 +349,7 @@ def plot_mosaic_source(ms: MeasurementSet, source: Source, figfile: str) -> None
 
 
 def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
-    """
-    Produce a plot of the Tsys scans relative to the target pointings.
+    """Produce a plot of the Tsys scans relative to the target pointings.
 
     Args:
         ms: MeasurementSet object.
@@ -363,6 +362,9 @@ def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
     LOG.info("Creating Tsys plot for source %s.", source.name)
     # Retrieve correct Tsys field for source based on mapping
     tsys_field = select_tsys_field(ms, source)
+    if tsys_field is None:
+        LOG.warning("No Tsys field found for source %s, skipping Tsys plot.", source.name)
+        return
 
     # Retrieve TARGET field positions and configurations
     fields = [f for f in source.fields if not is_tsys_only(f)]
@@ -372,12 +374,13 @@ def plot_tsys_scans(ms: MeasurementSet, source: Source, figfile: str) -> None:
 
     # Calculate Tsys scans offset to apply to plot
     tsys_scans_dict = tsys_scans_radec(ms, mean_direction, tsys_field)
+    LOG.debug(" %d scans found for tsys field %s.", len(tsys_scans_dict), tsys_field.name)
 
     # Create Tsys scans plot
     fig, ax, fontsize = create_figure(delta_ra, delta_dec, beam_diameters)
     plot_dict = compute_element_locs(
         fields, delta_ra, delta_dec, dish_diameters, beam_diameters, tsys_scans_dict=tsys_scans_dict,
-        )
+    )
     legend_labels, legend_colors = add_elements_to_plot(ax, plot_dict, fontsize=fontsize)
 
     # Add title, legend, and labels
@@ -462,50 +465,81 @@ def label_format(x: float, _: Any) -> str:
 def select_tsys_field(
         ms: MeasurementSet,
         source: Source,
-        ) -> Field:
-    """
-    Pick the best-matching Tsys field for a given source.
+) -> Field | None:
+    """Pick the best-matching Tsys field for a given source.
 
     Selection order (stop at first non-empty result):
       1) Exact ID match among the source's fields
-      2) Exact NAME match among the source's fields (case-insensitive configurable)
-      3) Partial NAME match to account for prefix/suffix additions
+      2) Exact NAME match among the source's fields
+      3) Partial NAME match to account for suffix additions
+      4) Nearest field by angular separation
 
     Args:
         ms: MeasurementSet object.
         source: Source object.
 
     Returns:
-        A Field object of the associated Tsys field.
-
-    Raises:
-        LookupError if no Tsys fields are found or if no Tsys field is matched to the source.
+        A Field object of the associated Tsys field, or None if no Tsys fields are
+        found in the mapping for TARGET intent.
     """
     # Retrieve correct Tsys field for source based on mapping
     is_sd = ms.array_name == 'TP'
+    # PIPE-3163/PIPE-3175: get_intent_to_tsysfield_map() should return properly auto-quoted field identifiers.
     tsys_fields = get_intent_to_tsysfield_map(ms, is_single_dish=is_sd)['TARGET'].split(',')
+    tsys_fields = [x.strip() for x in tsys_fields if x.strip()]
     if not tsys_fields:
-        raise LookupError('No Tsys fields associated with TARGET.')
+        LOG.warning('No Tsys fields associated with TARGET in %s.', ms.name)
+        return None
 
     # Precompute lookup structures
     src_fields = source.fields
     src_by_id = {f.id: f for f in src_fields}
-    src_by_name = {f.name.strip().strip('"'): f for f in src_fields}
+    src_by_name = {f.name: f for f in src_fields}
 
     # ID or name match to a source field
-    for field_str in tsys_fields:
-        field_str_clean = field_str.strip().strip('"')
-        if field_str_clean.isdigit() and int(field_str_clean) in src_by_id:
-            return src_by_id[int(field_str_clean)]
-        if field_str_clean in src_by_name:
-            return src_by_name[field_str_clean]
-        # PIPE-2869: Partial name match
-        for name in src_by_name:
-            if field_str_clean.startswith(name):
-                return ms.get_fields(name=field_str)[0]
+    for tsys_field_identifier in tsys_fields:
+        if tsys_field_identifier.isdigit():
+            if int(tsys_field_identifier) in src_by_id:
+                return src_by_id[int(tsys_field_identifier)]
+        else:
+            if tsys_field_identifier in src_by_name:
+                return src_by_name[tsys_field_identifier]
+            # PIPE-2869: Partial name match
+            for name in src_by_name:
+                if tsys_field_identifier.strip('"').startswith(name.strip('"')):
+                    fields = ms.get_fields(name=tsys_field_identifier)
+                    if fields:
+                        return fields[0]
 
-    # If truly nothing matched, raise a clear error instead of returning a wrong field silently.
-    raise LookupError(f"No Tsys field match for Tsys fields: {tsys_fields}")
+    # If nothing matched, return the nearest Tsys field by angular separation to the source
+    candidate_fields = []
+    for tsys_field_identifier in tsys_fields:
+        if tsys_field_identifier.isdigit():
+            # Numeric ID that wasn't in source fields (already checked in early matching)
+            fields = ms.get_fields(field_id=int(tsys_field_identifier))
+            if fields:
+                candidate_fields.extend(fields)
+            else:
+                LOG.warning('Tsys field ID %s not found in MS', tsys_field_identifier)
+        else:
+            fields = ms.get_fields(name=tsys_field_identifier)
+            if fields:
+                candidate_fields.extend(fields)
+            else:
+                LOG.warning('Tsys field name %s not found in MS', tsys_field_identifier)
+
+    if not candidate_fields:
+        LOG.warning('No valid Tsys candidate fields found for source %s', source.name)
+        return None
+
+    src_ra = np.mean([direction_to_radec(f.mdirection)[0] for f in src_fields])
+    src_dec = np.mean([direction_to_radec(f.mdirection)[1] for f in src_fields])
+    # return closest candidate - this should be what applycal does with "nearest"
+    # Use (distance, field_id) tuple to break ties deterministically
+    return min(
+        candidate_fields,
+        key=lambda f: (angular_separation(src_ra, src_dec, *direction_to_radec(f.mdirection), in_arcsecs=False), f.id),
+    )
 
 
 def is_tsys_only(field: Field) -> bool:

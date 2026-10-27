@@ -266,8 +266,8 @@ class SDImagingWorkerInputs(vdp.StandardInputs):
     """
 
     # Search order of input vis
-    processing_data_type = [DataType.BASELINED, DataType.ATMCORR,
-                            DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.BASELINED, DataType.ATMCORR,
+                             DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     infiles = vdp.VisDependentProperty(default='', null_input=['', None, [], ['']])
     outfile = vdp.VisDependentProperty(default='')
@@ -636,6 +636,7 @@ class SDImagingWorker(basetask.StandardTaskTemplate):
 
         # execute job
         image_args['specmode'] = specmode
+        image_args['overwrite'] = True
         image_job = casa_tasks.tsdimaging(**image_args)
         self._executor.execute(image_job)
         # tsdimaging changes the image filename, workaround to revert it

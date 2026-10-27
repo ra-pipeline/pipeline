@@ -60,9 +60,8 @@ class ApplycalInputs(vdp.StandardInputs):
         field_finder = IntentFieldnames()
         intent_fields = field_finder.calculate(self.ms, self.intent)
 
-        # run the answer through a set, just in case there are duplicates
-        fields = set()
-        fields.update(utils.safe_split(intent_fields))
+        # deduplicate in case there are duplicates while preserving order
+        fields = utils.deduplicate(utils.safe_split(intent_fields))
 
         return ','.join(fields)
 
@@ -197,7 +196,7 @@ class ApplycalResults(basetask.Results):
         and marking any applied caltables, so removing them from subsequent
         on-the-fly calibration calculations.
 
-        See :method:`~pipeline.Results.merge_with_context`
+        See :meth:`~pipeline.Results.merge_with_context`
         """
         if not self.applied:
             LOG.error('No results to merge')

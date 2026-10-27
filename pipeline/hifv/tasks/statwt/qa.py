@@ -79,15 +79,17 @@ class StatwtQAHandler(pqa.QAPlugin):
                                        metric_score=variance,
                                        metric_units='')
 
-        logvar = np.log10(variance)
-        score = max(1 - (logvar/5.9)**4, 0.0)
-
         if variance > mean**2:
             score = min(rendererutils.SCORE_THRESHOLD_SUBOPTIMAL, score)
+            shortmsg = "Weight Variance greater than Square of Mean"
+            longmsg = "Weight Variance greater than Square of Mean."
+            result.qa.pool.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=vis, origin=variance_origin))
 
-        if score <= rendererutils.SCORE_THRESHOLD_SUBOPTIMAL:
-            shortmsg = "Very high variance"
-            longmsg = "Very high variance."
+        logvar = np.log10(variance)
+        score = max(1 - (logvar/5.9)**4, 0.0)
+        if score < 0.5:
+            shortmsg = "Very high weight variance"
+            longmsg = "Very high weight variance."
         else:
             shortmsg = "Variance OK"
             longmsg = "Variance of the weights is within normal range."
@@ -111,6 +113,10 @@ class StatwtQAHandler(pqa.QAPlugin):
             shortmsg = "Flagging increase OK"
             longmsg = "Flagging increase is within normal range."
             result.qa.pool.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=vis, origin=flagging_origin))
+
+        # PIPE-3046: checking if cont.dat was used and if so, adding a score for that.
+        if result.use_contdat:
+            result.qa.pool.append(qacalc.score_contdat_applied(result.inputs['vis']))
 
 
 class StatwtListQAHandler(pqa.QAPlugin):

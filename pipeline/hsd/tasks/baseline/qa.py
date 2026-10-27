@@ -30,15 +30,15 @@ class SDBaselineQAHandler(pqa.QAPlugin):
         """
         # register the properties for 'score_sd_line_detection'
         metric_name = 'score_sd_line_detection'
-        qautils.registry.register_longmsg_keys(metric_name, ['vis', 'field', 'spw', 'ant', 'pol'])
-        qautils.registry.register_keys_to_aggregate(metric_name, ['vis', 'field', 'spw', 'ant', 'pol'])
+        keys = ['vis', 'field', 'spw', 'ant', 'pol']
+        qautils.registry.register_longmsg_keys(metric_name, keys)
+        qautils.registry.register_keys_to_aggregate(metric_name, keys)
 
         # register the properties for 'score_sd_baseline_quality'
         metric_name = 'score_sd_baseline_quality'
-        qautils.registry.register_keys_to_aggregate(metric_name,
-                                                     ['vis', 'field', 'spw', 'ant', 'pol'])
-        qautils.registry.register_longmsg_keys(metric_name,
-                                                ['vis', 'field', 'spw', 'ant', 'pol'])
+        keys = ['vis', 'field', 'spw', 'ant', 'pol']
+        qautils.registry.register_keys_to_aggregate(metric_name, keys)
+        qautils.registry.register_longmsg_keys(metric_name, keys)
 
     def handle(self, context: Context, result: result_cls) -> None:
         """Compute QA score for baseline subtraction task.
@@ -59,7 +59,7 @@ class SDBaselineQAHandler(pqa.QAPlugin):
                                                            qstat.spw, qstat.pol, qstat.stat))
 
         scores.extend(
-            qacalc.score_sd_line_detection(context.observing_run.ms_reduction_group, result)
+            qacalc.score_sd_line_detection(context, result)
         )
 
         # reformat the messages and append to result.qa.pool
@@ -67,6 +67,7 @@ class SDBaselineQAHandler(pqa.QAPlugin):
         for qascore in scores:
             formatter.update_longmsg(qascore)
         result.qa.pool.extend(scores)
+
 
 class SDBaselineListQAHandler(pqa.QAPlugin):
     """QA handler to handle list of results."""

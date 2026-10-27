@@ -11,9 +11,6 @@ def hifv_circfeedpolcal(vis=None, Dterm_solint=None, refantignore=None, leakage_
     or 3C286 as polarization angle. Requires that all polarization intents are
     properly set during observation.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Basic circfeedpolcal task:
 

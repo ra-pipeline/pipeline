@@ -31,7 +31,7 @@ class AntposResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.api.Results.merge_with_context`
+        See :meth:`~pipeline.api.Results.merge_with_context`
         """
         if not self.final:
             LOG.warning('No antenna position results to merge')

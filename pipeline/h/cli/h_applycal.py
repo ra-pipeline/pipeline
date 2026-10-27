@@ -11,9 +11,6 @@ def h_applycal(vis=None, field=None, intent=None, spw=None, antenna=None, parang
     context to the set of visibility files using predetermined field and
     spectral window maps and default values for the interpolation schemes.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Apply the calibration to the target data
 

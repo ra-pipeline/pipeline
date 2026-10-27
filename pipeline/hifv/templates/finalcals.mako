@@ -8,7 +8,13 @@ from pipeline.infrastructure.renderer import rendererutils
 
 <%block name="title">Final calibration tables</%block>
 
-<p>Make the final calibration tables.</p>
+<p>Make the final calibration tables. The bandpass and amplitude gain calibration solutions are produced using the CASA tasks <b>bandpass</b> and <b>gaincal</b>.
+% if use_flux_cal:
+    The standard pipeline processing applies solution normalization disabled, relying on a standard flux density calibrator to set the flux density scale.
+% else:
+    <b>Note:</b> Solution normalization has been applied to the amplitude gain calibration solutions (solnorm=True, normtype='median'). This mode is used for observations lacking a standard flux density calibrator. <b>When used in conjunction with proper prior calibrations (gain curves and switched power/requantizer gains),</b> this results in visibility data scaled to approximate Janskys without requiring a flux calibrator reference.
+% endif
+</p>
 
 % for ms in summary_plots:
     <h4>Plots: <br> <a class="replace"

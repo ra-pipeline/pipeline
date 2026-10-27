@@ -71,18 +71,9 @@ class SelfcalQAHandler(pqa.QAPlugin):
             score = None
             longmsg = (
                 'No self-calibration attempted: unsupported observation modes '
-                '(e.g., ephemeris), or no suitable Datatype found.'
+                '(e.g., ephemeris, VLA mosaic), or no suitable Datatype found.'
             )
             shortmsg = 'No self-calibration attempted'
-            scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg))
-
-        if targets_mosaic:
-            score = 0.90
-            targets_desc = _target_list_to_desc(targets_mosaic)
-            longmsg = f'A new mode (mosaic) is used during self-calibration for {targets_desc}.'
-            n_field = len(targets_mosaic)
-            s_field = 'target field' if n_field == 1 else 'target fields'
-            shortmsg = f'A new mode (mosaic) is used during self-calibration for {n_field} {s_field}.'
             scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg))
 
         if targets and not targets_exception and not targets_attempt:

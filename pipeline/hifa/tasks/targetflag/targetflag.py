@@ -22,7 +22,7 @@ class TargetflagResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.infrastructure.api.Results.merge_with_context`
+        See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`
         """
         return
 
@@ -189,7 +189,7 @@ def create_plots(inputs, context, flagcmds, suffix=''):
     """
     # Exit early if weblog generation has been disabled
     if basetask.DISABLE_WEBLOG:
-        return [], []
+        return {'time': [], 'uvdist': []}
 
     calto = callibrary.CalTo(vis=inputs.vis)
     output_dir = context.output_dir

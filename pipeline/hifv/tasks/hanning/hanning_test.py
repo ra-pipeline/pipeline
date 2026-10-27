@@ -196,7 +196,7 @@ class TestHanningPrepare:
         mock_rmtree: MagicMock,
         mock_rename: MagicMock,
     ) -> None:
-        """Test cleanup logic when file operations fail."""
+        """Test that task_successful is False when removing the original MS raises OSError."""
         mock_table = MagicMock()
         mock_table.colnames.return_value = []
         mock_table_reader.return_value.__enter__.return_value = mock_table
@@ -209,8 +209,8 @@ class TestHanningPrepare:
         ms.get_spectral_windows.return_value = [spw]
         self.context.observing_run.get_ms.return_value = ms
 
-        # Simulate temp MS exists initially but removal fails
-        mock_exists.side_effect = [True, False, True, False]  # temp exists, then doesn't
+        self.inputs.keep_original = False  # take the shutil.rmtree path
+        mock_exists.return_value = True    # temp MS always "exists" for cleanup checks
         mock_rmtree.side_effect = OSError('Permission denied')
 
         hanning_task = Hanning(inputs=self.inputs)
@@ -218,40 +218,6 @@ class TestHanningPrepare:
         with patch.object(hanning_task, '_do_hanningsmooth'):
             with patch.object(hanning_task, '_track_hsmooth'):
                 results = hanning_task.prepare()
-
-        assert results.task_successful is False
-
-    @patch('pipeline.hifv.tasks.hanning.hanning.os.path.exists')
-    @patch('pipeline.hifv.tasks.hanning.hanning.casa_tools.TableReader')
-    def test_recovery_when_original_ms_removed(
-        self,
-        mock_table_reader: MagicMock,
-        mock_exists: MagicMock,
-    ) -> None:
-        """Test recovery attempt when original MS is removed but temp exists."""
-        mock_table = MagicMock()
-        mock_table.colnames.return_value = []
-        mock_table_reader.return_value.__enter__.return_value = mock_table
-
-        ms = MagicMock()
-        spw = MagicMock()
-        spw.id = 0
-        spw.sdm_num_bin = 0
-        spw.specline_window = False
-        ms.get_spectral_windows.return_value = [spw]
-        self.context.observing_run.get_ms.return_value = ms
-
-        hanning_task = Hanning(inputs=self.inputs)
-
-        with patch.object(hanning_task, '_do_hanningsmooth'):
-            with patch.object(hanning_task, '_track_hsmooth'):
-                with patch('pipeline.hifv.tasks.hanning.hanning.shutil.rmtree') as mock_rmtree:
-                    with patch('pipeline.hifv.tasks.hanning.hanning.os.rename') as mock_rename:
-                        # First check: temp exists, second check: original missing, third/fourth: recovery scenario
-                        mock_exists.side_effect = [True, False, True, False]
-                        mock_rmtree.side_effect = OSError('Removal failed')
-
-                        results = hanning_task.prepare()
 
         assert results.task_successful is False
 

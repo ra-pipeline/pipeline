@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
+from pipeline.hsd.tasks.common import qautils
 from . import atmcor
 
 if TYPE_CHECKING:
@@ -23,6 +24,16 @@ class SDATMCorrectionQAHandler(pqa.QAPlugin):
 
     result_cls = atmcor.SDATMCorrectionResults
     child_cls = None
+
+    def __init__(self):
+        """
+        Create SDATMCorrectionQAHandler instance
+        """
+        # register the properties for 'score_sd_atmcor_status'
+        metric_name = 'score_sd_atmcor_status'
+        keys = ['vis']
+        qautils.registry.register_longmsg_keys(metric_name, keys)
+        qautils.registry.register_keys_to_aggregate(metric_name, keys)
 
     def handle(self, context: Context, result: atmcor.SDATMCorrectionResults):
         """Generate QA score for hsd_atmcor.
@@ -42,14 +53,25 @@ class SDATMCorrectionQAHandler(pqa.QAPlugin):
         vis = os.path.basename(result.inputs['vis'])
 
         if is_successful:
-            shortmsg = 'Execution of sdatmcor was successful'
-            longmsg = f'Execution of sdatmcor for {vis} was successful'
+            shortmsg = 'Execution of sdatmcor has succeeded'
+            longmsg = f'Execution of sdatmcor for {vis} has succeeded'
             score = 1.0
         else:
-            shortmsg = 'Execution of sdatmcor failed'
-            longmsg = f'Execution of sdatmcor for {vis} failed. output MS may be created but will be corrupted.'
+            shortmsg = 'Execution of sdatmcor has failed'
+            longmsg = f'Execution of sdatmcor for {vis} has failed. Output MS may be created but will be corrupted.'
             score = 0.0
-        scores = [pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg)]
+        selection = pqa.TargetDataSelection(vis={vis})
+
+        origin = pqa.QAOrigin(metric_name='score_sd_atmcor_status',
+                              metric_score=score,
+                              metric_units='Execution stratus of sdatmcor')
+
+        scores = [pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=selection)]
+
+        # reformat the messages and append to result.qa.pool
+        formatter = qautils.QAScoreFormatter()
+        for qascore in scores:
+            formatter.update_longmsg(qascore)
 
         result.qa.pool.extend(scores)
 

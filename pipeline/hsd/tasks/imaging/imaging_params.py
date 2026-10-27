@@ -341,7 +341,7 @@ class TheoreticalImageRmsParameters(Parameters):
         self.weight_sum: float = 0.0
         self.time_unit: Final[str] = 's'
         self.ang_unit: str = self.cqa.getunit(_pp.qcell[0])
-        self.cx_val: float = self.cqa.getvalue(_pp.qcell[0])[0]
+        self.cx_val: float = self.cqa.getvalue(_pp.qcell[0]).item()
         self.cy_val: float = self.cqa.getvalue(self.cqa.convert(_pp.qcell[1], self.ang_unit))[0]
         self.bandwidth: float = numpy.abs(_pp.chan_width)
         self.context: Context = context

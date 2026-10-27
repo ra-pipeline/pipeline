@@ -145,7 +145,7 @@ class PhcorBandpass(bandpassworker.BandpassWorker):
         # domain Frequency object
         quanta = casa_tools.quanta
         bw_quantity = quanta.convert(quanta.quantity(inputs.phaseupbw), 'Hz')
-        bandwidth = measures.Frequency(quanta.getvalue(bw_quantity)[0],
+        bandwidth = measures.Frequency(quanta.getvalue(bw_quantity).item(),
                                        measures.FrequencyUnits.HERTZ)
 
         # Loop over the spws creating a new list with channel ranges

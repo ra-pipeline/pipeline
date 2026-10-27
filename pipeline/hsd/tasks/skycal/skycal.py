@@ -30,6 +30,9 @@ if TYPE_CHECKING:
 LOG = infrastructure.get_logger(__name__)
 
 # Threshold of the elevation difference of QA score
+#   CAS-11054: it is decided that we do not calculate QA score based on elevation difference for Cycle 6.
+#   PIPE-246: we implement QA score based on elevation difference for Cycle 7.
+#             requirement is that score is 0.8 if elevation difference is larger than 3deg.
 ELEVATION_DIFFERENCE_THRESHOLD = 3.0  # deg
 
 
@@ -548,7 +551,8 @@ def compute_elevation_difference(context: Context, results: SDSkyCalResults) -> 
                         selected = tb.query("&&".join([
                             f'FIELD_ID=={field_id_off}',
                             f'SPECTRAL_WINDOW_ID=={spw_id}',
-                            f'ANTENNA1=={antenna_id}'
+                            f'ANTENNA1=={antenna_id}',
+                            "NOT ALL(FLAG)"
                         ]))
                         timecal = selected.getcol('TIME') / 86400.0  # sec -> day
                         selected.close()

@@ -23,9 +23,6 @@ def hifv_flagdata(vis=None, autocorr=None, shadow=None, scan=None,
     - quack, shadow, and basebands
     - Antenna not-on-source (ANOS)
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Do basic flagging on a MeasurementSet:
 

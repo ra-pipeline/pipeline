@@ -29,9 +29,10 @@ def make_mstransform_table(context, results):
 
     # Loop over the results
     for single_result in results:
-        vis_cell = os.path.basename(single_result.inputs['vis'])
-        outputvis_cell = os.path.basename(single_result.inputs['outputvis'])
-        tr = MstransformTR(vis_cell, outputvis_cell)
-        rows.append(tr)
+        if single_result.inputs['vis'] and single_result.inputs['outputvis']:
+            vis_cell = os.path.basename(single_result.inputs['vis'])
+            outputvis_cell = os.path.basename(single_result.inputs['outputvis'])
+            tr = MstransformTR(vis_cell, outputvis_cell)
+            rows.append(tr)
 
     return utils.merge_td_columns(rows)

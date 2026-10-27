@@ -25,9 +25,6 @@ def h_export_calstate(filename=None, state=None):
             calibration state will be exported. If set to 'applied', the
             applied calibration state will be exported instead.
 
-    Returns:
-        The results object for the pipeline task is returned.
-
     Examples:
         1. Save the calibration state:
 

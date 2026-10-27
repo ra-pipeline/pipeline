@@ -2,10 +2,13 @@ import os
 import shutil
 import tarfile
 
+from packaging.version import parse
+
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.vdp as vdp
 from pipeline.h.tasks.restoredata import restoredata
 from pipeline.infrastructure import casa_tasks, task_registry, utils
+from pipeline.infrastructure.utils import conversion
 
 from ..finalcals import applycals
 from ..hanning import hanning
@@ -152,11 +155,44 @@ class VLARestoreData(restoredata.RestoreData):
         #    TBD: Add error handling
         import_results = self._do_importasdm(sessionlist=sessionlist, vislist=vislist, specline_spws=specline_spws)
 
-        for ms in self.inputs.context.observing_run.measurement_sets:
-            self._do_hanningsmooth(spws_to_smooth=spws_to_smooth)
+        spws_to_smooth_list = conversion.range_to_list(spws_to_smooth) if spws_to_smooth is not None else []
 
-        # Restore final MS.flagversions and flags
-        self._do_restore_flags(pipemanifest)
+        _MSTOOLS_HANNING_CUTOFF = parse('2026.1.1.3')
+        pipeline_version_original = None  # computed lazily on first need, then cached
+        partial_mstools_hanning_mses = []
+        for ms in self.inputs.context.observing_run.measurement_sets:
+            spws = ms.get_spectral_windows(science_windows_only=True)
+            partial_mstools_hanning = False
+            if 0 < len(spws_to_smooth_list) < len(spws):
+                # In older pipeline versions (2024.1.22–2025.1.0.37, after PIPE-672, before PIPE-2473,
+                # i.e. ver<2026.1.1.3), partial Hanning smoothing (subset of SPWs) was done via mstools,
+                # which is now deprecated.  Here we re-smooth using the Hanning task (mstransform-based) instead,
+                # which might produce a different row order — so the extracted flagversions must be remapped.
+                if pipeline_version_original is None:
+                    # we delay the pipeline version check until we know it's needed, since it
+                    # requires parsing the manifest and extracting the version string, which
+                    # might not work for older manifests
+                    _, pipeline_version, _ = self._extract_casa_pipeline_version(pipemanifest)
+                    pipeline_version_original = parse(pipeline_version)
+                if pipeline_version_original < _MSTOOLS_HANNING_CUTOFF:
+                    partial_mstools_hanning = True
+                    LOG.info(
+                        'MS %s: original pipeline version %s used mstools (deprecated) for partial'
+                        ' Hanning smoothing; re-smoothing via the Hanning task (mstransform-based)'
+                        ' and remapping flagversions to the new row order',
+                        ms.name,
+                        pipeline_version_original,
+                    )
+
+            if partial_mstools_hanning:
+                self._do_hanningsmooth(spws_to_smooth=spws_to_smooth, keep_original=True)
+                partial_mstools_hanning_mses.append(ms)
+            else:
+                self._do_hanningsmooth(spws_to_smooth=spws_to_smooth)
+
+        # Restore final MS.flagversions and flags (extracts production flagversions from tgz);
+        # for MSes that required partial mstools Hanning, remaps flagversions to the new row order before restoring.
+        self._do_restore_flags(pipemanifest, partial_mstools_hanning_mses=partial_mstools_hanning_mses)
 
         # Get the session list and the visibility files associated with
         # each session.
@@ -187,7 +223,7 @@ class VLARestoreData(restoredata.RestoreData):
         importdata_task = importdata.VLAImportData(container)
         return self._executor.execute(importdata_task, merge=True)
 
-    def _do_restore_flags(self, pipemanifest, flag_version_name=None):
+    def _do_restore_flags(self, pipemanifest, flag_version_name=None, partial_mstools_hanning_mses=None):
         if flag_version_name is None:
             try_flag_version_names = ['statwt_1', 'Pipeline_Final']
         else:
@@ -221,6 +257,19 @@ class VLARestoreData(restoredata.RestoreData):
             with tarfile.open(tarfilename, 'r:gz') as tar:
                 tar.extractall(path=inputs.output_dir, filter='fully_trusted')
 
+            # The original pipeline used the deprecated mstools for partial Hanning smoothing, but we
+            # re-smooth via the Hanning task (mstransform-based), which produces a different row order.
+            # Rename the extracted flagversions to pair with the preserved .original MS, then remap
+            # them to match the new row order of the Hanning-smoothed MS.
+            ms_path = os.path.join(inputs.output_dir, ms.basename)
+            needs_remap = bool(partial_mstools_hanning_mses and ms in partial_mstools_hanning_mses)
+            if needs_remap:
+                original_flagversions_path = ms_path + '.original.flagversions'
+                LOG.info("Renaming %s -> %s", flagversionpath, original_flagversions_path)
+                os.rename(flagversionpath, original_flagversions_path)
+                LOG.info("Remapping flagversions from %s.original to %s", ms_path, ms_path)
+                utils.transfer_flagversion(ms_path + '.original', ms_path, remap_ids=False)
+
             # Restore final flags version using flagmanager
             try_version = None
             for flagname in try_flag_version_names:
@@ -237,9 +286,18 @@ class VLARestoreData(restoredata.RestoreData):
                 LOG.error("Application of final flags failed for %s" % ms.basename)
                 raise
 
-    def _do_hanningsmooth(self, spws_to_smooth):
+            # Clean up the .original MS and its flagversions now that flags have
+            # been successfully restored into the Hanning-smoothed MS.
+            if needs_remap:
+                for path in (ms_path + '.original', ms_path + '.original.flagversions'):
+                    if os.path.exists(path):
+                        LOG.info("Removing %s", path)
+                        shutil.rmtree(path)
+
+    def _do_hanningsmooth(self, spws_to_smooth, keep_original=False):
         container = vdp.InputsContainer(hanning.Hanning, self.inputs.context,
-                                        spws_to_smooth=spws_to_smooth)
+                                        spws_to_smooth=spws_to_smooth,
+                                        keep_original=keep_original)
         hanning_task = hanning.Hanning(container)
         return self._executor.execute(hanning_task, merge=True)
 

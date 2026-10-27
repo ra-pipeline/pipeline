@@ -167,7 +167,7 @@ class BandpassResults(basetask.Results):
 
     def merge_with_context(self, context: Context):
         """
-        See :method:`~pipeline.api.Results.merge_with_context`
+        See :meth:`~pipeline.api.Results.merge_with_context`
         """
         if not self.final:
             LOG.error('No results to merge')

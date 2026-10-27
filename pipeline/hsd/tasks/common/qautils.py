@@ -5,11 +5,20 @@ QAScoreProperiesRegistry: Holds the parameters to control the behavior
 QAScoreFormatter: Holds methods to re-format QA scores
 QAScoreAggregator: Aggregates messages in QA score
 """
+from __future__ import annotations
+
 import copy
+import functools
 import math
+from operator import attrgetter
+from typing import TYPE_CHECKING, Callable
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
+
+if TYPE_CHECKING:
+    from pipeline.infrastructure.api import Results
+    from pipeline.infrastructure.launcher import Context
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -25,6 +34,7 @@ class QAScorePropertiesRegistry:
         self.longmsg_format_dict = {}
         self.keys_dict = {}
         self.to_aggregate_dict = {}
+        self.excludes = []
 
     def register_longmsg_format(self, metric_name: str, template: str):
         """
@@ -55,6 +65,15 @@ class QAScorePropertiesRegistry:
             keys        : longmsg_ksys
         """
         self.to_aggregate_dict[metric_name] = keys
+
+    def register_excludes(self, metric_names: list[str]):
+        """
+        Register metric_name to excludes list
+
+        Args:
+            metric_names : List of QA score metric names to exclude
+        """
+        self.excludes = metric_names
 
     def get_longmsg_format(self, metric_name: str) -> str | None:
         """
@@ -92,6 +111,15 @@ class QAScorePropertiesRegistry:
         """
         return self.to_aggregate_dict.get(metric_name)
 
+    def get_excludes(self) -> list[str]:
+        """
+        Get the metric_names to exclude
+
+        Returns:
+            List of metric_names to exclude
+        """
+        return self.excludes
+
 
 class QAScoreFormatter:
     """
@@ -106,7 +134,8 @@ class QAScoreFormatter:
     def update_longmsg(self,
                        qascore: pqa.QAScore,
                        longmsg_format: str | None = None,
-                       longmsg_keys: list[str] | None = None):
+                       longmsg_keys: list[str] | None = None,
+                       force_update: bool = False):
         """
         Update longmsg of QA score with asocciated keys in applies_to
 
@@ -121,13 +150,24 @@ class QAScoreFormatter:
             longmsg_keys:          List of keys to show on the updated longmsg of QA score,
                                        default is None which applies all keys in applies_to of QA score
                                        longmsg_format will be used regardless the longmsg_keys if longmsg_format is specified
+            force_update:          True to Update the longmsg even if TargetDataSelection is empty
+                                       default is False which inhibits to update longmsg for an empty TargetDataSelection
         """
+        # skip formatting if the metric_name is in the excludes list
+        if qascore.origin.metric_name in registry.get_excludes():
+            return
+
         # if longmsg_keys is not specified, try to get it from the registry
         if longmsg_keys is None:
             longmsg_keys = registry.get_longmsg_keys(qascore.origin.metric_name)
             # apply all keys in TargetDataSelection if longmsg_keys still does not exist
             if longmsg_keys is None:
                 longmsg_keys = list(vars(qascore.applies_to).keys())
+
+        # inhibit formatting if 1) everything associated with longmsg_keys are empty and 2) force_update is False
+        # this will prevent longmsg from being unintentionally overwritten with shortmsg
+        if all(len(getattr(qascore.applies_to, key)) == 0 for key in longmsg_keys) and not force_update:
+            return
 
         # if longmsg_format is not specified, try to get it from the registry
         if longmsg_format is None:
@@ -143,16 +183,16 @@ class QAScoreFormatter:
                             longmsg_format +=  '  Antenna: {ant}' if len(qascore.applies_to.ant) > 0 else ''
                         case _:
                             longmsg_format += f'  {key.capitalize()}: {{{key}}}' if len(getattr(qascore.applies_to, key)) > 0 else ''
-
         # compose and update the longmsg
         qascore.longmsg = longmsg_format.format(shortmsg=qascore.shortmsg,
                                                 score_metric=qascore.origin.metric_name,
                                                 vis=', '.join(sorted(qascore.applies_to.vis)),
                                                 field=', '.join(sorted(qascore.applies_to.field)),
                                                 intent=', '.join(sorted(qascore.applies_to.intent)),
-                                                spw=', '.join(sorted(str(v) for v in qascore.applies_to.spw)),
+                                                spw=', '.join(sorted([str(v) for v in qascore.applies_to.spw], key=smartsort)),
                                                 ant=', '.join(sorted(qascore.applies_to.ant)),
-                                                pol=', '.join(sorted(qascore.applies_to.pol)))
+                                                pol=', '.join(sorted(qascore.applies_to.pol)),
+                                                scan=', '.join(sorted([str(v) for v in qascore.applies_to.scan], key=smartsort)))
 
 
 class QAScoreAggregator:
@@ -177,23 +217,26 @@ class QAScoreAggregator:
         """
         self.keys_to_aggregate = ['vis', 'field', 'spw', 'ant', 'pol'] \
             if keys_to_aggregate is None else keys_to_aggregate
-        self.preserve_original = preserve_original,
+        self.preserve_original = preserve_original
         self.precision = precision
         self.always_update_longmsg = always_update_longmsg
 
     def update_origin(self,
                       destination: pqa.QAScore,
                       qascores: list[pqa.QAScore],
-                      matched_idxes: list[int]):
+                      matched_idxes: list[int],
+                      metric_scores_func: Callable[[list[float]], float] | None = None):
         """
         Update origin of a QA score to accommodate aggregated metric_scores
 
         The aggregation will simply concatinate the metric scores with commas
 
         Args:
-            destination:   QA score to update origin field
-            qascores:      List of QA scores
-            matched_idxes: List of indexes of QA scores to aggregate
+            destination:        QA score to update origin field
+            qascores:           List of QA scores
+            matched_idxes:      List of indexes of QA scores to aggregate
+            metric_scores_func: Function to calculate the metric_score when aggregating.
+                                Default is None, which concatenates the metric_scores as a string.
         """
         names   = [qascores[idx].origin.metric_name for idx in matched_idxes]
         mscores = [qascores[idx].origin.metric_score for idx in matched_idxes]
@@ -201,7 +244,10 @@ class QAScoreAggregator:
 
         assert len(set(names)) == 1
         assert len(set(units)) == 1
-        newscore = ", ".join(str(s) for s in mscores)
+        if metric_scores_func is None:
+            newscore = ", ".join(str(s) for s in mscores)
+        else:
+            newscore = metric_scores_func(mscores)
         new_origin = pqa.QAOrigin(metric_name=names[0],
                                   metric_score=newscore,
                                   metric_units=units[0])
@@ -224,7 +270,9 @@ class QAScoreAggregator:
                    for key in keys_to_compare)
 
     def _aggregate_qascores(self,
-                            qascores: list[pqa.QAScore], metric_name: str) -> list[pqa.QAScore]:
+                            qascores: list[pqa.QAScore],
+                            metric_name: str,
+                            metric_scores_func: Callable[[list[float]], float] | None = None) -> list[pqa.QAScore]:
         """
         Aggregate and recompose longmsg-es of QA scores with specified metric_name
 
@@ -232,12 +280,14 @@ class QAScoreAggregator:
         such as keys_to_aggregate and keys_to_show.
         This method is coded to respect the original 'order' of QA scores during the aggregation.
 
-        Aggregation happens within QA scores whose score, metric_name, and metric_units match:
+        Aggregation happens within QA scores whose score, shortmsg, metric_name, and metric_units match:
         attributes in TargetDataSelection (applies_to) are merged, meric_value will be concateneted with commas
 
         Args:
             qascores:    list of QA scores
             metric_name: metric_name to target
+            metric_scores_func: Function to calculate the metric_score when aggregating.
+                                Default is None, which concatenates the metric_scores as a string.
         Returns:
             Aggregated QA scores
         """
@@ -274,9 +324,20 @@ class QAScoreAggregator:
                 # go next if the target_qascore is already removed during former aggregation during the loop
                 if target_qascore not in qascores:
                     continue
+
+                # skip qascores with metric_name registered as excludes
+                if target_qascore.origin.metric_name in registry.get_excludes():
+                    continue
+
                 # filter out qascores with different metric_name
                 if target_qascore.origin.metric_name != metric_name:
                     continue
+
+                # skip if none of the keys of 'keys_to_aggregate' exist in target_qascore
+                if all(len(getattr(target_qascore.applies_to, key)) == 0 for key in keys_to_aggregate):
+                    formatter.update_longmsg(target_qascore)
+                    continue
+
                 # now the target qascore is selected
                 target_idx = qascores.index(target_qascore)
 
@@ -298,7 +359,7 @@ class QAScoreAggregator:
                 if len(matched_idxes) > 1:
                     # replace the first matched QAScore with the aggregated one, remove the other matches
                     setattr(qascores[matched_idxes[0]].applies_to, key, set().union(*matched_keys))
-                    self.update_origin(qascores[matched_idxes[0]], qascores, matched_idxes)
+                    self.update_origin(qascores[matched_idxes[0]], qascores, matched_idxes, metric_scores_func=metric_scores_func)
                     formatter.update_longmsg(qascores[matched_idxes[0]])
                     # remove
                     for idx in reversed(matched_idxes[1:]):   # remove in reversed order to conserve the index
@@ -308,7 +369,9 @@ class QAScoreAggregator:
 
         return qascores
 
-    def aggregate_qascores(self, orig_qascores: list[pqa.QAScore]) -> list[pqa.QAScore]:
+    def aggregate_qascores(self,
+                           orig_qascores: list[pqa.QAScore],
+                           metric_scores_func: Callable[[list[float]], float] | None = None) -> list[pqa.QAScore]:
         """
         Aggregate QA scores
 
@@ -319,6 +382,8 @@ class QAScoreAggregator:
 
         Args:
             orig_qascores: Original list of QA scores
+            metric_scores_func: Function to calculate the metric_score when aggregating.
+                                Default is None, which concatenates the metric_scores as a string.
         Returns:
             Aggregated List of QA scores (and, if requested, the original QA scores with WegLogLocation.HIDDEN)
         """
@@ -335,7 +400,7 @@ class QAScoreAggregator:
 
         # actual aggregation for each metric_name
         for metric_name in metric_names:
-            qascores = self._aggregate_qascores(qascores, metric_name)
+            qascores = self._aggregate_qascores(qascores, metric_name, metric_scores_func=metric_scores_func)
 
         # attach original qascores if requested
         if self.preserve_original:
@@ -344,6 +409,66 @@ class QAScoreAggregator:
                 qascores.append(qascore)
 
         return qascores
+
+
+def sort_qascores(method: Callable) -> Callable:
+    """
+    Decorator to sort QAScores with their 'score's
+
+    Args:
+        method: original method to be decorated
+    Returns:
+        wrapper method for decorating
+    """
+    @functools.wraps(method)
+    def wrapper(self, context: Context, result: Results) -> str:
+        # sort QAScores with 'score's
+        result.qa.pool.sort(key=attrgetter("score"))
+
+        return method(self, context, result)
+
+    return wrapper
+
+
+def aggregate_qascores(method: Callable) -> Callable:
+    """
+    Decorator to add a feature to aggregate QAScores
+
+    Args:
+        method: original method to be decorated
+    Returns:
+        wrapper method for decorating
+    """
+    @functools.wraps(method)
+    def wrapper(self, context: Context, result: Results) -> str:
+        # aggregate QAScores
+        aggregator = QAScoreAggregator()
+        result.qa.pool = aggregator.aggregate_qascores(result.qa.pool)
+
+        return method(self, context, result)
+
+    return wrapper
+
+
+def smartsort(x: any) -> tuple[int, any]:
+    """
+    Auxiliary method to sort a numerical value / str mixed list
+
+    This can be used with sorted as: sorted(arr, key=smartsort)
+    Numerical values stored as str are coverted to float for evaluation.
+    ex)
+     ['11.0', '6', '5.0deg', '4.3'] -> ['4.3', '6', '11.0', '5.0deg']
+
+    Args:
+        x : any value
+        Returns:
+            (0, float(x)) : if x is a numerical value
+            (1, x)        : if x is not a numerical value (ex. str)
+    """
+    try:
+        return (0, float(x))
+    except ValueError:
+        return (1, x)
 
 
 registry = QAScorePropertiesRegistry()

@@ -60,7 +60,7 @@ class ImagePreCheckResults(basetask.Results):
 
     def merge_with_context(self, context):
         """
-        See :method:`~pipeline.infrastructure.api.Results.merge_with_context`
+        See :meth:`~pipeline.infrastructure.api.Results.merge_with_context`
         """
         # Calculated sensitivities for later stages
         if self.per_spw_cont_sensitivities_all_chan is not None:
@@ -104,7 +104,7 @@ class ImagePreCheckResults(basetask.Results):
 
 class ImagePreCheckInputs(vdp.StandardInputs):
     # Search order of input vis
-    processing_data_type = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
+    processing_data_types = [DataType.REGCAL_CONTLINE_SCIENCE, DataType.REGCAL_CONTLINE_ALL, DataType.RAW]
 
     calcsb = vdp.VisDependentProperty(default=False)
     parallel = vdp.VisDependentProperty(default='automatic')
@@ -120,7 +120,7 @@ class ImagePreCheckInputs(vdp.StandardInputs):
             vis: The list of input MeasurementSets. Defaults to the list of MeasurementSets specified in the hifa_importdata task.
                 '': use all MeasurementSets in the context
 
-                Examples: ``'ngc5921.ms'``, ``['ngc5921a.ms', ngc5921b.ms', 'ngc5921c.ms']``
+                Examples: ``'ngc5921.ms'``, ``['ngc5921a.ms', 'ngc5921b.ms', 'ngc5921c.ms']``
 
             desired_angular_resolution: User specified angular resolution goal string. When this parameter is set, uvtapering may be performed.
                 '': automatic from performance parameters (default).
@@ -129,7 +129,10 @@ class ImagePreCheckInputs(vdp.StandardInputs):
 
             calcsb: Force (re-)calculation of sensitivities and beams; defaults to False
 
-            parallel: Use the CASA imager parallel processing when possible.
+            parallel: Turn on CASA MPI parallel synthesis imaging (``PyParallelContSynthesisImager``).
+                If ``'automatic'``, parallel imaging is enabled only when running inside an active ``mpicasa`` session.
+                If ``True`` or ``'true'``, parallel imaging is requested; if no active ``mpicasa`` session is detected,
+                a warning is logged and execution automatically falls back to serial mode (``PySynthesisImager``).
 
                 Options: ``'automatic'``, ``'true'``, ``'false'``, ``True``, ``False``
 
@@ -236,7 +239,7 @@ class ImagePreCheck(basetask.StandardTaskTemplate):
         user_maxAllowedBeamAxialRatio = maxAllowedBeamAxialRatio
 
         # Use user selected angular resolution for calculation, if specified
-        if cqa.getvalue(userAngResolution)[0] != 0.0:
+        if cqa.getvalue(userAngResolution).item() != 0.0:
             minAcceptableAngResolution = user_minAcceptableAngResolution
             maxAcceptableAngResolution = user_maxAcceptableAngResolution
             maxAllowedBeamAxialRatio = user_maxAllowedBeamAxialRatio

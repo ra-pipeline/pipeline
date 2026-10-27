@@ -28,8 +28,8 @@ class SDBLFlagWorkerInputs(vdp.StandardInputs):
     NOTE: infile should be a complete list of MSes
     """
     # Search order of input vis
-    processing_data_type = [DataType.BASELINED, DataType.ATMCORR,
-                            DataType.REGCAL_CONTLINE_ALL, DataType.RAW ]
+    processing_data_types = [DataType.BASELINED, DataType.ATMCORR,
+                             DataType.REGCAL_CONTLINE_ALL, DataType.RAW ]
 
     edge = vdp.VisDependentProperty(default=(0, 0))
 

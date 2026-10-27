@@ -274,8 +274,6 @@ class FlagDeterALMASingleDishResults(flagdeterbase.FlagDeterBaseResults):
 
         # regenerate pointing plots
         if not basetask.DISABLE_WEBLOG:
-            ephem_names = casa_tools.measures.listcodes(casa_tools.measures.direction())['extra']
-            valid_ephem_names = [x for x in ephem_names if x != 'COMET']
             LOG.info('Regenerate pointing plots to update flag information')
             msobj = context.observing_run.get_ms(self.inputs['vis'])
             task = pointing.SingleDishPointingChart(context, msobj)
@@ -288,14 +286,10 @@ class FlagDeterALMASingleDishResults(flagdeterbase.FlagDeterBaseResults):
                               reference_field_id=reference, target_only=False)
 
                     # if the target is ephemeris, offset pointing pattern should also be plotted
-                    target_field = msobj.fields[target]
-                    source_name = target_field.source.name
-                    offset_pointings = []
-                    if source_name.upper() in valid_ephem_names:
-                        plotres = task.plot(revise_plot=True, antenna=antenna, target_field_id=target,
-                                            reference_field_id=reference, target_only=True, ofs_coord=True)
-                        if plotres is not None:
-                            offset_pointings.append(plotres)
+                    target_source = msobj.fields[target].source
+                    if target_source.is_eph_obj or target_source.is_known_eph_obj:
+                        task.plot(revise_plot=True, antenna=antenna, target_field_id=target,
+                                  reference_field_id=reference, target_only=True, ofs_coord=True)
 
 
 def update_flag_pointing(filename: str, flag_incomplete_raster: bool):
@@ -469,13 +463,11 @@ class SerialFlagDeterALMASingleDish(flagdeterbase.FlagDeterBase):
 
         heuristic = PointingOutlierHeuristics()
 
-        for field, antenna in itertools.product(target_fields, antennas):
+        for field in target_fields:
             # data selection
-            field_antenna_flag = np.logical_and(
-                field_id_all == field.id,
-                antenna_id_all == antenna.id
+            selection = np.logical_and(
+                valid_on_source, field_id_all == field.id
             )
-            selection = np.logical_and(valid_on_source, field_antenna_flag)
             rows = np.where(selection)[0]
             ra = ra_all[selection]
             dec = dec_all[selection]
@@ -485,27 +477,39 @@ class SerialFlagDeterALMASingleDish(flagdeterbase.FlagDeterBase):
 
             outlier_mask = np.where(np.logical_not(heuristic_result.mask))[0]
             if len(outlier_mask) > 0:
-                outliers = rows[outlier_mask]
-                LOG.info(
-                    'MS "%s" field "%s" antenna "%s": %d pointing outliers detected',
-                    msname, field.name, antenna.name, len(outliers)
-                )
-                LOG.debug("Outliers: %s", outliers)
-                separations = heuristic_result.dist[outlier_mask]
-                timerange_list = datatable_rowid_to_timerange(
-                    datatable, rows[outlier_mask]
-                )
-                outliers_for_field = PointingOutlierStats(
-                        heuristic_result.cx, heuristic_result.cy,
-                        heuristic_result.med_dist, heuristic_result.factor,
-                        outliers, timerange_list, separations
+                outliers_all = rows[outlier_mask]
+                for antenna in antennas:
+                    antenna_mask = antenna_id_all[outliers_all] == antenna.id
+
+                    if np.all(np.logical_not(antenna_mask)):
+                        LOG.debug(
+                            'MS "%s" field "%s" antenna "%s": no pointing outliers detected',
+                            msname, field.name, antenna.name
+                        )
+                        continue
+
+                    outliers = outliers_all[antenna_mask]
+                    LOG.info(
+                        'MS "%s" field "%s" antenna "%s": %d pointing outliers detected',
+                        msname, field.name, antenna.name, len(outliers)
                     )
-                outlier_stats[(field.id, antenna.id)] = outliers_for_field
+                    LOG.debug("Outliers: %s", outliers)
+                    separations = heuristic_result.dist[outlier_mask]
+                    timerange_list = datatable_rowid_to_timerange(
+                        datatable, rows[outlier_mask]
+                    )
+                    outliers_for_field = PointingOutlierStats(
+                            heuristic_result.cx, heuristic_result.cy,
+                            heuristic_result.med_dist, heuristic_result.factor,
+                            outliers, timerange_list, separations
+                        )
+                    outlier_stats[(field.id, antenna.id)] = outliers_for_field
             else:
-                LOG.debug(
-                    'MS "%s" field "%s" antenna "%s": no outliers detected',
-                    msname, field.name, antenna.name
-                )
+                for antenna in antennas:
+                    LOG.debug(
+                        'MS "%s" field "%s" antenna "%s": no pointing outliers detected',
+                        msname, field.name, antenna.name
+                    )
 
         return outlier_stats
 

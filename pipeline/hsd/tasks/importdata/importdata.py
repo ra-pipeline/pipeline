@@ -96,10 +96,10 @@ class SDImportDataInputs(importdata.ImportDataInputs):
 
                 Example: ``session=['Session_1', 'Sessions_2']``
 
-            overwrite: Overwrite existing files on import. When converting
-                ASDM to MS, if overwrite=False and the MS already exists in
-                output directory, then this existing MS dataset will be used
-                instead.
+            overwrite: If ``overwrite=False`` and the task is asked to convert
+                an input ASDM to an MS, the ``importasdm`` conversion step is
+                skipped when the output MS already exists in the output directory,
+                and the existing MS will be imported instead.
 
                 Default: ``None`` (equivalent to ``False``)
 

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
+from pipeline.hsd.tasks.common import qautils
 from . import k2jycal
 
 if TYPE_CHECKING:
@@ -22,6 +23,16 @@ class SDK2JyCalQAHandler(pqa.QAPlugin):
     result_cls = k2jycal.SDK2JyCalResults
     child_cls = None
 
+    def __init__(self):
+        """
+        Create SDK2JyCalQAHandler instance
+        """
+        # register the properties for 'score_sd_jyperk_factors' 'and score_sd_jkperk_dbaccess'
+        keys = ['vis']
+        for metric_name in ['score_sd_jyperk_factors','score_sd_jkperk_dbaccess']:
+            qautils.registry.register_longmsg_keys(metric_name, keys)
+            qautils.registry.register_keys_to_aggregate(metric_name, keys)
+
     def handle(self, context: Context, result: k2jycal.SDK2JyCalResults) -> None:
         """Evaluate QA score for k2jycal result.
 
@@ -36,24 +47,47 @@ class SDK2JyCalQAHandler(pqa.QAPlugin):
         """
         is_missing_factor = (not result.all_ok)
 
-        shortmsg = "Missing Jy/K factors for some data" if is_missing_factor else "Jy/K factors are found for all data"
-        longmsg = shortmsg + (" in "+result.vis if result.vis is not None else "") + (". Those data will remain in the unit of Kelvin after applying the calibration tables." if is_missing_factor else "")
+        if is_missing_factor:
+            shortmsg = "Jy/K factors are missing for some data. They will stay with Kelvin unit."
+        else:
+            shortmsg = "Jy/K factors are found for all data"
+        longmsg = shortmsg + (" in "+result.vis if result.vis is not None else "")
         score = 0.0 if is_missing_factor else 1.0
-        scores = [pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg)]
+
+        selection = pqa.TargetDataSelection(vis={result.vis} if result.vis else set())
+
+        origin = pqa.QAOrigin(metric_name='score_sd_jyperk_factors',
+                              metric_score=score,
+                              metric_units='Jy/K factors status')
+
+        scores = [pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, applies_to=selection, origin=origin)]
 
         # PIPE-384 lower the score to 0.8 if DB access was failed
         if result.dbstatus is not None:
             # the task attempted to access the DB
             if result.dbstatus is True:
-                statusstr = 'successful'
+                statusstr = 'succeeded'
                 score = 1.0
             else:
                 statusstr = 'failed'
                 score = 0.0
                 #score = 0.8
-            shortmsg = "Accessing Jy/K DB was {}".format(statusstr)
+            shortmsg = "Jy/K DB access has {}".format(statusstr)
             longmsg = shortmsg + " for " + (result.vis if result.vis is not None else "input vis")
-            scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg))
+
+            selection = pqa.TargetDataSelection(vis={result.vis} if result.vis else set())
+
+            origin = pqa.QAOrigin(metric_name='score_sd_jkperk_dbaccess',
+                                  metric_score=score,
+                                  metric_units='Access to Jy/K DB')
+
+            scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, applies_to=selection, origin=origin))
+
+        # reformat the messages and append to result.qa.pool
+        formatter = qautils.QAScoreFormatter()
+        for qascore in scores:
+            formatter.update_longmsg(qascore)
+
         result.qa.pool.extend(scores)
 
 

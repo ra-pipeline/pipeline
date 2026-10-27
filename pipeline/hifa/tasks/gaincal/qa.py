@@ -76,7 +76,10 @@ class TimegaincalQAPool(pqa.QAScorePool):
             GOOD = 1.0
             NOISY = 0.82
             OUTLIER1 = 0.8
-            OUTLIER2 = 0.5
+            #PIPE-3026 
+            #OUTLIER has to be adjusted to 0.75 and later if a spw with QA score 0.75 is found to be mapped, the score for that spw should be 0.4
+            OUTLIER2 = 0.75
+            OUTLIER2_MAPPED = 0.4
             SPW_MAPPING_PENALTY = 0.1  # decrease the score for outliers by this much if the spw(s) are mapped
 
             phase_scan_ids = np.array([s.id for s in ms.get_scans(scan_intent='PHASE')])
@@ -388,8 +391,18 @@ class TimegaincalQAPool(pqa.QAScorePool):
                     score = outlier_spws_and_score['min_score']
                     mapped_spws_for_antennas = outlier_spws_and_score['spws'].intersection(mapped_spws)
                     if mapped_spws_for_antennas:
-                        score -= SPW_MAPPING_PENALTY
-                        mapping_msg = 'SPW mapping used for spw{}, so any offsets could affect calibration.'.format(
+                        #PIPE-3026: if score is OUTLIER2 (now adjusted to 0.75), remap it to 0.4 when spw mapping is present
+                        #otherwise, apply the usual SPW_MAPPING_PENALTY
+                        if score == OUTLIER2:
+                            score = OUTLIER2_MAPPED
+                        else:
+                            score=max(0.0, score-SPW_MAPPING_PENALTY)
+                        #PIPE-3028: update the qa message for the case of spw mapping 
+                        mapping_msg = (
+                            'SPW mapping used for spw{}, so any offsets could affect calibration. ' 
+                            'If the phase-offset outliers are constant with time and self calibration is applied, ' 
+                            'then these offsets should calibrate out'
+                        ).format(
                             utils.commafy(sorted(mapped_spws_for_antennas), quotes=False, multi_prefix='s'))
                     else:
                         mapping_msg = 'This spw is not mapped, so any offsets should calibrate out.'

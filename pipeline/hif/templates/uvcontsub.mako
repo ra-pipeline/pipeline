@@ -21,7 +21,7 @@ import os
                         <th scope="col" colspan="2">Applied To</th>
         </tr>
         <tr>
-                        <th>Frequency Ranges (TOPO)</th>
+                        <th>Frequency Ranges (MS native frame)</th>
                         <th>Fit Order</th>
                         <th>Source Intent</th>
                         <th>Spectral Window</th>

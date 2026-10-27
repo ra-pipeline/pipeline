@@ -18,6 +18,7 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.sessionutils as sessionutils
+import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import FluxMeasurement
 from pipeline.h.tasks.common import commonfluxresults, mstools
@@ -562,7 +563,9 @@ class SerialGcorFluxscale(basetask.StandardTaskTemplate):
         # Use only valid science spws covered by current intent(s) and field(s).
         fieldlist = inputs.ms.get_fields(task_arg=field)
         sci_spws = set(inputs.ms.get_spectral_windows(science_windows_only=True, intent=intent))
-        spws_to_solve = ','.join({str(spw.id) for fld in fieldlist for spw in fld.valid_spws.intersection(sci_spws)})
+        spws_to_solve = ','.join(
+            utils.deduplicate(str(spw.id) for fld in fieldlist for spw in fld.valid_spws.intersection(sci_spws))
+        )
 
         # Initialize gaincal task inputs.
         task_args = {

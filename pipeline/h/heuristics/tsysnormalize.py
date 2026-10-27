@@ -124,6 +124,7 @@ def tsysNormalize(vis, tsysTable, newTsysTable, scaleSpws=[], verbose=False):
     Generate Tsys entries for one field from other fields, using autocorr
     (linear!) or SQLD data to determine the change in Tsys.
     Inputs:
+
      vis          the MS
      tsysTable:  the tsys caltable (default = <vis>.tsys)
      newTsysTable:  the new tsys caltable to create (default = <tsysTable>_normalized)

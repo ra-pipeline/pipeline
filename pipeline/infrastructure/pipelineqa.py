@@ -66,7 +66,13 @@ class WebLogLocation(enum.Enum):
     BANNER = enum.auto()
     # Render output to QA section of the accordion at bottom of task detail page
     ACCORDION = enum.auto()
-    # Include this QA score in calculations, but do not render it
+    # PIPE-65 (note, i'm not sure the added NOWEB, and below HIDDER
+    # are included in the scoring calc, see "renderer/htmlrenderer.py"
+    # Include this QA score in calculations, but do not render it,
+    # but do include in the exported AQUA report
+    NOWEB = enum.auto()
+    # Include this QA score in calculations, but do not render it,
+    # by default these scores do not populate the AQUA report
     HIDDEN = enum.auto()
     # Place this score in the banner or accordion, as appropriate. This
     # emulates < Cycle 7 behaviour.

@@ -11,6 +11,7 @@ import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
+import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.h.heuristics import caltable as caltable_heuristic
 from pipeline.h.tasks.common import commonhelpermethods
@@ -79,6 +80,8 @@ class WvrgcalInputs(vdp.StandardInputs):
     qa_bandpass_intent = vdp.VisDependentProperty(default='')
     qa_intent = vdp.VisDependentProperty(default='')
     qa_spw = vdp.VisDependentProperty(default='', hidden=True)
+    qa_combine = vdp.VisDependentProperty(default='', hidden=True)
+    qa_solint = vdp.VisDependentProperty(default='int', hidden=True)
     scale = vdp.VisDependentProperty(default=1.0)
     segsource = vdp.VisDependentProperty(default=True)
     smooth = vdp.VisDependentProperty(default='')
@@ -111,8 +114,8 @@ class WvrgcalInputs(vdp.StandardInputs):
     def __init__(self, context, output_dir=None, vis=None, caltable=None, offsetstable=None, hm_toffset=None,
                  toffset=None, segsource=None, hm_tie=None, tie=None, sourceflag=None, nsol=None, disperse=None,
                  wvrflag=None, hm_smooth=None, smooth=None, scale=None, maxdistm=None, minnumants=None,
-                 mingoodfrac=None, refant=None, qa_intent=None, qa_bandpass_intent=None, qa_spw=None,
-                 accept_threshold=None, bandpass_result=None, nowvr_result=None):
+                 mingoodfrac=None, refant=None, qa_intent=None, qa_bandpass_intent=None, qa_spw=None, qa_combine=None,
+                 qa_solint=None, accept_threshold=None, bandpass_result=None, nowvr_result=None):
         """Initialize Inputs.
 
         Args:
@@ -240,6 +243,15 @@ class WvrgcalInputs(vdp.StandardInputs):
                 which case the task will try SpWs in order of decreasing median sky
                 opacity.
 
+            qa_combine: Used to set whether the spws can be combined.
+                The trigger to combine SpW in the phase based gaincal when lowSNR
+                data are present. This parameter is reported back from the pre-bandpass 
+                phaseup lowSNR assessment. Default is no combine, i.e. = '' 
+
+            qa_solint:  The solution interval in the phase based gaincal when lowSNR
+                data are present. This parameter is reported back from the pre-bandpass 
+                phaseup lowSNR assessment. Default is 'int'
+
             accept_threshold: The phase-rms improvement ratio
                 (rms without wvr / rms with wvr) above which the wrvg file will be
                 accepted into the context for subsequent application.
@@ -281,10 +293,11 @@ class WvrgcalInputs(vdp.StandardInputs):
         self.qa_intent = qa_intent
         self.qa_bandpass_intent = qa_bandpass_intent
         self.qa_spw = qa_spw
+        self.qa_combine = qa_combine
+        self.qa_solint = qa_solint
         self.accept_threshold = accept_threshold
         self.bandpass_result = bandpass_result
-        self.nowvr_result = nowvr_result
-
+        self.nowvr_result = nowvr_result           
 
 @task_registry.set_equivalent_casa_task('hifa_wvrgcal')
 class Wvrgcal(basetask.StandardTaskTemplate):
@@ -297,7 +310,7 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         inputs = self.inputs
         result = resultobjects.WvrgcalResult(vis=inputs.vis)
         jobs = []
-
+       
         # get parameters that can be set from outside or which will be derived
         # from heuristics otherwise
         wvrheuristics = wvrgcal_heuristic.WvrgcalHeuristics(
@@ -485,7 +498,8 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         # Determine the list of SpWs for which QA results are needed. If no QA
         # SpW order was specified explicitly, then calculate an order here based
         # on SpW bandwidth and Tsys; otherwise use the specified order.
-        if inputs.qa_spw == '':
+        # PIPE-3006 if in the second loop after any antenna flags reestablish spwlist again
+        if inputs.qa_spw == '' or inputs.qa_combine == 'spw':
             # PIPE-2056: if the observing mode is band-to-band, then restrict
             # the list of QA SpWs to only the diffgain on-source SpWs, otherwise
             # use all science SpWs.
@@ -505,33 +519,94 @@ class Wvrgcal(basetask.StandardTaskTemplate):
             if qa_spw_list is None:
                 LOG.info(f"qa: ranking spws by bandwidth and Tsys failed for {inputs.ms.basename}; will rank by"
                          f" bandwidth and opacity instead.")
-                qa_spw_list = atmheuristics.spwid_rank_by_opacity_and_bandwidth()
+                qa_spw_list = atmheuristics.spwid_rank_by_opacity_and_bandwidth()                
         else:
             qa_spw_list = inputs.qa_spw.split(',')
 
-        for qa_spw in qa_spw_list:
-            LOG.info(f'qa: {inputs.ms.basename} attempting to calculate wvrgcal QA using spw {qa_spw}')
-            inputs.qa_spw = qa_spw
+        # PIPE-3006 get string of all spws required and pass to the bandpass to run lowSNR heuristics       
+        # for a spectral scan we want to avoid passing all spws as this will take unnecessary time
+        # to solve the bandpass. Thus, loop the spws per spectral spec and use those spws of the spectral spec
+        # matching the top ranked qa_spw_list spw.
+        spspec_to_spwid = utils.get_spectralspec_to_spwid_map(inputs.ms.get_spectral_windows(','.join(sorted(qa_spw_list))))
+        for spwids in spspec_to_spwid.values():
+            if int(qa_spw_list[0]) in spwids:
+                qa_spw_list = [qa_spw for qa_spw in qa_spw_list if int(qa_spw) in spwids]
+        LOG.info(f'filtered spw rank: {qa_spw_list}')
+        
+        # Do a bandpass calibration
+        LOG.info('qa: calculating bandpass calibration')
+        bp_result = self._do_qa_bandpass(inputs, ','.join(sorted(qa_spw_list)))
+        if not bp_result.final:
+            LOG.warning('qa: calculating phase calibration without bandpass applied')
+        else:
+            LOG.info('qa: calculating phase calibration with bandpass applied')
+            # PIPE-3006 establish the combine and solint used for pre-bandpass phaseup
+            # combine and solint are passed as hidden inputs the same as qa_spw which was already coded
+            inputs.qa_combine, inputs.qa_solint = self._check_for_combine(bp_result)
+            
+        # if combine was used in pre-bandpass phaseup we can piggy-back
+        # that we know any subsequent gaincal will also need combine as not to
+        # fail or drop lots of solutions. 
+        if inputs.qa_combine == 'spw':
+            LOG.info(f'lowSNR data for {inputs.ms.basename}, combining spectral windows to calculate wvrgcal QA')
+            inputs.qa_spw = ','.join(sorted(qa_spw_list))
+            
+            # PIPE-3006 protect against doing phasediff again in a second loop after
+            # antenna flags if there is a 'no-wvr' caltable already
+            if not inputs.nowvr_result:
+                # A phasediff is required to offset all SpW before doing the no wvr gaincal with combine='spw'
+                nowvr_phasediff_result = self._do_phasediff_gaincal(inputs, False)
+                # Temporarily accept the result into the local context
+                nowvr_phasediff_result.accept(inputs.context) 
+                nowvr_result = self._do_nowvr_gaincal(inputs)
+                # must now remove the gaintable from the local context as the
+                # phasediff without wvr is not valid for further solves
+            
+                def phasediff_matcher(calto: callibrary.CalToArgs, calfrom: callibrary.CalFrom) -> bool:
+                    calto_vis = {os.path.basename(v) for v in calto.vis}
+                    return 'solintinf.gpcal.nowvr' in calfrom.gaintable and inputs.ms.basename in calto_vis
 
-            # Do a bandpass calibration
-            LOG.info('qa: calculating bandpass calibration')
-            bp_result = self._do_qa_bandpass(inputs)
-            # Do a gain calibration
-            if not bp_result.final:
-                LOG.warning('qa: calculating phase calibration without bandpass applied')
+                LOG.info('Unregistering previous phasediff without wvr calibration while task executes')
+                inputs.context.callibrary.unregister_calibrations(phasediff_matcher)
+
+                LOG.info(f'qa: wvrgcal QA calculation was successful')
+                LOG.info(f'    will pass solutions in combined SpW {sorted(qa_spw_list)[0]} for with/without WVR assessment')
             else:
-                LOG.info('qa: calculating phase calibration with bandpass applied')
-            nowvr_result = self._do_nowvr_gaincal(inputs)
-            if not nowvr_result.final:
-                continue
+                # result of no-wvr gaincal is passed through
+                nowvr_result = self._do_nowvr_gaincal(inputs)
+                LOG.info(f'qa: wvrgcal QA calculation without WVR is reused')                
+                LOG.info(f'    will pass solutions in combined SpW {sorted(qa_spw_list)[0]} for with/without WVR assessment')
 
-            inputs.bandpass_result = bp_result
-            inputs.nowvr_result = nowvr_result
-            result.qa_wvr.bandpass_result = bp_result
-            result.qa_wvr.nowvr_result = nowvr_result
-            result.qa_wvr.qa_spw = qa_spw
-            LOG.info('qa: wvrgcal QA calculation was successful')
-            break
+                
+            # set the single result qa spw as the minimum spw of the qa_spw_list
+            result.qa_wvr.qa_spw = sorted(qa_spw_list)[0]
+
+
+        else:
+            # If no combine='spw' loop over the qa_spw_list as ordered
+            # in a second loop this qa_spw_list is "the" QA spw
+            for qa_spw in qa_spw_list:
+                LOG.info(f'qa: {inputs.ms.basename} attempting to calculate wvrgcal QA using spw {qa_spw}')
+                inputs.qa_spw = qa_spw
+                nowvr_result = self._do_nowvr_gaincal(inputs)
+                if not nowvr_result.final:
+                    continue
+                else:
+                    LOG.info('qa: wvrgcal QA calculation was successful')
+                    LOG.info(f'   will pass solutions in SpW {qa_spw} for with/without WVR assessment')
+                    result.qa_wvr.qa_spw = qa_spw
+                    break
+
+        # PIPE-3006 Need to be set as in subsequent loops (after flags) these are cached and reused
+        result.qa_wvr.qa_combine = inputs.qa_combine
+        result.qa_wvr.qa_solint = inputs.qa_solint
+                     
+        # note full result saving out of the loop                
+        inputs.bandpass_result = bp_result
+        inputs.nowvr_result = nowvr_result
+        result.qa_wvr.bandpass_result = bp_result
+        result.qa_wvr.nowvr_result = nowvr_result
+ 
 
         # Accept the result object into the local copy of the context, thus
         # adding the WVR table to the callibrary of this local copy.
@@ -550,23 +625,39 @@ class Wvrgcal(basetask.StandardTaskTemplate):
             LOG.warning('qa: calculating phase calibration with wvr applied')
         else:
             LOG.info('qa: calculating phase calibration with bandpass and wvr applied')
-        wvr_result = self._do_wvr_gaincal(inputs)
 
+        # PIPE-3006 now with the WVR solution we have to process combine or not
+        # this should always run even if a second loop after antenna flagging
+        if inputs.qa_combine =='spw':
+            # A phasediff is required to offset all
+            # SpW before doing the no wvr gaincal with combine='spw'
+            # result needs to be in local context
+            wvr_phasediff_result = self._do_phasediff_gaincal(inputs, True)
+            wvr_phasediff_result.accept(inputs.context) 
+            wvr_result = self._do_wvr_gaincal(inputs)
+            # must now remove the gaintable from the local context as the
+            # phasediff is not valid for further solves
+            
+            def phasediff_matcher(calto: callibrary.CalToArgs, calfrom: callibrary.CalFrom) -> bool:
+                calto_vis = {os.path.basename(v) for v in calto.vis}
+                return 'solintinf.gpcal.wvr' in calfrom.gaintable and inputs.ms.basename in calto_vis
+
+            LOG.info('Unregistering previous phasediff with wvr calibration while task executes')
+            inputs.context.callibrary.unregister_calibrations(phasediff_matcher)
+        else:
+            wvr_result = self._do_wvr_gaincal(inputs)
+
+        # finally save both with and without WVR result caltables     
         nowvr_caltable = nowvr_result.inputs['caltable']
         wvr_caltable = wvr_result.inputs['caltable']
         result.qa_wvr.gaintable_wvr = wvr_caltable
 
         # Edited for PIPE-1837 adding BPgood and PHgood
         LOG.info('qa: calculate ratio with-WVR phase RMS / without-WVR phase rms')
-        PHnoisy, BPnoisy, PHgood, BPgood = wvrg_qa.calculate_view(inputs.context, nowvr_caltable, wvr_caltable,
+        result.PHnoisy, result.BPnoisy, result.PHgood, result.BPgood = wvrg_qa.calculate_view(inputs.context, nowvr_caltable, wvr_caltable,
                                                                   result.qa_wvr, qa_intent)
-        result.PHnoisy = PHnoisy
-        result.BPnoisy = BPnoisy
-        result.PHgood = PHgood
-        result.BPgood = BPgood
 
-        suggest_remcloud = wvrg_qa.calculate_qa_numbers(result.qa_wvr, result.wvr_infos, PHnoisy, BPnoisy)
-        result.suggest_remcloud = suggest_remcloud
+        result.suggest_remcloud = wvrg_qa.calculate_qa_numbers(result.qa_wvr, result.wvr_infos, result.PHnoisy, result.BPnoisy)
 
         # PIPE-846: report improvement factors.
         self._report_wvr_improvement(result)
@@ -605,7 +696,7 @@ class Wvrgcal(basetask.StandardTaskTemplate):
                     LOG.info(f"Ant #{antid} ({ant_names[antid]}), time {timestamp}: {qa_result.data[xid, yid]:.2f}"
                              f" {'(flagged)' if qa_result.flag[xid, yid] else ''}")
 
-    def _do_qa_bandpass(self, inputs: WvrgcalInputs) -> BandpassResults:
+    def _do_qa_bandpass(self, inputs: WvrgcalInputs, spws: str) -> BandpassResults:
         """
         Create a bandpass caltable for QA analysis, returning the result of
         the worker bandpass task.
@@ -619,7 +710,7 @@ class Wvrgcal(basetask.StandardTaskTemplate):
             return self._do_user_qa_bandpass(inputs)
         else:
             LOG.info('Calculating new bandpass for QA analysis')
-            result = self._do_new_qa_bandpass(inputs)
+            result = self._do_new_qa_bandpass(inputs, spws)
             return result
 
     @staticmethod
@@ -634,7 +725,7 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         bp_result.accept(inputs.context)
         return bp_result
 
-    def _do_new_qa_bandpass(self, inputs: WvrgcalInputs) -> BandpassResults:
+    def _do_new_qa_bandpass(self, inputs: WvrgcalInputs, spws:str) -> BandpassResults:
         """
         Create a new bandpass caltable by spawning a bandpass worker task,
         merging the results with the context.
@@ -649,13 +740,12 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         else:
             intent = None
 
+        # PIPE-3006 allow lowSNR heuristics for phaseup and bandpass 
         args = {'vis': inputs.vis,
                 'mode': 'channel',
                 'intent': intent,
-                'spw': inputs.qa_spw,
-                'hm_phaseup': 'manual',
-                'hm_bandpass': 'fixed',
-                'solint': 'inf,7.8125MHz'}
+                'spw': spws,
+                'phaseupsnr': 5.0}
 
         inputs = bandpass.SerialALMAPhcorBandpass.Inputs(inputs.context, **args)
         task = bandpass.SerialALMAPhcorBandpass(inputs)
@@ -666,14 +756,39 @@ class Wvrgcal(basetask.StandardTaskTemplate):
             result.accept(inputs.context)
         return result
 
+    @staticmethod
+    def _check_for_combine(bp_result) -> tuple[str, str]:
+        # For PIPE-3006
+        # this method loops over the pre-applies of the bandpass result
+        # which can include a 'phasediff' and a 'phaseup', as to
+        # find whether combine='spw' was an option used in phaseup
+
+        # set defaults to return
+        combine = ''
+        solint = 'int'
+        
+        # same code as bandpass/qa.py
+        for calapp_list in bp_result.preceding:
+            for calapp in calapp_list: # only ever 2 are possible
+                # Skip the phase-offset tables (created with solint='inf').
+                if utils.get_origin_input_arg(calapp, 'solint') == 'inf':
+                    continue
+
+                # Evaluate whether CalApp used spw combination.
+                combine = utils.get_origin_input_arg(calapp, 'combine')
+
+                # if combine is set for this caltable check the solution interval too
+                # there still could be time > 'int' if very low SNR
+                solint = utils.get_origin_input_arg(calapp, 'solint')
+                
+        return combine, solint
+    
     def _do_nowvr_gaincal(self, inputs: WvrgcalInputs) -> GaincalResults:
-        # do a phase calibration on the bandpass and phase
-        # calibrators with B preapplied
-        LOG.info('Calculating phase calibration with B applied')
+        # do a phase calibration on the bandpass and phase calibrators
 
         if inputs.nowvr_result:
             # if table already exists use it
-            LOG.debug('Reusing WVR-uncorrected gain result for RMS:\n %s' %
+            LOG.info('Reusing WVR-uncorrected gain result for RMS:\n %s' %
                       inputs.nowvr_result)
             return inputs.nowvr_result
         else:
@@ -697,12 +812,15 @@ class Wvrgcal(basetask.StandardTaskTemplate):
         preapply. Coding the gaincal as a separate function with minimal
         outside interaction helps enforce that requirement.
         """
+        # PIPE-3006 has established qa_combine and qa_solint
+        # from the pre-bandpass phaseup
         args = {'vis': inputs.vis,
                 'intent': inputs.qa_intent,
                 'spw': inputs.qa_spw,
-                'solint': 'int',
+                'solint': inputs.qa_solint,
+                'combine': inputs.qa_combine,
                 'calmode': 'p',
-                'minsnr': 0.0}
+                'minsnr': 2.0} # was 0.0 - not sure this propagates
 
         inputs = gaincal.GTypeGaincal.Inputs(inputs.context, **args)
 
@@ -715,6 +833,42 @@ class Wvrgcal(basetask.StandardTaskTemplate):
 
         return result
 
+
+    def _do_phasediff_gaincal(self, inputs: WvrgcalInputs, withWVR: bool) -> GaincalResults:
+        """
+        Generate a new gain caltable via a call to a child pipeline task.
+
+        Before performing the phase gaincal for with and without WVR assessment
+        some low SNR data my required SpWs to be combined. If so, a 
+        phasediff solve is required to align all SpWs in common phase
+        """     
+        if withWVR:
+            caltable_namer = self._get_wvr_caltable_namer(inputs)
+        else:
+            caltable_namer = self._get_nowvr_caltable_namer()
+            
+        # PIPE-3006 has established qa_combine and qa_solint
+        # from the pre-bandpass phaseup
+        args = {'vis': inputs.vis,
+                'intent': 'BANDPASS',
+                'spw': inputs.qa_spw,
+                'solint': 'inf',
+                'calmode': 'p',
+                'minsnr': 2.0} # was 0.0 
+
+        inputs = gaincal.GTypeGaincal.Inputs(inputs.context, **args)
+
+        LOG.info(f'{inputs.ms.basename}: since phaseup will use spw combination, first computing temporary'
+                 f' spw-to-spw phase offsets table to use in pre-apply.')
+        # give calling code a chance to customise the caltable name via the
+        # callback passed as an argument
+        inputs.caltable = caltable_namer(inputs.caltable)
+
+        task = gaincal.GTypeGaincal(inputs)
+        result = self._executor.execute(task, merge=False)
+
+        return result
+    
     @staticmethod
     def _get_nowvr_caltable_namer() -> Callable[[str], str]:
         """
