@@ -134,8 +134,6 @@ class PipelineStatistic:
             self.value = int(self.value)
         elif type(value) is np.ndarray:
             self.value = list(self.value)
-        elif type(value) is set: 
-            self.value = list(self.value)
 
     def __str__(self) -> str:
         return 'PipelineStatistic({!s}, {!r}, {!r}, {!s})'.format(self.name, self.value, self.origin, self.units)
@@ -181,7 +179,7 @@ class PipelineStatsCollection:
                 level = stat.level
             else:
                 LOG.warning(f"Pipeline statistic {stat.name} does not have a level specified. It will not be added to the stats collection.")
-            return
+                return
 
         # deal with situation in which eb level is specificed but not eb
         if level == PipelineStatisticLevel.MOUS:
@@ -721,7 +719,7 @@ def get_stats_from_context(context) -> PipelineStatsCollection:
     LOG.info("Getting pipeline statistics from context")
     mous = context.get_oussid()
 
-    # List of datatypes to use (in order) for fetching EB-level information.
+    # list of datatypes to use (in order) for fetching EB-level information.
     # The following function call will fetch all the MSes for only the first
     # datatype it finds in the list. This is needed so that information is
     # not repeated for the ms and _targets.ms when both are present.
@@ -794,11 +792,11 @@ class ResultsStatsExtractor(abc.ABC):
             return False
 
     @abc.abstractmethod
-    def handle(self, result: Results, context=None) -> PipelineStatistic:
+    def handle(self, result: Results, context=None) -> list[tuple[str, PipelineStatistic]]:
         """
         [Abstract] Extract pipeline statistics values
 
-        This method should return a PipelineStatistic object
+        This method should return a list of (eb name, PipelineStatistic) tuples
 
         :param result:
         :return:
@@ -875,10 +873,9 @@ class FlagDeterALMAResultsExtractor(ResultsStatsExtractor):
     result_cls = FlagDeterALMAResults
     child_cls = None
 
-    def handle(self, result: FlagDeterALMAResults, context) -> dict:
+    def handle(self, result: FlagDeterALMAResults, context) -> list[tuple[str, PipelineStatistic]]:
         value = self.calculate_value(result, context)
         ps = self.create_stat(value)
-        print("EVEN HERE?")
         return ps
 
     def calculate_value(self, result: FlagDeterALMAResults, context: Context) -> dict:
@@ -905,7 +902,7 @@ class FlagDeterALMAResultsExtractor(ResultsStatsExtractor):
                             output_dict[ms][reason] = percentage
         return output_dict
 
-    def create_stat(self, value_dict: dict) -> dict:
+    def create_stat(self, value_dict: dict) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "dictionary giving percentage of data newly flagged by the following intents: online, shadow, qa0, qa2 before and template flagging agents"
         stats = []
         for ms in value_dict:
@@ -918,7 +915,6 @@ class FlagDeterALMAResultsExtractor(ResultsStatsExtractor):
         return stats
 
 
-<<<<<<< HEAD
 class FluxcalflagResultsStatsExtractor(ResultsStatsExtractor):
     """Regression test result extractor for hifa_gfluxscaleflag.
 
@@ -932,7 +928,7 @@ class FluxcalflagResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = Gfluxscaleflag
 
-    def handle(self, result: GfluxscaleflagResults, context) -> Dict:
+    def handle(self, result: GfluxscaleflagResults, context) -> list[tuple[str, PipelineStatistic]]:
         before, after = self.calculate_value(result, context)
         vis = result.inputs['vis']
         ps = self.create_stat(before, after, vis)
@@ -949,10 +945,6 @@ class FluxcalflagResultsStatsExtractor(ResultsStatsExtractor):
         """
         summaries_by_name = {s['name']: s for s in result.cafresult.summaries}
 
-        print("THIS HERE: ")
-        print(result)
-        print(result.cafresult.summaries)
-
         num_flags_before = summaries_by_name['before']['flagged']
 
         if 'after' in summaries_by_name:
@@ -962,7 +954,7 @@ class FluxcalflagResultsStatsExtractor(ResultsStatsExtractor):
 
         return int(num_flags_before), int(num_flags_after)
 
-    def create_stat(self, before, after, vis) -> Dict:
+    def create_stat(self, before, after, vis) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for regression tests: number of flags before gfluxscaleflag."
         ps1 = PipelineStatistic(name="gfluxscaleflag_before",
                                value=before,
@@ -973,12 +965,7 @@ class FluxcalflagResultsStatsExtractor(ResultsStatsExtractor):
                                value=after,
                                longdesc=longdescription,
                                level=PipelineStatisticLevel.EB)
-        dct1 = {}
-        dct2 = {}
-        dct1[vis] = ps1
-        dct2[vis] = ps2
-        # oof that won't do it
-        return [dct1, dct2]
+        return [(vis, ps1), (vis, ps2)]
 
 
 class GcorFluxscaleResultsStatsExtractor(ResultsStatsExtractor):
@@ -993,13 +980,13 @@ class GcorFluxscaleResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = GcorFluxscale
 
-    def handle(self, result:FluxCalibrationResults, context) -> Dict:
+    def handle(self, result:FluxCalibrationResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result:FluxCalibrationResults) -> Dict:
+    def calculate_value(self, result:FluxCalibrationResults) -> dict:
         """
         Extract values for testing.
 
@@ -1017,15 +1004,13 @@ class GcorFluxscaleResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for regression tests: flux density results from flux calibration."
         ps1 = PipelineStatistic(name="fluxcal_I",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class ApplycalResultsStatsExtractor(ResultsStatsExtractor):
@@ -1042,13 +1027,13 @@ class ApplycalResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = IFApplycal
 
-    def handle(self, result:FluxCalibrationResults, context) -> Dict:
+    def handle(self, result:FluxCalibrationResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result:ApplycalResults) -> Dict:
+    def calculate_value(self, result:ApplycalResults) -> dict:
         """
         Extract values for testing.
 
@@ -1081,15 +1066,13 @@ class ApplycalResultsStatsExtractor(ResultsStatsExtractor):
             d = {}
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for regression tests: applycal flags before and after"
         ps1 = PipelineStatistic(name="applycal_flagging",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class SDApplycalResultsStatsExtractor(ApplycalResultsStatsExtractor):
@@ -1124,13 +1107,13 @@ class CheckflagResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = Checkflag
 
-    def handle(self, result: CheckflagResults, context) -> Dict:
+    def handle(self, result: CheckflagResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result: CheckflagResults) -> Dict:
+    def calculate_value(self, result: CheckflagResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1138,7 +1121,7 @@ class CheckflagResultsStatsExtractor(ResultsStatsExtractor):
             result: CheckflagResults object
 
         Returns:
-            Dict[str, Union[int, Dict]]
+            dict[str, Union[int, dict]]
         """
         d = {}
         try:
@@ -1176,15 +1159,13 @@ class CheckflagResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: checkflag flagging summaries."
         ps1 = PipelineStatistic(name="checkflag_flagging",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class TargetflagResultsStatsExtractor(ResultsStatsExtractor):
@@ -1197,13 +1178,13 @@ class TargetflagResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = Targetflag
 
-    def handle(self, result: TargetflagResults, context) -> Dict:
+    def handle(self, result: TargetflagResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result: TargetflagResults) -> Dict:
+    def calculate_value(self, result: TargetflagResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1211,7 +1192,7 @@ class TargetflagResultsStatsExtractor(ResultsStatsExtractor):
             result: TargetflagResults object
 
         Returns:
-            Dict[str, Union[int, Dict]]
+            dict[str, Union[int, dict]]
         """
         d = {}
         try:
@@ -1234,15 +1215,13 @@ class TargetflagResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: targetflag flagging summaries."
         ps1 = PipelineStatistic(name="targetflag_flagging",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class FluxbootResultsStatsExtractor(ResultsStatsExtractor):
@@ -1257,13 +1236,13 @@ class FluxbootResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = Fluxboot
 
-    def handle(self, result: FluxbootResults, context) -> Dict:
+    def handle(self, result: FluxbootResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result: FluxbootResults) -> Dict:
+    def calculate_value(self, result: FluxbootResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1271,7 +1250,7 @@ class FluxbootResultsStatsExtractor(ResultsStatsExtractor):
             result: FluxbootResults object
 
         Returns:
-            Dict[str, Union[float, Dict]]
+            dict[str, Union[float, dict]]
         """
         d = {}
         try:
@@ -1298,15 +1277,13 @@ class FluxbootResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: fluxboot flux densities and spectral index."
         ps1 = PipelineStatistic(name="fluxboot_results",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class SolintResultsStatsExtractor(ResultsStatsExtractor):
@@ -1322,13 +1299,13 @@ class SolintResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = Solint
 
-    def handle(self, result: SolintResults, context) -> Dict:
+    def handle(self, result: SolintResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result: SolintResults) -> Dict:
+    def calculate_value(self, result: SolintResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1336,7 +1313,7 @@ class SolintResultsStatsExtractor(ResultsStatsExtractor):
             result: SolintResults object
 
         Returns:
-            Dict[str, Dict[str, float]]
+            dict[str, dict[str, float]]
         """
         d = {}
         try:
@@ -1356,15 +1333,13 @@ class SolintResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: solint solution intervals per band."
         ps1 = PipelineStatistic(name="solint_intervals",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class PriorcalsResultsStatsExtractor(ResultsStatsExtractor):
@@ -1378,13 +1353,13 @@ class PriorcalsResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = Priorcals
 
-    def handle(self, result: PriorcalsResults, context) -> Dict:
+    def handle(self, result: PriorcalsResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result: PriorcalsResults) -> Dict:
+    def calculate_value(self, result: PriorcalsResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1392,7 +1367,7 @@ class PriorcalsResultsStatsExtractor(ResultsStatsExtractor):
             result: PriorcalResults object
 
         Returns:
-            Dict[str, Dict[str, float]]
+            dict[str, dict[str, float]]
         """
         d = {}
         try:
@@ -1409,15 +1384,13 @@ class PriorcalsResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: priorcals opacities per spw."
         ps1 = PipelineStatistic(name="priorcals_opacity",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class VLASetjyResultsStatsExtractor(ResultsStatsExtractor):
@@ -1431,13 +1404,13 @@ class VLASetjyResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = VLASetjy
 
-    def handle(self, result: FluxCalibrationResults, context) -> Dict:
+    def handle(self, result: FluxCalibrationResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result: FluxCalibrationResults) -> Dict:
+    def calculate_value(self, result: FluxCalibrationResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1445,7 +1418,7 @@ class VLASetjyResultsStatsExtractor(ResultsStatsExtractor):
             result: FluxCalibrationResults object
 
         Returns:
-            Dict[str, Dict[str, float]]
+            dict[str, dict[str, float]]
         """
         d = {}
         try:
@@ -1462,15 +1435,13 @@ class VLASetjyResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: vlasetjy flux calibration values."
         ps1 = PipelineStatistic(name="vlasetjy_flux",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class VLAStatwtResultsStatsExtractor(ResultsStatsExtractor):
@@ -1484,13 +1455,13 @@ class VLAStatwtResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = Statwt
 
-    def handle(self, result: StatwtResults, context) -> Dict:
+    def handle(self, result: StatwtResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result: StatwtResults) -> Dict:
+    def calculate_value(self, result: StatwtResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1498,7 +1469,7 @@ class VLAStatwtResultsStatsExtractor(ResultsStatsExtractor):
             result: StatwtResults object
 
         Returns:
-            Dict[str, float]
+            dict[str, float]
         """
         d = {}
         try:
@@ -1512,15 +1483,13 @@ class VLAStatwtResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: statwt mean and variance."
         ps1 = PipelineStatistic(name="statwt_stats",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class VLAImportDataResultsStatsExtractor(ResultsStatsExtractor):
@@ -1535,15 +1504,15 @@ class VLAImportDataResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = VLAImportData
 
-    def handle(self, result: VLAImportDataResults, context) -> Dict:
+    def handle(self, result: VLAImportDataResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis'] if hasattr(result, 'inputs') and 'vis' in result.inputs else result.mses[0].name if result.mses else None
         if vis and val:
             ps = self.create_stat(vis, val)
             return ps
-        return {}
+        return []
 
-    def calculate_value(self, result: VLAImportDataResults) -> Dict:
+    def calculate_value(self, result: VLAImportDataResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1551,7 +1520,7 @@ class VLAImportDataResultsStatsExtractor(ResultsStatsExtractor):
             result: VLAImportDataResults object
 
         Returns:
-            Dict[str, Union[int, float]]
+            dict[str, Union[int, float]]
         """
         d = {}
         try:
@@ -1565,15 +1534,13 @@ class VLAImportDataResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: VLA import data antenna count and integration time."
         ps1 = PipelineStatistic(name="vla_importdata_stats",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class FlagDeterVLAResultsStatsExtractor(ResultsStatsExtractor):
@@ -1587,13 +1554,13 @@ class FlagDeterVLAResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = FlagDeterVLA
 
-    def handle(self, result: FlagDeterVLAResults, context) -> Dict:
+    def handle(self, result: FlagDeterVLAResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result: FlagDeterVLAResults) -> Dict:
+    def calculate_value(self, result: FlagDeterVLAResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1601,7 +1568,7 @@ class FlagDeterVLAResultsStatsExtractor(ResultsStatsExtractor):
             result: FlagDeterVLAResults object
 
         Returns:
-            Dict[str, Dict[str, int]]
+            dict[str, dict[str, int]]
         """
         d = {}
         try:
@@ -1618,15 +1585,13 @@ class FlagDeterVLAResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: VLA flagdata flagging by category."
         ps1 = PipelineStatistic(name="vla_flagdata_flagging",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class testBPdcalsResultsStatsExtractor(ResultsStatsExtractor):
@@ -1640,13 +1605,13 @@ class testBPdcalsResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = testBPdcals
 
-    def handle(self, result: testBPdcalsResults, context) -> Dict:
+    def handle(self, result: testBPdcalsResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result: testBPdcalsResults) -> Dict:
+    def calculate_value(self, result: testBPdcalsResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1654,7 +1619,7 @@ class testBPdcalsResultsStatsExtractor(ResultsStatsExtractor):
             result: testBPdcalsResults object
 
         Returns:
-            Dict[str, Dict[str, Dict[str, int]]]
+            dict[str, dict[str, dict[str, int]]]
         """
         d = {}
         try:
@@ -1676,15 +1641,13 @@ class testBPdcalsResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: testBPdcals flagged solutions per band."
         ps1 = PipelineStatistic(name="testbpdcals_flagged",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class semiFinalBPdcalsResultsStatsExtractor(ResultsStatsExtractor):
@@ -1698,13 +1661,13 @@ class semiFinalBPdcalsResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = semiFinalBPdcals
 
-    def handle(self, result: semiFinalBPdcalsResults, context) -> Dict:
+    def handle(self, result: semiFinalBPdcalsResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result: semiFinalBPdcalsResults) -> Dict:
+    def calculate_value(self, result: semiFinalBPdcalsResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1712,7 +1675,7 @@ class semiFinalBPdcalsResultsStatsExtractor(ResultsStatsExtractor):
             result: semiFinalBPdcalsResults object
 
         Returns:
-            Dict[str, Dict[str, Dict[str, int]]]
+            dict[str, dict[str, dict[str, int]]]
         """
         d = {}
         try:
@@ -1734,15 +1697,13 @@ class semiFinalBPdcalsResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: semiFinalBPdcals flagged solutions per band."
         ps1 = PipelineStatistic(name="semifinalbpdcals_flagged",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class FinalcalsResultsStatsExtractor(ResultsStatsExtractor):
@@ -1756,13 +1717,13 @@ class FinalcalsResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = Finalcals
 
-    def handle(self, result: FinalcalsResults, context) -> Dict:
+    def handle(self, result: FinalcalsResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result: FinalcalsResults) -> Dict:
+    def calculate_value(self, result: FinalcalsResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1770,7 +1731,7 @@ class FinalcalsResultsStatsExtractor(ResultsStatsExtractor):
             result: FinalcalsResults object
 
         Returns:
-            Dict[str, int]
+            dict[str, int]
         """
         d = {}
         try:
@@ -1783,15 +1744,13 @@ class FinalcalsResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: finalcals flagged solutions."
         ps1 = PipelineStatistic(name="finalcals_flagged",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class SDBLFlagResultsStatsExtractor(ResultsStatsExtractor):
@@ -1807,13 +1766,13 @@ class SDBLFlagResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = SDBLFlag
 
-    def handle(self, result: SDBLFlagResults, context) -> Dict:
+    def handle(self, result: SDBLFlagResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         vis = result.inputs['vis']
         ps = self.create_stat(vis, val)
         return ps
 
-    def calculate_value(self, result: SDBLFlagResults) -> Dict:
+    def calculate_value(self, result: SDBLFlagResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1821,7 +1780,7 @@ class SDBLFlagResultsStatsExtractor(ResultsStatsExtractor):
             result: SDBLFlagResults object
         
         Returns:
-            Dict[str, Union[int, Dict]]
+            dict[str, Union[int, dict]]
         """
         d = {}
         try:
@@ -1850,15 +1809,13 @@ class SDBLFlagResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: SD baseline flagging summaries and QA scores."
         ps1 = PipelineStatistic(name="sd_blflag_flagging",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class SDImagingResultsStatsExtractor(ResultsStatsExtractor):
@@ -1872,10 +1829,10 @@ class SDImagingResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = SDImaging
 
-    def handle(self, result: SDImagingResults, context) -> Dict:
+    def handle(self, result: SDImagingResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         if not val:
-            return {}
+            return []
         # For imaging, we may not have a single vis, so we need to handle it differently
         # Try to get vis from context or result
         vis = None
@@ -1887,9 +1844,9 @@ class SDImagingResultsStatsExtractor(ResultsStatsExtractor):
         if vis:
             ps = self.create_stat(vis, val)
             return ps
-        return {}
+        return []
 
-    def calculate_value(self, result: SDImagingResults) -> Dict:
+    def calculate_value(self, result: SDImagingResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1897,20 +1854,18 @@ class SDImagingResultsStatsExtractor(ResultsStatsExtractor):
             result: SDImagingResults object
         
         Returns:
-            Dict[str, Dict]
+            dict[str, dict]
         """
         d = {}
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: SD imaging QA scores."
         ps1 = PipelineStatistic(name="sd_imaging_qa",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
 class SDRestoredataResultsStatsExtractor(ResultsStatsExtractor):
@@ -1925,7 +1880,7 @@ class SDRestoredataResultsStatsExtractor(ResultsStatsExtractor):
     child_cls = None
     generating_task = SDRestoreData
 
-    def handle(self, result: SDRestoreDataResults, context) -> Dict:
+    def handle(self, result: SDRestoreDataResults, context) -> list[tuple[str, PipelineStatistic]]:
         val = self.calculate_value(result)
         # For restoredata, we may have multiple sessions/mses
         # Create stats for each session/ms combination
@@ -1945,17 +1900,13 @@ class SDRestoredataResultsStatsExtractor(ResultsStatsExtractor):
                             session_val[f'target_{target_name}'] = target_dict
                     
                     if session_val:
-                        ps = self.create_stat(ms_name, session_val)
-                        stats_list.append(ps)
+                        stats_list.extend(self.create_stat(ms_name, session_val))
         except Exception as e:
             LOG.info(f"Error processing SDRestoreDataResults: {e}")
-        
-        # Return union of all stats
-        if stats_list:
-            return union([], stats_list[0]) if len(stats_list) == 1 else union([], stats_list)
-        return []
 
-    def calculate_value(self, result: SDRestoreDataResults) -> Dict:
+        return stats_list
+
+    def calculate_value(self, result: SDRestoreDataResults) -> dict:
         """
         Extract values for pipeline statistics.
 
@@ -1963,7 +1914,7 @@ class SDRestoredataResultsStatsExtractor(ResultsStatsExtractor):
             result: SDRestoreDataResults object
         
         Returns:
-            Dict[str, Dict]
+            dict[str, dict]
         """
         d = {}
         try:
@@ -1981,31 +1932,39 @@ class SDRestoredataResultsStatsExtractor(ResultsStatsExtractor):
 
         return d
 
-    def create_stat(self, vis, val):
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "Added for pipeline statistics: SD restoredata flagging summaries and QA scores."
         ps1 = PipelineStatistic(name="sd_restoredata_flagging",
                                 value=val,
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
-        d = {}
-        d[vis] = ps1
-        return d
+        return [(vis, ps1)]
 
 
-def extract_qa_score_regression(result: Results) -> List:
+class NRORestoredataResultsStatsExtractor(SDRestoredataResultsStatsExtractor):
+    """
+    Pipeline statistics extractor for hsdn_restoredata.
+
+    It extends SDRestoredataResultsStatsExtractor to use the same extraction logic.
+    """
+    result_cls = NRORestoreDataResults
+    child_cls = None
+    generating_task = NRORestoreData
+
+
+def extract_qa_score_regression(result: Results) -> list:
     """Extract QA scores from a TaskResults object, package them into stats objects, and return them in a list.
 
     Args:
         result: TaskResults Object containing QA pool data to be processed.
 
     Returns:
-        dict: List of PipelineStatistic objects representing the extracted QA scores, structured for regression testing.
+        dict: list of PipelineStatistic objects representing the extracted QA scores, structured for regression testing.
     """
     qa = []
 
     # Iterate through each QA score in the result's pool
     for qa_score in result.qa.pool:
-#        print("Processing QA score for PL stats: ", qa_score)
         individual_score_dict = {}
         # Extract and clean metric name for use in keys
         metric_name = qa_score.origin.metric_name
@@ -2017,8 +1976,8 @@ def extract_qa_score_regression(result: Results) -> List:
         metric_score, score_value = qa_score.origin.metric_score, qa_score.score
 
         individual_score_dict['metric_name'] = metric_name
-        individual_score_dict['score'] = metric_score
-        individual_score_dict['value'] = score_value
+        individual_score_dict['metric'] = metric_score
+        individual_score_dict['score'] = score_value
         # FIXME: better approach than casting to a list? Literally doing this here because they need to be serialized *eventually*. 
         individual_score_dict['fields'] = list(qa_score.applies_to.field) if qa_score.applies_to and qa_score.applies_to.field else []
         individual_score_dict['spws'] = list(qa_score.applies_to.spw) if qa_score.applies_to and qa_score.applies_to.spw else []
@@ -2026,7 +1985,6 @@ def extract_qa_score_regression(result: Results) -> List:
         # TODO: consider adding the rest of the applies_to information as well (e.g. scans, intents) or other info from the QA score object 
         # but only if relevant for regression testing and *after* everything else works. 
 
-#        print("score dict", individual_score_dict)
 
         qa.append((result.stage_number, individual_score_dict))
 
@@ -2058,15 +2016,10 @@ def get_stats_from_results(context: Context, stats_collection: PipelineStatsColl
         results = results_proxy.read()
         extracted = registry.handle(results, context)
         LOG.debug("Got stats from results: %s", extracted)
-#        print("extracted: ", extracted)
         for eb, stat in extracted:
-#            print("Elt: ", eb, stat)
-#            print("type(elt): ", type(stat))
             stats_collection.add_stat(stat, eb=eb, level=stat.level, mous=mous)
-#            print(f"stats collection results so far: {stats_collection}")
 
 
-<<<<<<< HEAD
 def serialize_qa(context: Context) -> dict:
     """Extract QA scores from all results and add to stages"""
     qa_dict = {}
@@ -2081,12 +2034,8 @@ def serialize_qa(context: Context) -> dict:
 
     return qa_dict
 
-# Main interface for generating statistics.
-def generate_stats(context: Context) -> Dict:
-=======
 # This is the main interface for generating statistics.
 def generate_stats(context: Context) -> dict:
->>>>>>> 68b73a438d0491c28627dabe9f820cd1d1d611cc
     """
     Gathers statistics from the context and results and returns a
     representation of them as a dict.
@@ -2109,9 +2058,9 @@ def generate_stats(context: Context) -> dict:
     # 4. Serialize QA objects and add to pipeline stats file. 
     LOG.info("Serializing QA objects and adding to pipeline stats file...")
     qa_dict = serialize_qa(context)
-    qa_for_stats = {"STAGE": qa_dict}
-
-    final_dict.update(qa_for_stats)
+    stage_dict = final_dict.setdefault("STAGE", {})
+    for stage, stage_qa in qa_dict.items():
+        stage_dict.setdefault(stage, {}).update(stage_qa)
 
     LOG.info("Returning final pipeline stats dictionary...")
 

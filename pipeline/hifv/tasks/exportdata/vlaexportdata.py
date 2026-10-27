@@ -3,6 +3,7 @@ import os
 import shutil
 import sys
 import tarfile
+import traceback
 import xml.etree.ElementTree as eltree
 
 import pipeline.infrastructure as infrastructure

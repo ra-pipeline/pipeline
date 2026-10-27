@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import collections
 import os
+import traceback
 from typing import TYPE_CHECKING
 
 import pipeline.h.tasks.exportdata.exportdata as exportdata
@@ -138,6 +139,7 @@ class NROExportData(sdexportdata.SDExportData):
             self._update_manifest(manifest_file, scalefile=template_file)
 
         # Create and export the pipeline stats file
+        oussid = self.inputs.context.get_oussid()
         pipeline_stats_file = None
         try:
             pipeline_stats_file = self._export_stats_file(context=self.inputs.context, oussid=oussid)

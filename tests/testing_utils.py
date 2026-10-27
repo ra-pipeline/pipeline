@@ -3,6 +3,9 @@ from __future__ import annotations
 import ast
 import gc
 import glob
+import json
+import math
+import numbers
 import os
 import re
 import shutil
@@ -103,6 +106,8 @@ class PipelineTester:
             output_dir: Path to the output directory. If `None`, it is derived using `visname` and/or `project_id`.
             expectedoutput_file: Path to a file defining the expected test output. Overrides `expectedoutput_dir` if set.
             expectedoutput_dir: Path to a directory containing expected output files. Ignored if `expectedoutput_file` is set.
+            use_json: If True, compare against pipeline stats json reference files (pipeline_stats_*.json) instead of
+                      *.results.txt files.
 
         Raises:
             ValueError: For `mode='regression'`, if neither `recipe` nor `ppr` is provided.
@@ -303,7 +308,7 @@ class PipelineTester:
             telescope: Literal['alma', 'vla'] = 'alma',
             default_relative_tolerance: float = 1e-7,
             omp_num_threads: int | None = None,
-            use_json=True,
+            use_json: bool | None = None,
             ) -> None:
         """
         Run test with recipereducer and compared to expected results.
@@ -317,6 +322,8 @@ class PipelineTester:
                              the default value of the current CASA session. An explicit setting could mitigate potential small
                              numerical difference from threading-sensitive CASA tasks (e.g. setjy/tclean, which relies
                              on the FFTW library).
+            use_json: Compare pipeline stats json files instead of *.results.txt files. Defaults to the value given
+                      when the PipelineTester was created.
 
         NOTE: Because a PL execution depends on global CASA states, only one test can run under
         a CASA process at the same. Therefore a parallelization based on process-forking might not work
@@ -327,6 +334,10 @@ class PipelineTester:
         # Run the Pipeline using cal+imag ALMA IF recipe
         # set datapath in ~/.casa/config.py, e.g. datapath = ['/users/jmasters/pl-testdata.git']
         input_vis = [casa_tools.utils.resolve(testinput) for testinput in self.testinput]
+
+        # Compare in the same format as the reference file chosen in __init__ unless overridden
+        if use_json is None:
+            use_json = self.use_json
 
         if not self.compare_only and omp_num_threads is not None:
             # optionally set OpenMP nthreads to a specified value.
@@ -342,7 +353,7 @@ class PipelineTester:
                         if self.ppr:
                             self.__run_ppr(input_vis, telescope)
                         else:
-                            LOG.warning("Running without Pipeline Processing Request (PPR). Using recipereducer instead.") #TODO: I'm not sure this should be a warning? We run with recipereducer on purpose.
+                            LOG.warning("Running without Pipeline Processing Request (PPR). Using recipereducer instead.")
                             recipereducer.reduce(vis=input_vis, procedure=self.recipe)
                     elif self.mode == 'component':
                         recipereducer.run_named_tasks(self.tasks)
@@ -358,14 +369,17 @@ class PipelineTester:
                     # Do sanity checks
                     self.__do_sanity_checks(context)
 
-                if use_json:
-                    new_file = self.__get_pipeline_stats_file()
+                    if use_json:
+                        # Find (or generate) the pipeline stats file before copying the reference file
+                        # into the working directory, so the glob cannot pick up the reference file.
+                        new_file = self.__get_pipeline_stats_file(context)
+                    else:
+                        # Get new results
+                        new_results = self.__get_results_of_from_current_context(context)
+
                     # Copy the reference results file to current working directory for record
                     if self.expectedoutput_file and os.path.exists(self.expectedoutput_file):
                         shutil.copyfile(self.expectedoutput_file, os.path.basename(self.expectedoutput_file))
-
-                    # Get new results
-                    new_results = self.__get_results_of_from_current_context(context)
                 finally:
                     # Release context before _cleanup()'s gc.collect() so the cyclic
                     # Context → ResultsProxy → Context chain is actually collectable.
@@ -373,13 +387,7 @@ class PipelineTester:
                     # local variable and cannot free the cycle (PIPE-3061).
                     del context
 
-                # new results file path
-                if self.mode == 'component':
-                    new_file = f'{self.output_dir}.NEW.results.txt'
-                else:
-                    # Get new results
-                    new_results = self.__get_results_of_from_current_context()
-
+                if not use_json:
                     # new results file path
                     if self.mode == 'component':
                         new_file = f'{self.output_dir}.NEW.results.txt'
@@ -390,7 +398,7 @@ class PipelineTester:
                     self.__save_new_results_to(new_file, new_results)
 
                 # Compare new results with expected results
-                self.__compare_results(new_file, default_relative_tolerance, json=use_json)
+                self.__compare_results(new_file, default_relative_tolerance, use_json=use_json)
 
         finally:
             # clean up if requested
@@ -400,7 +408,7 @@ class PipelineTester:
         if not self.compare_only and omp_num_threads is not None:
             casa_tools.casalog.ompSetNumThreads(default_nthreads)
 
-    def __compare_results(self, new_file: str, relative_tolerance: float, json=True) -> None:
+    def __compare_results(self, new_file: str, relative_tolerance: float, use_json: bool = True) -> None:
         """
         Compare results between new one loaded from file and old one.
 
@@ -408,7 +416,7 @@ class PipelineTester:
             new_file : file path of new results
             relative_tolerance : relative tolerance of output value
         """
-        if not json:
+        if not use_json:
             self.__compare_reference_txt(new_file, relative_tolerance)
         else:
             self.__compare_reference_json(new_file, relative_tolerance)
@@ -422,17 +430,17 @@ class PipelineTester:
             worst_percent_diff = (0, 0)
             for old, new in zip(expected_results, new_results):
                 try:
-                    oldkey, oldval, tol = self.__sanitize_regression_string(old)
-                    newkey, newval, _ = self.__sanitize_regression_string(new)
+                    oldkey, oldval, tol = self.__sanitize_results_string(old)
+                    newkey, newval, _ = self.__sanitize_results_string(new)
                 except ValueError as e:
                     errorstr = "The results: {0} could not be parsed. Error: {1}".format(new, str(e))
                     errors.append(errorstr)
                     continue
 
-                assert oldkey == newkey
+                assert oldkey == newkey, f"Expected key {oldkey} does not match new key {newkey}."
                 tolerance = tol if tol else relative_tolerance
                 if newval is not None:
-                    LOG.info(f'Comparing {oldval} to {newval} with a rel. tolerance of {tolerance}')
+                    LOG.info('Comparing %s to %s with a rel. tolerance of %s', oldval, newval, tolerance)
                     if oldval != pytest.approx(newval, rel=tolerance):
                         diff = oldval-newval
                         percent_diff = (oldval-newval)/oldval * 100 if oldval != 0 else 100
@@ -448,7 +456,7 @@ class PipelineTester:
                     errors.append(errorstr)
                 else:
                     # If old and new values are both None, this is expected, so pass
-                    LOG.info(f'Comparing {oldval} and {newval}... both values are None.')
+                    LOG.info('Comparing %s and %s... both values are None.', oldval, newval)
 
             [LOG.warning(x) for x in errors]
             n_errors = len(errors)
@@ -464,12 +472,9 @@ class PipelineTester:
             return isinstance(value, numbers.Number)
 
         def _should_skip(path):
-            skip_paths = {
-                ("header", "stats_file_creation_date"),
-                ("stage_duration"),
-                ("total_time"),
-            }
-            return tuple(path) in skip_paths
+            # Run-dependent values: skip wherever they appear in the file.
+            skip_keys = {"stats_file_creation_date", "stage_duration", "total_time"}
+            return bool(path) and path[-1] in skip_keys
 
         def _compare_values(ref_val, cur_val, path, errors):
             if _should_skip(path):
@@ -478,7 +483,8 @@ class PipelineTester:
             if _is_numeric(ref_val) and _is_numeric(cur_val):
                 if not math.isclose(ref_val, cur_val, rel_tol=relative_tolerance, abs_tol=relative_tolerance):
                     errors.append(
-                        f"values differ by > a relative difference of {relative_tolerance}\n\texpected: {ref_val}, new: {cur_val}, "
+                        f"Value mismatch at {'.'.join(path)}: values differ by > a relative difference of "
+                        f"{relative_tolerance}\n\texpected: {ref_val}, new: {cur_val}"
                     )
                 return
 
@@ -534,9 +540,12 @@ class PipelineTester:
                 pytrace=True,
             )
 
-    def __get_pipeline_stats_file(self):
+    def __get_pipeline_stats_file(self, context: Context) -> str:
         """
-        Get the path to the pipeline stats file.
+        Get the path to the pipeline stats file, generating one from the context if none was exported.
+
+        Args:
+            context: the already-loaded pipeline context
 
         Returns:
             path to the pipeline stats file
@@ -546,7 +555,6 @@ class PipelineTester:
         if len(pipeline_stats_files) != 0:
             pipeline_stats_file = pipeline_stats_files[0]
         else:
-            context = launcher.Pipeline(context='last').context
             pipeline_stats = pipeline_statistics.generate_stats(context)
             with open('pipeline_stats_testing.json', 'w') as f:
                 json.dump(pipeline_stats, f, ensure_ascii=False, indent=4, sort_keys=True)
