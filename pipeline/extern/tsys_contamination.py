@@ -1198,7 +1198,7 @@ if True:
         puffed = []
 
         for i in intervals:
-            pufflim0, pufflim1 = max(0, i[0] - delta), min(nchan, i[1] + delta)
+            pufflim0, pufflim1 = max(0, i[0] - delta), min(nchan-1, i[1] + delta)
             if chan_avoidance is not None:
                 if np.any(
                     [p in range(int(pufflim0), int(i[0]) + 1) for p in chan_avoidance]
@@ -1811,7 +1811,7 @@ def get_tsys_contaminated_intervals(
         if number_of_intervals > 0:
             auxiliary_intervals = np.array(
                 [
-                    [min(chans[labeling == l]), max(chans[labeling == l]) + 1]
+                    [min(chans[labeling == l]), max(chans[labeling == l])]
                     for l in range(1, number_of_intervals + 1)
                 ]
             )
