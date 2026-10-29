@@ -7,7 +7,6 @@ import copy
 import fnmatch
 import glob
 import io
-import json
 import os
 import shutil
 import sys
@@ -1718,10 +1717,5 @@ finally:
         stats_file = os.path.join(context.output_dir, statsfile_name)
         LOG.info('Generating pipeline statistics file')
 
-        stats_dict = pstats.generate_stats(context)
-
-        # Write the stats file to disk
-        with open(stats_file, 'w', encoding='utf-8') as f:
-            json.dump(stats_dict, f, ensure_ascii=False, indent=4, sort_keys=True)
-
-        return stats_file
+        # The delivered product: nested layout, product statistics only
+        return pstats.write_stats_file(context, stats_file)

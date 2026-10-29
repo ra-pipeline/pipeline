@@ -3,9 +3,6 @@ from __future__ import annotations
 import ast
 import gc
 import glob
-import json
-import math
-import numbers
 import os
 import re
 import shutil
@@ -375,8 +372,7 @@ class PipelineTester:
                     self.__do_sanity_checks(context)
 
                     if use_json:
-                        # Find (or generate) the pipeline stats file before copying the reference file
-                        # into the working directory, so the glob cannot pick up the reference file.
+                        # Write the pipeline stats file for the new results
                         new_file = self.__get_pipeline_stats_file(context)
                     else:
                         # Get new results
@@ -471,101 +467,46 @@ class PipelineTester:
                 pytest.fail("Failed to match {0} result value{1} within tolerance{1} :\n{2}".format(
                     n_errors, '' if n_errors == 1 else 's', '\n'.join(errors)), pytrace=True)
 
-    def __compare_reference_json(self, new_file, relative_tolerance=1e-6):
-        # Compare two pipeline stats json files.
-        def _is_numeric(value):
-            return isinstance(value, numbers.Number)
+    def __compare_reference_json(self, new_file: str, relative_tolerance: float) -> None:
+        """
+        Compare a new pipeline stats file with the reference file.
 
-        def _should_skip(path):
-            # Run-dependent values: skip wherever they appear in the file.
-            skip_keys = {"stats_file_creation_date", "stage_duration", "total_time"}
-            return bool(path) and path[-1] in skip_keys
+        Records are matched by name, stage, task and dims. Each statistic's own tolerance (from its definition) is
+        used if it has one; otherwise relative_tolerance is used.
 
-        def _compare_values(ref_val, cur_val, path, errors):
-            if _should_skip(path):
-                return
-
-            if _is_numeric(ref_val) and _is_numeric(cur_val):
-                if not math.isclose(ref_val, cur_val, rel_tol=relative_tolerance, abs_tol=relative_tolerance):
-                    errors.append(
-                        f"Value mismatch at {'.'.join(path)}: values differ by > a relative difference of "
-                        f"{relative_tolerance}\n\texpected: {ref_val}, new: {cur_val}"
-                    )
-                return
-
-            if isinstance(ref_val, dict) and isinstance(cur_val, dict):
-                _compare_dicts(ref_val, cur_val, path, errors)
-                return
-
-            if isinstance(ref_val, list) and isinstance(cur_val, list):
-                if len(ref_val) != len(cur_val):
-                    errors.append(
-                        f"List length mismatch at {'.'.join(path)}: expected {len(ref_val)}, got {len(cur_val)}"
-                    )
-                    return
-                for idx, (ref_item, cur_item) in enumerate(zip(ref_val, cur_val)):
-                    _compare_values(ref_item, cur_item, path + [str(idx)], errors)
-                return
-
-            if ref_val != cur_val:
-                errors.append(
-                    f"Value mismatch at {'.'.join(path)}: expected {ref_val}, got {cur_val}"
-                )
-
-        def _compare_dicts(ref_dict, cur_dict, path, errors):
-            ref_keys = set(ref_dict.keys())
-            cur_keys = set(cur_dict.keys())
-
-            missing_keys = ref_keys - cur_keys
-            extra_keys = cur_keys - ref_keys
-
-            for key in sorted(missing_keys):
-                if not _should_skip(path + [key]):
-                    errors.append(f"Missing key at {'.'.join(path + [key])}")
-
-            for key in sorted(extra_keys):
-                if not _should_skip(path + [key]):
-                    errors.append(f"Unexpected key at {'.'.join(path + [key])}")
-
-            for key in sorted(ref_keys & cur_keys):
-                _compare_values(ref_dict[key], cur_dict[key], path + [key], errors)
-
-        with open(self.expectedoutput_file, 'r') as reference_json, open(new_file, 'r') as current_json:
-            reference_dict = json.load(reference_json)
-            current_dict = json.load(current_json)
-
-        errors = []
-        _compare_dicts(reference_dict, current_dict, [], errors)
-
-        if errors:
-            for err in errors:
-                LOG.error(err)
-            pytest.fail(
-                "JSON regression comparison failed:\n{}".format("\n".join(errors)),
-                pytrace=True,
-            )
+        Args:
+            new_file : file path of the new pipeline stats file
+            relative_tolerance : default relative tolerance of output values
+        """
+        differences = pipeline_statistics.compare_stats_files(self.expectedoutput_file, new_file,
+                                                              default_rel_tol=relative_tolerance)
+        if differences:
+            for difference in differences:
+                LOG.warning(difference)
+            pytest.fail("Failed to match {0} pipeline statistic{1}:\n{2}".format(
+                len(differences), '' if len(differences) == 1 else 's', '\n'.join(differences)), pytrace=True)
 
     def __get_pipeline_stats_file(self, context: Context) -> str:
         """
-        Get the path to the pipeline stats file, generating one from the context if none was exported.
+        Write the regression pipeline stats file for the current run.
+
+        This is a flat file containing both product and test-only statistics, so it is generated here rather than
+        reusing the product file written by exportdata.
 
         Args:
             context: the already-loaded pipeline context
 
         Returns:
-            path to the pipeline stats file
+            path to the new pipeline stats file
         """
-        # glob to find the pipeline stats file which has the form pipeline_stats_*.json
-        pipeline_stats_files = glob.glob('pipeline_stats_*.json')
-        if len(pipeline_stats_files) != 0:
-            pipeline_stats_file = pipeline_stats_files[0]
+        if self.mode == 'component':
+            new_file = f'{self.output_dir}.NEW.pipeline_stats.json'
         else:
-            pipeline_stats = pipeline_statistics.generate_stats(context)
-            with open('pipeline_stats_testing.json', 'w') as f:
-                json.dump(pipeline_stats, f, ensure_ascii=False, indent=4, sort_keys=True)
-            pipeline_stats_file = 'pipeline_stats_testing.json'
-        LOG.info("Using %s for the current results json file", pipeline_stats_file)
-        return pipeline_stats_file
+            new_file = f'{self.visname[0]}.NEW.pipeline_stats.json'
+        pipeline_statistics.write_stats_file(context, new_file, fmt=pipeline_statistics.OutputFormat.FLAT,
+                                             audiences=pipeline_statistics.ALL_AUDIENCES)
+        LOG.info("Using %s for the current results json file", new_file)
+        return new_file
 
     def __save_new_results_to(self, new_file: str, new_results: list[str]) -> None:
         """

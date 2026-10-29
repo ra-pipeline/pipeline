@@ -1,2076 +1,735 @@
+"""Pipeline statistics framework.
+
+Pipeline statistics are individual values describing a pipeline run (e.g. the number of antennas in an EB, the
+percentage of data flagged by a stage, a QA score). They are written to a JSON file that is delivered as a pipeline
+product, and the same machinery writes the file used by the regression tests.
+
+Data model:
+
+    * StatDefinition: what a statistic *is* -- its name, description, units, tolerance, etc. There is one
+      definition per name, kept in pipeline_stats_definitions.py.
+    * StatRecord: one *measurement* of a statistic -- its name, the stage and task it came from, its dimensions
+      (e.g. {'eb': 'uid___A002_X1.ms', 'spw': '17'}) and its value. A statistic that varies by spw has one record
+      per spw. The address of a record is (name, stage, task, dims).
+
+Extractors are plain functions registered with the module-level ``registry`` (see pipeline_stats_extractors.py).
+Results extractors are called for every matching Results object; context extractors are called once per run.
+Both produce records by calling ``emit(name, value, **dims)``. Any exception raised by an extractor is recorded in
+the ``errors`` section of the output instead of stopping the run.
+
+Output formats (both contain the sections header, definitions and errors):
+
+    * flat: a ``stats`` list with one record per line, sorted by stage. Used for regression test files.
+    * nested: records nested under the MOUS by dimension, e.g. ``<mous>.EB.<eb>.SPW.<spw>.<name>``, with per-stage
+      statistics under ``STAGE.<stage number>``. This is the format of the delivered product.
+
+Both formats can be read back into records with ``document_to_records``, which is what the comparator uses.
+"""
 from __future__ import annotations
 
-import abc
 import collections.abc
-import copy
+import dataclasses
 import datetime
 import enum
 import json
+import math
+import numbers
+import os
 import re
-from typing import TYPE_CHECKING
+import traceback
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator
 
 import numpy as np
 
 import pipeline.infrastructure as infrastructure
-import pipeline.infrastructure.renderer.htmlrenderer as htmlrenderer
-import pipeline.infrastructure.utils as utils
-from pipeline import environment
-from pipeline.domain import measures
-from pipeline.h.tasks.applycal.applycal import ApplycalResults
-from pipeline.hif.tasks.applycal.ifapplycal import IFApplycal
-from pipeline.h.tasks.common.commonfluxresults import FluxCalibrationResults
-from pipeline.hifa.tasks.flagging.flagdeteralma import FlagDeterALMAResults
-from pipeline.hifa.tasks.fluxscale.gcorfluxscale import GcorFluxscale
-from pipeline.hifa.tasks.gfluxscaleflag import Gfluxscaleflag
-from pipeline.hifa.tasks.gfluxscaleflag.resultobjects import GfluxscaleflagResults
-from pipeline.infrastructure.basetask import Results, ResultsList
-import pipeline.infrastructure.renderer.htmlrenderer as htmlrenderer
-from pipeline.infrastructure.launcher import Context
-from pipeline.domain.measurementset import MeasurementSet
-from pipeline.domain.measures import FluxDensityUnits
-from pipeline.domain.datatype import DataType
-from pipeline.h.tasks.common import flagging_renderer_utils as flagutils
-from pipeline.hifa.tasks.flagging.flagdeteralma import FlagDeterALMAResults
-from pipeline.infrastructure.renderer import regression
-from pipeline.infrastructure import launcher, utils
+from pipeline.infrastructure import basetask
+from pipeline.infrastructure.taskregistry import task_registry
 
-# Additional imports for VLA and SD extractors
-from pipeline.hsd.tasks.applycal.applycal import SDApplycal
-from pipeline.hifv.tasks.finalcals.applycals import Applycals
-from pipeline.hifv.tasks.finalcals.finalcals import Finalcals, FinalcalsResults
-from pipeline.hifv.tasks.flagging.checkflag import Checkflag, CheckflagResults
-from pipeline.hifv.tasks.flagging.flagdetervla import FlagDeterVLA, FlagDeterVLAResults
-from pipeline.hifv.tasks.flagging.targetflag import Targetflag, TargetflagResults
-from pipeline.hifv.tasks.fluxscale.fluxboot import Fluxboot, FluxbootResults
-from pipeline.hifv.tasks.fluxscale.solint import Solint, SolintResults
-from pipeline.hifv.tasks.importdata.importdata import VLAImportData, VLAImportDataResults
-from pipeline.hifv.tasks.priorcals import Priorcals
-from pipeline.hifv.tasks.priorcals.resultobjects import PriorcalsResults
-from pipeline.hifv.tasks.semiFinalBPdcals.semiFinalBPdcals import semiFinalBPdcals, semiFinalBPdcalsResults
-from pipeline.hifv.tasks.setmodel.vlasetjy import VLASetjy
-from pipeline.hifv.tasks.statwt.statwt import Statwt, StatwtResults
-from pipeline.hifv.tasks.testBPdcals.testBPdcals import testBPdcals, testBPdcalsResults
-from pipeline.hsd.tasks.baselineflag.baselineflag import SDBLFlag, SDBLFlagResults
-from pipeline.hsd.tasks.imaging.imaging import SDImaging
-from pipeline.hsd.tasks.imaging.resultobjects import SDImagingResults
-from pipeline.hsd.tasks.restoredata.restoredata import SDRestoreData, SDRestoreDataResults
-from pipeline.hsdn.tasks.restoredata.restoredata import NRORestoreData, NRORestoreDataResults
+if TYPE_CHECKING:
+    from pipeline.infrastructure.basetask import Results
+    from pipeline.infrastructure.launcher import Context
 
 LOG = infrastructure.logging.get_logger(__name__)
 
+# Version of the pipeline stats file format. Bump when the structure of the file changes.
+FILE_FORMAT_VERSION = '2.0'
 
-if TYPE_CHECKING:
-    from numpy import generic
-    from numpy.typing import NDArray
+# Dimension vocabulary. The order of this dict is the order in which dimensions are nested in nested output, and
+# the values are the labels used for each dimension in nested output.
+DIMENSIONS: dict[str, str] = {
+    'eb': 'EB',
+    'session': 'SESSION',
+    'source': 'TARGET',
+    'field': 'FIELD',
+    'intent': 'INTENT',
+    'band': 'BAND',
+    'spw': 'SPW',
+    'ant': 'ANT',
+    'scan': 'SCAN',
+    'pol': 'POL',
+    'stokes': 'STOKES',
+    'specmode': 'SPECMODE',
+    'datatype': 'DATATYPE',
+    'reason': 'REASON',
+    'summary': 'SUMMARY',
+    'metric': 'METRIC',
+}
+_LABEL_TO_DIMENSION = {label: dim for dim, label in DIMENSIONS.items()}
 
-    from pipeline.domain.measurementset import MeasurementSet
-    from pipeline.infrastructure.basetask import Results, ResultsList
-    from pipeline.infrastructure.launcher import Context
-
-
-# useful helper functions:
-def determine_import_program(context: Context, ms: MeasurementSet) -> str:
-    """
-    Returns the name of the import program used to create the MS
-    """
-    if ms.antenna_array.name == 'ALMA':
-        if utils.contains_single_dish(context):
-            return "hsd_importdata"
-        else:
-            return "hifa_importdata"
-    elif ms.antenna_array.name == "VLA":
-        return "hifv_importdata"
-    else:
-        return "unknown"
-
-
-def strip_html(text: str):
-    pattern = re.compile('<.*?>')
-    clean_text = re.sub(pattern, '', text)
-    return clean_text
-
-
-class PipelineStatisticLevel(enum.Enum):
-    """
-    An enum to specify which "level" of information an individual pipeline statistic applies to:
-    SPW, EB, SOURCE, MOUS, or STAGE.
-    """
-    MOUS = enum.auto()
-    EB = enum.auto()
-    SPW = enum.auto()
-    SOURCE = enum.auto()
-    STAGE = enum.auto()
+# Top-level keys of a stats document other than the MOUS.
+HEADER_KEY = 'header'
+DEFINITIONS_KEY = 'definitions'
+ERRORS_KEY = 'errors'
+STATS_KEY = 'stats'
+STAGE_KEY = 'STAGE'
+_RESERVED_KEYS = {HEADER_KEY, DEFINITIONS_KEY, ERRORS_KEY, STATS_KEY, STAGE_KEY}
 
 
-class PipelineStatistic:
-    """A single unit of pipeline statistics information.
+class Audience(enum.Enum):
+    """Who a statistic is for. Product statistics are delivered; test statistics are only used by regression tests."""
+    PRODUCT = 'product'
+    TEST = 'test'
+
+
+ALL_AUDIENCES = frozenset(Audience)
+
+
+class OutputFormat(enum.Enum):
+    """Layout of a pipeline stats file."""
+    FLAT = 'flat'
+    NESTED = 'nested'
+
+
+@dataclasses.dataclass(frozen=True)
+class StatDefinition:
+    """Definition of a pipeline statistic. There is exactly one definition per statistic name.
 
     Attributes:
-        name: The name of this pipeline statistic
-        value: The value for this pipeline statistic
-        longdesc: A long description of the value
-        origin: The stage that this value was calculated or populated in (Optional)
-        units: The units associated with the value (Optional)
-        level: A PipelineStatisticLevel that specifies whether this value applies to a MOUS, EB, or SPW
+        name: Name of the statistic.
+        description: Long description of the statistic.
+        units: Units of the value, if any.
+        audience: Whether the statistic is delivered in the product file or only used by regression tests.
+        per_stage: If True, the statistic describes a stage (e.g. its duration or QA scores) and is placed under
+            STAGE.<stage number> in nested output.
+        priority: Priority from the pipeline statistics specification, if any.
+        rel_tol: Relative tolerance used when comparing values in regression tests. None means use the test default.
+        abs_tol: Absolute tolerance used when comparing values in regression tests. None means use the test default.
+        compare: If False, regression tests ignore this statistic (e.g. run times and version strings).
     """
-    def __init__(self, name: str, value: str | int | float | list | dict | set | np.int64 | NDArray[generic],
-                 longdesc: str, origin: str = '', units: str = '',
-                 level: PipelineStatisticLevel = None):
-
-        self.name = name
-        self.value = value
-        self.longdesc = longdesc
-        self.units = units
-        # The level indicates whether a given quantity applies to the whole MOUS, EB, or SPW
-        self.level = level
-        self.origin = origin
-
-        # Convert initial value from the pipeline to a value that can be serialized by JSON
-        # In the future, it may make sense to move this conversion to when the data is written out.
-        # FIXME: indeed move this to when data is written out
-        if type(value) is set:
-            self.value = list(self.value)
-        elif type(value) is np.int64:
-            self.value = int(self.value)
-        elif type(value) is np.ndarray:
-            self.value = list(self.value)
-
-    def __str__(self) -> str:
-        return 'PipelineStatistic({!s}, {!r}, {!r}, {!s})'.format(self.name, self.value, self.origin, self.units)
+    name: str
+    description: str
+    units: str = ''
+    audience: Audience = Audience.PRODUCT
+    per_stage: bool = False
+    priority: int | None = None
+    rel_tol: float | None = None
+    abs_tol: float | None = None
+    compare: bool = True
 
     def to_dict(self) -> dict:
-        """
-        Convert an individual pipeline statistics item to a dictionary
-        representation
-        """
-        stats_dict = {}
+        return {
+            'description': self.description,
+            'units': self.units,
+            'audience': self.audience.value,
+            'per_stage': self.per_stage,
+            'priority': self.priority,
+            'rel_tol': self.rel_tol,
+            'abs_tol': self.abs_tol,
+            'compare': self.compare,
+        }
 
-        if self.value not in ["", None]:
-            stats_dict['value'] = self.value
-
-        if self.units not in ["", None]:
-            stats_dict['units'] = self.units
-
-        if self.longdesc not in ["", None]:
-            stats_dict['longdescription'] = self.longdesc
-
-        if self.origin not in ["", None]:
-            stats_dict['origin'] = self.origin
-
-        return stats_dict
+    @classmethod
+    def from_dict(cls, name: str, d: dict) -> StatDefinition:
+        return cls(name=name,
+                   description=d.get('description', ''),
+                   units=d.get('units', ''),
+                   audience=Audience(d.get('audience', Audience.PRODUCT.value)),
+                   per_stage=d.get('per_stage', False),
+                   priority=d.get('priority'),
+                   rel_tol=d.get('rel_tol'),
+                   abs_tol=d.get('abs_tol'),
+                   compare=d.get('compare', True))
 
 
-class PipelineStatsCollection:
+def build_definitions(definitions: Iterable[StatDefinition]) -> dict[str, StatDefinition]:
+    """Index definitions by name, checking that names are unique and cannot be confused with nesting labels."""
+    by_name = {}
+    for definition in definitions:
+        if definition.name in by_name:
+            raise ValueError(f'Duplicate pipeline statistic definition: {definition.name}')
+        if definition.name in _LABEL_TO_DIMENSION or definition.name in _RESERVED_KEYS:
+            raise ValueError(f'Pipeline statistic name {definition.name} clashes with a reserved key')
+        by_name[definition.name] = definition
+    return by_name
+
+
+@dataclasses.dataclass
+class StatRecord:
+    """One measurement of a pipeline statistic.
+
+    Attributes:
+        name: Name of the statistic; must have a StatDefinition.
+        value: JSON-serializable value: a scalar, a list (e.g. a spectrum) or a dict.
+        dims: Dimensions the value applies to, e.g. {'eb': 'uid___A002_X1.ms', 'spw': '17'}. Values are strings.
+        stage: Number of the stage that produced the value, or None for values not tied to a stage.
+        task: Name of the task the value came from (e.g. 'hifa_bandpass'), or None.
     """
-    A collection of PipelineStatistics.
-    """
-    def __init__(self):
-        self.stats_collection_mous = {}
-        self.stats_collection_eb = {}
-        self.stats_collection_spw = {}
-        self.stats_collection_source = {}
-        self.stats_collection_stage = {}
+    name: str
+    value: Any
+    dims: dict[str, str] = dataclasses.field(default_factory=dict)
+    stage: int | None = None
+    task: str | None = None
 
-    def add_stat(self, stat: PipelineStatistic, level: PipelineStatisticLevel,
-                 mous: str = None, source: str = None, eb: str = None, spw: str = None, stage: int = None):
-
-        if level is None:
-            if stat.level is not None:
-                level = stat.level
-            else:
-                LOG.warning(f"Pipeline statistic {stat.name} does not have a level specified. It will not be added to the stats collection.")
-                return
-
-        # deal with situation in which eb level is specificed but not eb
-        if level == PipelineStatisticLevel.MOUS:
-            if mous not in self.stats_collection_mous:
-                self.stats_collection_mous[mous] = []
-            self.stats_collection_mous[mous].append(stat)
-
-        elif level == PipelineStatisticLevel.EB:
-            if eb not in self.stats_collection_eb:
-                self.stats_collection_eb[eb] = []
-            self.stats_collection_eb[eb].append(stat)
-
-        elif level == PipelineStatisticLevel.SPW:
-            if spw not in self.stats_collection_spw:
-                self.stats_collection_spw[spw] = []
-            self.stats_collection_spw[spw].append(stat)
-
-        elif level == PipelineStatisticLevel.SOURCE:
-            if source not in self.stats_collection_source:
-                self.stats_collection_source[source] = []
-            self.stats_collection_source[source].append(stat)
-        elif level == PipelineStatisticLevel.STAGE:
-            if stage not in self.stats_collection_stage:
-                self.stats_collection_stage[stage] = []
-            self.stats_collection_stage[stage].append(stat)
-        else:
-            LOG.warning(f"Unknown pipeline statistics level: {level}")
-
-    def add_stats(self, stats: list[PipelineStatistic], mous: str = None, source: str = None,
-                  level: PipelineStatisticLevel = None, eb: str = None, spw: str = None):
-        for stat in stats:
-            self.add_stat(stat, level=level, mous=mous, source=source, eb=eb, spw=spw)
+    @property
+    def key(self) -> tuple:
+        """The address of this record: (name, stage, task, dims)."""
+        return self.name, self.stage, self.task, tuple(sorted(self.dims.items()))
 
     def to_dict(self) -> dict:
-        """
-        Generates a nested output dict with EBs, SPWs, TARGETs, MOUSs
-        Each level is represented in the structure of the output.
-        """
-        # new version, using dicts
-        final_dict = {}
-        for mous_name, mous_stats in self.stats_collection_mous.items():
-            final_dict[mous_name] = {stat.name: stat.to_dict() for stat in mous_stats}
-            # okay I get it, mous_stats is a list of Pipeline stats object
-            # I need to get from [stats, stats, stats]
-            # to {stat.name: stat.to_dict()}
+        d = {'name': self.name}
+        if self.stage is not None:
+            d['stage'] = self.stage
+        if self.task is not None:
+            d['task'] = self.task
+        if self.dims:
+            d['dims'] = dict(self.dims)
+        d['value'] = self.value
+        return d
 
-        final_dict[mous_name]["EB"] = {}
-        for eb_name, eb_stats in self.stats_collection_eb.items():
-            final_dict[mous_name]["EB"][eb_name] = {stat.name: stat.to_dict() for stat in eb_stats}
-
-        final_dict[mous_name]["SPW"] = {}
-        for spw_name, spw_stats in self.stats_collection_spw.items():
-            final_dict[mous_name]["SPW"][spw_name] = {stat.name: stat.to_dict() for stat in spw_stats}
-
-        final_dict[mous_name]["TARGET"] = {}
-        for source_name, source_stats in self.stats_collection_source.items():
-            final_dict[mous_name]["TARGET"][source_name] = {stat.name: stat.to_dict() for stat in source_stats}
-        
-        final_dict["STAGE"] = {} 
-        for stage_name, stage_stats in self.stats_collection_stage.items():
-            final_dict["STAGE"][stage_name] = {stat.name: stat.to_dict() for stat in stage_stats}
-        
-#        LOG.info(f"Final dict: {final_dict}")
-
-        # # Step through the collected statistics values and construct
-        # # a dictionary representation. The output format is as follows:
-        # # { mous_name: {
-        # #    mous_property: { ...
-        # #    }
-        # #    "EB": {
-        # #       eb_name: {
-        # #           eb_property: {...
-        # #           }
-        # #       }
-        # #    }
-        # #    "SPW": {
-        # #       spw_id: {
-        # #           spw_property: {...
-        # #           }
-        # #       }
-        # #    }
-        # #    "TARGET": {
-        # #       source_name: {
-        # #           source_property: {...
-        # #           }
-        # #       }
-        # #    }
-        # #    "STAGE": {
-        # #       stage_name: {}
-        # #  }
-        # #  header: {version: 0.1, creation_date: YYMMDD-HH:MM:SS Z}
-        # # }
-
-        # Generate and append a header with information about statistics file version and date created
-        version_dict = _generate_header()
-        final_dict['header'] = version_dict
-
-        return final_dict
+    @classmethod
+    def from_dict(cls, d: dict) -> StatRecord:
+        return cls(name=d['name'], value=d.get('value'), dims=dict(d.get('dims', {})),
+                   stage=d.get('stage'), task=d.get('task'))
 
 
-def _generate_header() -> dict:
+def format_address(key: tuple) -> str:
+    """Human-readable form of a record address, used in log and test failure messages."""
+    name, stage, task, dims = key
+    parts = [name]
+    if stage is not None or task is not None:
+        parts.append('[' + ' '.join(str(x) for x in ('stage', stage, task) if x is not None) + ']')
+    parts.extend(f'{k}={v}' for k, v in dims)
+    return ' '.join(parts)
+
+
+def to_serializable(value: Any) -> Any:
+    """Convert a value from the pipeline into something json can write.
+
+    Raises TypeError for values that cannot be converted, so the extractor that produced them is reported.
     """
-    Creates a header with information about the pipeline stats file
+    if value is None or isinstance(value, (bool, str)):
+        return value
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, numbers.Integral):
+        return int(value)
+    if isinstance(value, numbers.Real):
+        return float(value)
+    if isinstance(value, np.ndarray):
+        return [to_serializable(v) for v in value.tolist()]
+    if isinstance(value, (set, frozenset)):
+        return sorted((to_serializable(v) for v in value), key=_natural_key)
+    if isinstance(value, (list, tuple)):
+        return [to_serializable(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): to_serializable(v) for k, v in value.items()}
+    raise TypeError(f'Cannot serialize value of type {type(value).__name__}: {value!r}')
+
+
+def _natural_key(value: Any) -> tuple:
+    """Sort key that orders '2' before '10' and copes with mixed types."""
+    s = str(value)
+    return tuple((0, int(part), '') if part.isdigit() else (1, 0, part) for part in re.split(r'(\d+)', s))
+
+
+def _record_sort_key(record: StatRecord) -> tuple:
+    return (record.stage is not None, record.stage or 0, record.task or '', record.name,
+            tuple((k, _natural_key(v)) for k, v in sorted(record.dims.items())))
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Extractor registry
+# ---------------------------------------------------------------------------------------------------------------------
+
+# Signature of the emit function given to extractors: emit(name, value, *, stage=None, task=None, **dims)
+Emit = Callable[..., None]
+
+
+@dataclasses.dataclass(frozen=True)
+class ResultsExtractor:
+    """A function that extracts statistics from one type of Results object.
+
+    Attributes:
+        func: Called as func(result, context, emit).
+        result_cls: The Results class (or tuple of classes) handled.
+        generating_task: The task class that generated the results, or None to handle results of result_cls
+            regardless of which task generated them.
+        top_level_only: If True, only the stage's top-level Results (or ResultsList) is offered to the extractor,
+            not the Results it contains.
     """
-    LOG.info("Generating header")
-    version_dict = {}
-    version_dict["version"] = 1.0
-    now = datetime.datetime.now(datetime.timezone.utc)
-    dt_string = now.strftime("%Y/%m/%d %H:%M:%S %Z")
-    version_dict["stats_file_creation_date"] = dt_string
-    return version_dict
-
-
-# MOUS helper functions
-def project_id(context):
-    return next(iter(context.observing_run.project_ids))
-
-
-def pipeline_version(environment) -> str:
-    return environment.pipeline_revision
-
-
-def pipeline_recipe(context) -> str:
-    return context.project_structure.recipe_name
-
-
-def casa_version(environment) -> str:
-    return environment.casa_version_string
-
-
-def mous_uid(context) -> str:
-    return context.get_oussid()
-
-
-def n_eb(context) -> str:
-    return len(context.observing_run.execblock_ids)
-
-
-def stage_duration(context) -> list:
-    #TODO: copied from htmlrenderer.py. Should be pulled out into a common function.
-
-    ## Obtain time duration of tasks by the difference of start times from successive tasks.
-    ## The end time of the last task is tentatively defined as the time of current time.
-
-    timestamps = [r.read().timestamps.start for r in context.results]
-
-    # tentative task end time stamp for the last stage
-    timestamps.append(datetime.datetime.now(datetime.timezone.utc))
-    task_duration = []
-    for i in range(len(context.results)):
-        # task execution duration
-        dt = timestamps[i+1] - timestamps[i]
-        # remove unnecessary precision for execution duration
-        task_duration.append(dt.total_seconds() / 3600.0)
-    return task_duration
-
-
-def execution_duration(context) -> float:
-    """
-    Return the execution duration as reported in the aquareport.
-    This is the difference between the time the first stage was
-    run in the pipeline and the time the last stage was completed.
-    """
-
-    # Processing time
-    exec_start = context.results[0].read().timestamps.start
-    exec_end = context.results[-1].read().timestamps.end
-    # remove unnecessary precision for execution duration
-    dt = exec_end - exec_start
-    exec_duration = dt.total_seconds() / 3600.0
-    return exec_duration
-
-
-def stage_info(context) -> dict:
-    info = {}
-    for i in range(len(context.results)):
-        info[context.results[i].read().stage_number] = strip_html(htmlrenderer.get_task_description(context.results[i].read(), context))
-    return info
-
-
-def _get_mous_values(context, mous: str, ms_list: list[MeasurementSet],
-                     stats_collection: PipelineStatsCollection):
-    """
-    Get the statistics values for a given MOUS
-    """
-    LOG.info("Getting MOUS values")
-    level = PipelineStatisticLevel.MOUS
-    stats_collection_list = []
-    first_ms = ms_list[0]
-    LOG.info(f"First ms: {first_ms}")
-    import_program = determine_import_program(context=context, ms=first_ms)
-
-    p1 = PipelineStatistic(
-        name='project_id',
-        value=project_id(context),
-        longdesc='Proposal id number',
-        origin=import_program,
-        level=level,
-        )
-    stats_collection_list.append(p1)
-
-    p2 = PipelineStatistic(
-        name='pipeline_version',
-        value=pipeline_version(environment),
-        longdesc="pipeline version string",
-        origin=import_program,
-        level=level,
-        )
-    stats_collection_list.append(p2)
-
-    p3 = PipelineStatistic(
-        name='pipeline_recipe',
-        value=pipeline_recipe(context),
-        longdesc="recipe name",
-        origin=import_program,
-        level=level,
-        )
-    stats_collection_list.append(p3)
-
-    p4 = PipelineStatistic(
-        name='casa_version',
-        value=casa_version(environment),
-        longdesc="casa version string",
-        origin=import_program,
-        level=level,
-        )
-    stats_collection_list.append(p4)
-
-    p5 = PipelineStatistic(
-        name='mous_uid',
-        value=mous_uid(context),
-        longdesc="Member Obs Unit Set ID",
-        origin=import_program,
-        level=level,
-        )
-    stats_collection_list.append(p5)
-
-    p6 = PipelineStatistic(
-        name='n_EB',
-        value=n_eb(context),
-        longdesc="number of execution blocks",
-        origin=import_program,
-        level=level,
-    )
-
-    stats_collection_list.append(p6)
-
-    all_bands = sorted({spw.band for spw in ms_list[0].get_all_spectral_windows()})
-    p7 = PipelineStatistic(
-        name='bands',
-        value=all_bands,
-        longdesc="Band(s) used in observations.",
-        origin=import_program,
-        level=level,
-        )
-    stats_collection_list.append(p7)
-
-    science_source_names = sorted({source.name for source in ms_list[0].sources if 'TARGET' in source.intents})
-
-    p8 = PipelineStatistic(
-        name='n_target',
-        value=len(science_source_names),
-        longdesc="total number of science targets in the MOUS",
-        origin=import_program,
-        level=level,
-    )
-
-    stats_collection_list.append(p8)
-
-    p9 = PipelineStatistic(
-        name='target_list',
-        value=science_source_names,
-        longdesc="list of science target names",
-        origin=import_program,
-        level=PipelineStatisticLevel.MOUS)
-    stats_collection_list.append(p9)
-
-    p10 = PipelineStatistic(
-        name='rep_target',
-        value=first_ms.representative_target[0],
-        longdesc="representative target name",
-        origin=import_program,
-        level=PipelineStatisticLevel.MOUS)
-    stats_collection_list.append(p10)
-
-    p11 = PipelineStatistic(
-        name='n_spw',
-        value=len(first_ms.get_all_spectral_windows()),
-        longdesc="number of spectral windows",
-        origin=import_program,
-        level=PipelineStatisticLevel.MOUS)
-    stats_collection_list.append(p11)
-
-    stats_collection_list.append(
-        PipelineStatistic(
-            name='total_time',
-            value=execution_duration(context),
-            longdesc="total processing time",
-            units="hours",
-            origin=import_program,
-            level=PipelineStatisticLevel.MOUS,
-        )
-    )
-
-    stats_collection_list.append(
-        PipelineStatistic(
-            name='stage_info',
-            value=stage_info(context),
-            longdesc="stage number and name",
-            origin=import_program,
-            level=PipelineStatisticLevel.MOUS,
-        )
-    )
-
-    stats_collection_list.append(
-        PipelineStatistic(
-            name='stage_duration',
-            value=stage_duration(context),
-            longdesc="time spent in each stage",
-            units="hours",
-            origin=import_program,
-            level=PipelineStatisticLevel.MOUS,
-        )
-    )
-
-    stats_collection.add_stats(stats_collection_list, level=PipelineStatisticLevel.MOUS, mous=mous)
-
-
-# def _get_stage_values(stats_collection):
-#     """
-#     Get the statistics values for a given stage
-#     """
-#     LOG.info("Getting stage values")
-#     level = PipelineStatisticLevel.STAGE
-
-#     for i in range(len(context.results)):
-#         stats_collection.add_stat(
-#             PipelineStatistic(
-#                 name=context.results[i].read().stage_number,
-#                 value=strip_html(htmlrenderer.get_task_description(context.results[i].read(), context)), 
-#                 longdesc="stage number and name",
-#                 level=level)
-#         )
-
-# MS helper functions (only EB so far)
-def n_ant(ms: MeasurementSet) -> int:
-    return len(ms.antennas)
-
-
-def n_scan(ms: MeasurementSet) -> int:
-    return len(ms.get_scans())
-
-
-def l80(ms: MeasurementSet) -> float:
-    return np.percentile(ms.antenna_array.baselines_m, 80)
-
-
-def _get_eb_values(context, mous: str, ms_list: list[MeasurementSet],
-                   stats_collection: PipelineStatsCollection):
-    """
-    Get the statistics values for a given EB
-    """
-    LOG.info("Getting EB values")
-    level = PipelineStatisticLevel.EB
-    import_program = determine_import_program(context, ms_list[0])
-
-    for ms in ms_list:
-        eb = ms.name
-        stats_collection_list = []
-        p1 = PipelineStatistic(
-            name='n_ant',
-            value=n_ant(ms),
-            longdesc="Number of antennas per execution block",
-            origin=import_program,
-            level=level,
-        )
-        stats_collection_list.append(p1)
-
-        p2 = PipelineStatistic(
-            name='n_scan',
-            value=n_scan(ms),
-            longdesc="number of scans per EB",
-            origin=import_program,
-            level=level,
-        )
-        stats_collection_list.append(p2)
-
-        p3 = PipelineStatistic(
-            name='L80',
-            value=l80(ms),
-            longdesc="80th percentile baseline",
-            origin=import_program,
-            units="m",
-            level=level,
-        )
-
-        stats_collection_list.append(p3)
-        stats_collection.add_stats(stats_collection_list, level=level, mous=mous, eb=eb)
-
-
-# SPW helper functions
-def spw_width(spw) -> float:
-    return float(spw.bandwidth.to_units(measures.FrequencyUnits.MEGAHERTZ))
-
-
-def spw_freq(spw) -> float:
-    return float(spw.centre_frequency.to_units(measures.FrequencyUnits.GIGAHERTZ))
-
-
-def n_chan(spw) -> int:
-    return spw.num_channels
-
-
-def nbin_online(spw) -> int:
-    return spw.sdm_num_bin
-
-
-def chan_width(spw) -> float:
-    chan_width_MHz = [chan * 1e-6 for chan in spw.channels.chan_widths]
-    return chan_width_MHz[0]
-
-
-def n_pol(spw, ms) -> int:
-    dd = ms.get_data_description(spw=int(spw.id))
-    numpols = dd.num_polarizations
-    return numpols
-
-
-def _get_spw_values(context, mous: str, ms_list: list[MeasurementSet],
-                    stats_collection: PipelineStatsCollection):
-    """
-    Get the statistics values for a given SPW
-    """
-    LOG.info("Getting SPW values")
-    level = PipelineStatisticLevel.SPW
-    stats_collection_list = []
-    ms = ms_list[0]
-    spw_list = ms.get_all_spectral_windows()
-    import_program = determine_import_program(context, ms)
-
-    for spw in spw_list:
-        p1 = PipelineStatistic(
-            name='spw_width',
-            value=spw_width(spw),
-            longdesc="width of the spectral window",
-            origin=import_program,
-            units="MHz",
-            level=level,
-        )
-        stats_collection_list.append(p1)
-
-        p2 = PipelineStatistic(
-            name='spw_freq',
-            value=spw_freq(spw),
-            longdesc="central frequency of the spectral window in TOPO",
-            origin=import_program,
-            units="GHz",
-            level=level,
-        )
-        stats_collection_list.append(p2)
-
-        p3 = PipelineStatistic(
-            name='n_chan',
-            value=n_chan(spw),
-            longdesc="number of channels in the spectral window",
-            origin=import_program,
-            level=level,
-        )
-        stats_collection_list.append(p3)
-
-        p4 = PipelineStatistic(
-            name='nbin_online',
-            value=nbin_online(spw),
-            longdesc="online nbin factor",
-            origin=import_program,
-            level=level,
-        )
-        stats_collection_list.append(p4)
-
-        p5 = PipelineStatistic(
-            name='chan_width',
-            value=chan_width(spw),
-            longdesc="frequency width of the channels in the spectral window",
-            origin=import_program,
-            units="MHz",
-            level=level,
-        )
-        stats_collection_list.append(p5)
-
-        p6 = PipelineStatistic(
-            name='n_pol',
-            value=n_pol(spw, ms),
-            longdesc="number of polarizations in the spectral window",
-            origin=import_program,
-            level=level,
-        )
-        stats_collection_list.append(p6)
-        stats_collection.add_stats(stats_collection_list, level=PipelineStatisticLevel.SPW, spw=spw.id, mous=mous)
-
-
-# source helper functions
-def pointings(ms, source):
-    pointings = len([f for f in ms.fields if f.source_id == source.id])
-    return pointings
-
-
-def _get_source_values(context, mous: str, ms_list: list[MeasurementSet],
-                       stats_collection: PipelineStatsCollection):
-    """
-    Get the statistics values for a given source
-    """
-    LOG.info("Getting source values")
-    level = PipelineStatisticLevel.SOURCE
-    first_ms = ms_list[0]
-    import_program = determine_import_program(context, first_ms)
-
-    science_sources = sorted({source for source in first_ms.sources
-                              if 'TARGET' in source.intents}, key=lambda source: source.name)
-
-    for source in science_sources:
-        LOG.info(f"Getting source values for {source.name}")
-        p1 = PipelineStatistic(
-            name='n_pointings',
-            value=pointings(first_ms, source),
-            longdesc="number of mosaic pointings for the science target",
-            origin=import_program,
-            level=level,
-        )
-        stats_collection.add_stat(p1, level=level, mous=mous, source=source.name)
-
-
-def get_stats_from_context(context) -> PipelineStatsCollection:
-    """
-    Gather statistics results for the pipleline run information and pipeline product information
-    These can be directly obtained from the context.
-    """
-    LOG.info("Getting pipeline statistics from context")
-    mous = context.get_oussid()
-
-    # list of datatypes to use (in order) for fetching EB-level information.
-    # The following function call will fetch all the MSes for only the first
-    # datatype it finds in the list. This is needed so that information is
-    # not repeated for the ms and _targets.ms when both are present.
-    datatypes = [DataType.REGCAL_CONTLINE_ALL, DataType.REGCAL_CONTLINE_SCIENCE, DataType.SELFCAL_CONTLINE_SCIENCE,
-                 DataType.REGCAL_LINE_SCIENCE, DataType.SELFCAL_LINE_SCIENCE, DataType.RAW]
-    ms_list = context.observing_run.get_measurement_sets_of_type(datatypes)
-
-    stats_collection = PipelineStatsCollection()
-    # TODO: If keeping this pattern, update all names to _add_mous_values, etc...
-    # Don't *want* to pass stats_collection around, but leave it for now.
-
-    # Add MOUS-level information
-    _get_mous_values(context, mous, ms_list, stats_collection)
-
-    # Add per-EB information
-    _get_eb_values(context, mous, ms_list, stats_collection)
-
-    # # Add per-SPW stats information
-    # The spw ids from the first MS are used so the information will be included once per MOUS.
-    _get_spw_values(context, mous, ms_list, stats_collection)
-
-    # # Add per-SOURCE stats information
-    _get_source_values(context, mous, ms_list, stats_collection)
-
-    return stats_collection
-
-
-# Used to be in stats_extractor.py
-class ResultsStatsExtractor(abc.ABC):
-    """
-    Adapted from the RegressisonExtractor,
-    this class is the base class for a pipeline statistics extractor
-    which uses a result to extract statistics information.
-    """
-    # the Results class this handler is expected to handle
-    result_cls = None
-    # if result_cls is a list, the type of classes it is expected to contain
-    child_cls = None
-    # the task class that generated the results, or None if it should handle
-    # all results of this type regardless of which task generated it
-    generating_task = None
-
-    def is_handler_for(self, result: Results | ResultsList) -> bool:
-        """
-        Return True if this StatsExtractor can process the Result.
-
-        result: the task Result to inspect
-        returns: True if the Result can be processed
-        """
-        # if the result is not a list or the expected results class,
-        # return False
+    func: Callable[[Results, Context, Emit], None]
+    result_cls: type | tuple[type, ...]
+    generating_task: type | None = None
+    top_level_only: bool = False
+
+    @property
+    def name(self) -> str:
+        return self.func.__name__
+
+    def handles(self, result: Results) -> bool:
         if not isinstance(result, self.result_cls):
             return False
-
-        # this is the expected class and we weren't expecting any
-        # children, so we should be able to handle the result
-        if self.child_cls is None and (self.generating_task is None
-                                       or result.task is self.generating_task
-                                       or (hasattr(self.generating_task, 'Task') and result.task is self.generating_task.Task)):
+        if self.generating_task is None:
             return True
-
-        try:
-            if all([isinstance(r, self.child_cls) and
-                    (self.generating_task is None or r.task is self.generating_task)
-                    for r in result]):
-                return True
-            return False
-        except:
-            # catch case when result does not have a task attribute
-            return False
-
-    @abc.abstractmethod
-    def handle(self, result: Results, context=None) -> list[tuple[str, PipelineStatistic]]:
-        """
-        [Abstract] Extract pipeline statistics values
-
-        This method should return a list of (eb name, PipelineStatistic) tuples
-
-        :param result:
-        :return:
-        """
-        raise NotImplementedError
+        task = getattr(result, 'task', None)
+        return task is self.generating_task or task is getattr(self.generating_task, 'Task', None)
 
 
-class StatsExtractorRegistry:
-    """
-    The registry and manager of the stats result extractor framework.
+@dataclasses.dataclass(frozen=True)
+class ContextExtractor:
+    """A function that extracts statistics from the context, called once per run as func(context, emit)."""
+    func: Callable[[Context, Emit], None]
 
-    The responsibility of the StatsResultRegistry is to pass Results to
-    Extractors that can handle them.
-    """
+    @property
+    def name(self) -> str:
+        return self.func.__name__
+
+
+class ExtractorRegistry:
+    """Registry of statistics extractors. Extractors register themselves at import time with the decorators."""
+
     def __init__(self):
-        """Constractor of this class."""
-        self.__plugins_loaded = False
-        self.__handlers = []
-
-    def add_handler(self, handler: ResultsStatsExtractor) -> None:
-        """
-        Push ResultsStatsExtractor into handlers list __handler.
-
-        Args:
-            handler: ResultsStatsExtractor
-        """
-        task = handler.generating_task.__name__ if handler.generating_task else 'all'
-        child_name = ''
-        if hasattr(handler.child_cls, '__name__'):
-            child_name = handler.child_cls.__name__
-        elif isinstance(handler.child_cls, collections.abc.Iterable):
-            child_name = str([x.__name__ for x in handler.child_cls])
-        container = 's of %s' % child_name
-        s = '{}{} results generated by {} tasks'.format(handler.result_cls.__name__, container, task)
-        LOG.debug('Registering {} as new pipeline stats handler for {}'.format(handler.__class__.__name__, s))
-        self.__handlers.append(handler)
-
-    def handle(self, result: Results | ResultsList, context=None):
-        """
-        Extract values from corresponding StatsExtractor object of Result object.
-        """
-        if not self.__plugins_loaded:
-            for plugin_class in regression.get_all_subclasses(ResultsStatsExtractor):
-                self.add_handler(plugin_class())
-            self.__plugins_loaded = True
-
-        extracted = []
-
-        # Process leaf results first
-        if isinstance(result, collections.abc.Iterable):
-            LOG.info("Result type: {}".format(type(result)))
-            for r in result:
-                LOG.info("Extracting stats for {}".format(r.__class__.__name__))
-                LOG.info("Descending... calling self with result: {}".format(r))
-                d = self.handle(r, context)
-                extracted = union(extracted, d)
-
-        # process the group-level results.
-        for handler in self.__handlers:
-            if handler.is_handler_for(result):
-                LOG.info('{} extracting stats results for {}'.format(handler.__class__.__name__,
-                                                                           result.__class__.__name__))
-                d = handler.handle(result, context)
-                extracted = union(extracted, d)
-
-        return extracted
-
-
-# default StatsExtractorRegistry initialization
-registry = StatsExtractorRegistry()
-
-
-class FlagDeterALMAResultsExtractor(ResultsStatsExtractor):
-    result_cls = FlagDeterALMAResults
-    child_cls = None
-
-    def handle(self, result: FlagDeterALMAResults, context) -> list[tuple[str, PipelineStatistic]]:
-        value = self.calculate_value(result, context)
-        ps = self.create_stat(value)
-        return ps
-
-    def calculate_value(self, result: FlagDeterALMAResults, context: Context) -> dict:
-        intents_to_summarise = flagutils.intents_to_summarise(context)
-        flag_table_intents = ['TOTAL', 'SCIENCE SPWS']
-        flag_table_intents.extend(intents_to_summarise)
-
-        flag_totals = {}
-        flag_totals = utils.dict_merge(flag_totals,
-                      flagutils.flags_for_result(result, context, intents_to_summarise=intents_to_summarise))
-
-        reasons_to_export = ['online', 'shadow', 'qa0', 'qa2', 'before', 'template']
-
-        output_dict = {}
-        for ms in flag_totals:
-            output_dict[ms] = {}
-            for reason in flag_totals[ms]:
-                for intent in flag_totals[ms][reason]:
-                    if reason in reasons_to_export:
-                        if "TOTAL" in intent:
-                            new = float(flag_totals[ms][reason][intent][0])
-                            total = float(flag_totals[ms][reason][intent][1])
-                            percentage = new/total * 100
-                            output_dict[ms][reason] = percentage
-        return output_dict
-
-    def create_stat(self, value_dict: dict) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "dictionary giving percentage of data newly flagged by the following intents: online, shadow, qa0, qa2 before and template flagging agents"
-        stats = []
-        for ms in value_dict:
-            ps = PipelineStatistic(name="flagdata_percentage",
-                                   value=value_dict[ms],
-                                   longdesc=longdescription,
-                                   units='%',
-                                   level=PipelineStatisticLevel.EB)
-            stats.append((ms, ps))
-        return stats
-
-
-class FluxcalflagResultsStatsExtractor(ResultsStatsExtractor):
-    """Regression test result extractor for hifa_gfluxscaleflag.
-
-    The extracted values are:
-       - the number of flagged rows before this task
-       - the number of flagged rows after this task
-       - QA score
-    """
-
-    result_cls = GfluxscaleflagResults
-    child_cls = None
-    generating_task = Gfluxscaleflag
-
-    def handle(self, result: GfluxscaleflagResults, context) -> list[tuple[str, PipelineStatistic]]:
-        before, after = self.calculate_value(result, context)
-        vis = result.inputs['vis']
-        ps = self.create_stat(before, after, vis)
-        return ps
-
-    def calculate_value(self, result: GfluxscaleflagResults, context):
-        """Extract values for testing.
-
-        Args:
-            result: GfluxscaleflagResults object
-        
-        Returns:
-            OrderedDict[str, float]
-        """
-        summaries_by_name = {s['name']: s for s in result.cafresult.summaries}
-
-        num_flags_before = summaries_by_name['before']['flagged']
-
-        if 'after' in summaries_by_name:
-            num_flags_after = summaries_by_name['after']['flagged']
-        else:
-            num_flags_after = num_flags_before
-
-        return int(num_flags_before), int(num_flags_after)
-
-    def create_stat(self, before, after, vis) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for regression tests: number of flags before gfluxscaleflag."
-        ps1 = PipelineStatistic(name="gfluxscaleflag_before",
-                               value=before,
-                               longdesc=longdescription,
-                               level=PipelineStatisticLevel.EB)
-        longdescription = "Added for regression tests: number of flags after gfluxscaleflag."
-        ps2 = PipelineStatistic(name="gfluxscaleflag_after",
-                               value=after,
-                               longdesc=longdescription,
-                               level=PipelineStatisticLevel.EB)
-        return [(vis, ps1), (vis, ps2)]
-
-
-class GcorFluxscaleResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Regression test result extractor for hifa_gcorfluxscale.
-
-    The extracted values are:
-       - Stokes I for each field and spw, in Jy
-    """
-
-    result_cls = FluxCalibrationResults
-    child_cls = None
-    generating_task = GcorFluxscale
-
-    def handle(self, result:FluxCalibrationResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result:FluxCalibrationResults) -> dict:
-        """
-        Extract values for testing.
-
-        Args:
-            result: FluxCalibrationResults object
-        
-        Returns:
-            OrderedDict[str, float]
-        """
-        d = {}
-        for field_id, measurements in result.measurements.items():
-            for m in measurements:
-                key = 'field_{}.spw_{}.I'.format(field_id, m.spw_id)
-                d[key] = str(m.I.to_units(FluxDensityUnits.JANSKY))
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for regression tests: flux density results from flux calibration."
-        ps1 = PipelineStatistic(name="fluxcal_I",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class ApplycalResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Regression test result extractor for applycal tasks.
-
-    The extracted values are:
-       - the number of flagged and scanned rows before this task
-       - the number of flagged and scanned rows after this task
-       - QA score
-    """
-
-    result_cls = ApplycalResults
-    child_cls = None
-    generating_task = IFApplycal
-
-    def handle(self, result:FluxCalibrationResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result:ApplycalResults) -> dict:
-        """
-        Extract values for testing.
-
-        Args:
-            result: ApplycalResults object
-        
-        Returns:
-            OrderedDict[str, float]
-        """
-        d = {}
-
-        try:
-            summaries_by_name = {s['name']: s for s in result.summaries}
-            num_flags_before = summaries_by_name['before']['flagged']
-            num_flags_after = summaries_by_name['applycal']['flagged']
-            
-            d['num_rows_flagged.before'] = int(num_flags_before)
-            d['num_rows_flagged.after'] = int(num_flags_after)
-
-            flag_summary_before = summaries_by_name['before']
-            for scan_id, v in flag_summary_before['scan'].items():
-                d['scan_{}.num_rows_flagged.before'.format(scan_id)] = int(v['flagged'])
-
-            flag_summary_after = summaries_by_name['applycal']
-            for scan_id, v in flag_summary_after['scan'].items():
-                d['scan_{}.num_rows_flagged.after'.format(scan_id)] = int(v['flagged'])
-
-        except:
-            LOG.info("Some information missing from ApplycalResults. Omitting from resgression comparison.")
-            d = {}
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for regression tests: applycal flags before and after"
-        ps1 = PipelineStatistic(name="applycal_flagging",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class SDApplycalResultsStatsExtractor(ApplycalResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for sd_applycal.
-    
-    It extends ApplycalResultsStatsExtractor to use the same extraction logic.
-    """
-    result_cls = ApplycalResults
-    child_cls = None
-    generating_task = SDApplycal
-
-
-class VLAApplycalResultsStatsExtractor(ApplycalResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_applycals.
-    
-    It extends ApplycalResultsStatsExtractor to use the same extraction logic.
-    """
-    result_cls = ApplycalResults
-    child_cls = None
-    generating_task = Applycals
-
-
-class CheckflagResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_checkflag.
-    
-    Extract flagging summaries from CheckflagResults.
-    """
-    result_cls = CheckflagResults
-    child_cls = None
-    generating_task = Checkflag
-
-    def handle(self, result: CheckflagResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result: CheckflagResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: CheckflagResults object
-
-        Returns:
-            dict[str, Union[int, dict]]
-        """
-        d = {}
-        try:
-            summaries_by_name = {s['name']: s for s in result.summaries}
-            
-            if 'before' in summaries_by_name:
-                num_flags_before = summaries_by_name['before']['flagged']
-                d['num_rows_flagged.before'] = int(num_flags_before)
-                
-                flag_summary_before = summaries_by_name['before']
-                scan_before = {}
-                for scan_id, v in flag_summary_before['scan'].items():
-                    scan_before[f'scan_{scan_id}'] = int(v['flagged'])
-                if scan_before:
-                    d['scan.num_rows_flagged.before'] = scan_before
-            else:
-                d['num_rows_flagged.before'] = None
-
-            if 'after' in summaries_by_name:
-                num_flags_after = summaries_by_name['after']['flagged']
-                d['num_rows_flagged.after'] = int(num_flags_after)
-                
-                flag_summary_after = summaries_by_name['after']
-                scan_after = {}
-                for scan_id, v in flag_summary_after['scan'].items():
-                    scan_after[f'scan_{scan_id}'] = int(v['flagged'])
-                if scan_after:
-                    d['scan.num_rows_flagged.after'] = scan_after
-            else:
-                d['num_rows_flagged.after'] = None
-
-        except Exception as e:
-            LOG.info(f"Some information missing from CheckflagResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: checkflag flagging summaries."
-        ps1 = PipelineStatistic(name="checkflag_flagging",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class TargetflagResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_targetflag.
-    
-    Extract flagging summaries from TargetflagResults.
-    """
-    result_cls = TargetflagResults
-    child_cls = None
-    generating_task = Targetflag
-
-    def handle(self, result: TargetflagResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result: TargetflagResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: TargetflagResults object
-
-        Returns:
-            dict[str, Union[int, dict]]
-        """
-        d = {}
-        try:
-            summaries_by_name = {s['name']: s for s in result.summarydict}
-            
-            if 'Summary' in summaries_by_name:
-                num_flags_summary = summaries_by_name['Summary']['flagged']
-                d['num_rows_flagged.summary'] = int(num_flags_summary)
-                
-                flag_summary = summaries_by_name['Summary']
-                scan_summary = {}
-                for scan_id, v in flag_summary['scan'].items():
-                    scan_summary[f'scan_{scan_id}'] = int(v['flagged'])
-                if scan_summary:
-                    d['scan.num_rows_flagged.summary'] = scan_summary
-
-        except Exception as e:
-            LOG.info(f"Some information missing from TargetflagResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: targetflag flagging summaries."
-        ps1 = PipelineStatistic(name="targetflag_flagging",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class FluxbootResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_fluxboot.
-
-    The extracted values are:
-       - the flux_densities value (single spw)
-       - spectral index list values (spix, curvature, delta, gamma coefficients)
-    """
-    result_cls = FluxbootResults
-    child_cls = None
-    generating_task = Fluxboot
-
-    def handle(self, result: FluxbootResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result: FluxbootResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: FluxbootResults object
-
-        Returns:
-            dict[str, Union[float, dict]]
-        """
-        d = {}
-        try:
-            flux_densities = result.flux_densities
-            spindex = result.spindex_results
-
-            # Extract flux densities per spw
-            flux_dict = {}
-            for i, spw in enumerate(sorted(result.spws)):
-                flux_dict[f'spw_{spw}'] = flux_densities[i][0]
-            if flux_dict:
-                d['flux_densities'] = flux_dict
-
-            # Extract spectral index parameters
-            if spindex:
-                d['spindex.spix'] = float(spindex[0]['spix'])
-                d['spindex.curvature'] = float(spindex[0]['curvature'])
-                d['spindex.delta'] = float(spindex[0]['delta'])
-                d['spindex.gamma'] = float(spindex[0]['gamma'])
-
-        except Exception as e:
-            LOG.info(f"Some information missing from FluxbootResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: fluxboot flux densities and spectral index."
-        ps1 = PipelineStatistic(name="fluxboot_results",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class SolintResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_solint.
-
-    The extracted values are:
-       - long solution interval per band
-       - short solution interval per band
-       - shortsol2 variable interval per band
-    """
-    result_cls = SolintResults
-    child_cls = None
-    generating_task = Solint
-
-    def handle(self, result: SolintResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result: SolintResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: SolintResults object
-
-        Returns:
-            dict[str, dict[str, float]]
-        """
-        d = {}
-        try:
-            solint_dict = {}
-            for band, value in result.longsolint.items():
-                solint_dict[f'{band}-band'] = {
-                    'longsolint': value,
-                    'short_solint': result.short_solint[band],
-                    'shortsol2': result.shortsol2[band]
-                }
-            if solint_dict:
-                d['solution_intervals'] = solint_dict
-
-        except Exception as e:
-            LOG.info(f"Some information missing from SolintResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: solint solution intervals per band."
-        ps1 = PipelineStatistic(name="solint_intervals",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class PriorcalsResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_priorcals.
-
-    The extracted values are:
-       - Opacities per spw
-    """
-    result_cls = PriorcalsResults
-    child_cls = None
-    generating_task = Priorcals
-
-    def handle(self, result: PriorcalsResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result: PriorcalsResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: PriorcalResults object
-
-        Returns:
-            dict[str, dict[str, float]]
-        """
-        d = {}
-        try:
-            opacity_dict = {}
-            for idx, opacity in enumerate(result.oc_result.opacities):
-                spw = result.oc_result.spw[idx]
-                opacity_dict[f'spw_{spw}'] = opacity
-            if opacity_dict:
-                d['opacity'] = opacity_dict
-
-        except Exception as e:
-            LOG.info(f"Some information missing from PriorcalsResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: priorcals opacities per spw."
-        ps1 = PipelineStatistic(name="priorcals_opacity",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class VLASetjyResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_vlasetjy.
-
-    The extracted values are:
-       - Stokes I flux value per field
-    """
-    result_cls = FluxCalibrationResults
-    child_cls = None
-    generating_task = VLASetjy
-
-    def handle(self, result: FluxCalibrationResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result: FluxCalibrationResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: FluxCalibrationResults object
-
-        Returns:
-            dict[str, dict[str, float]]
-        """
-        d = {}
-        try:
-            flux_dict = {}
-            for field, fluxlist in result.measurements.items():
-                flux_I = float(fluxlist[0].I.value)
-                flux_dict[f'field_{field}'] = {'I': flux_I}
-            if flux_dict:
-                d['flux'] = flux_dict
-
-        except Exception as e:
-            LOG.info(f"Some information missing from FluxCalibrationResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: vlasetjy flux calibration values."
-        ps1 = PipelineStatistic(name="vlasetjy_flux",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class VLAStatwtResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_statwt.
-
-    The extracted values are:
-       - mean and variance
-    """
-    result_cls = StatwtResults
-    child_cls = None
-    generating_task = Statwt
-
-    def handle(self, result: StatwtResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result: StatwtResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: StatwtResults object
-
-        Returns:
-            dict[str, float]
-        """
-        d = {}
-        try:
-            if result.jobs:
-                d['mean'] = result.jobs[0]['mean']
-                d['variance'] = result.jobs[0]['variance']
-
-        except Exception as e:
-            LOG.info(f"Some information missing from StatwtResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: statwt mean and variance."
-        ps1 = PipelineStatistic(name="statwt_stats",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class VLAImportDataResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_importdata.
-
-    The extracted values are:
-       - number of antennas
-       - max integration time
-    """
-    result_cls = VLAImportDataResults
-    child_cls = None
-    generating_task = VLAImportData
-
-    def handle(self, result: VLAImportDataResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis'] if hasattr(result, 'inputs') and 'vis' in result.inputs else result.mses[0].name if result.mses else None
-        if vis and val:
-            ps = self.create_stat(vis, val)
-            return ps
-        return []
-
-    def calculate_value(self, result: VLAImportDataResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: VLAImportDataResults object
-
-        Returns:
-            dict[str, Union[int, float]]
-        """
-        d = {}
-        try:
-            if result.mses:
-                d['numantennas'] = len(result.mses[0].antennas)
-                d['vla_max_integration_time'] = result.mses[0].get_integration_time_stats(stat_type="max")
-
-        except Exception as e:
-            LOG.info(f"Some information missing from VLAImportDataResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: VLA import data antenna count and integration time."
-        ps1 = PipelineStatistic(name="vla_importdata_stats",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class FlagDeterVLAResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_flagdata.
-
-    The extracted values are:
-       - number of flags per category
-    """
-    result_cls = FlagDeterVLAResults
-    child_cls = None
-    generating_task = FlagDeterVLA
-
-    def handle(self, result: FlagDeterVLAResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result: FlagDeterVLAResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: FlagDeterVLAResults object
-
-        Returns:
-            dict[str, dict[str, int]]
-        """
-        d = {}
-        try:
-            flag_dict = {}
-            for summary in result.summaries:
-                category = summary['name']
-                flag_dict[category] = int(summary['flagged'])
-            if flag_dict:
-                d['flagged'] = flag_dict
-
-        except Exception as e:
-            LOG.info(f"Some information missing from FlagDeterVLAResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: VLA flagdata flagging by category."
-        ps1 = PipelineStatistic(name="vla_flagdata_flagging",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class testBPdcalsResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_testBPdcals.
-
-    The extracted values are:
-       - number of flagged solutions per band for bandpass and delay
-    """
-    result_cls = testBPdcalsResults
-    child_cls = None
-    generating_task = testBPdcals
-
-    def handle(self, result: testBPdcalsResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result: testBPdcalsResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: testBPdcalsResults object
-
-        Returns:
-            dict[str, dict[str, dict[str, int]]]
-        """
-        d = {}
-        try:
-            bandpass_dict = {}
-            for band, flagdict in result.flaggedSolnApplycalbandpass.items():
-                bandpass_dict[f'{band}-band'] = int(flagdict['all']['flagged'])
-            if bandpass_dict:
-                d['bandpass.flagged'] = bandpass_dict
-
-            delay_dict = {}
-            for band, flagdict in result.flaggedSolnApplycaldelay.items():
-                delay_dict[f'{band}-band'] = int(flagdict['all']['flagged'])
-            if delay_dict:
-                d['delay.flagged'] = delay_dict
-
-        except Exception as e:
-            LOG.info(f"Some information missing from testBPdcalsResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: testBPdcals flagged solutions per band."
-        ps1 = PipelineStatistic(name="testbpdcals_flagged",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class semiFinalBPdcalsResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_semiFinalBPdcals.
-
-    The extracted values are:
-       - number of flagged solutions per band for bandpass and delay
-    """
-    result_cls = semiFinalBPdcalsResults
-    child_cls = None
-    generating_task = semiFinalBPdcals
-
-    def handle(self, result: semiFinalBPdcalsResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result: semiFinalBPdcalsResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: semiFinalBPdcalsResults object
-
-        Returns:
-            dict[str, dict[str, dict[str, int]]]
-        """
-        d = {}
-        try:
-            bandpass_dict = {}
-            for band, flagdict in result.flaggedSolnApplycalbandpass.items():
-                bandpass_dict[f'{band}-band'] = int(flagdict['all']['flagged'])
-            if bandpass_dict:
-                d['bandpass.flagged'] = bandpass_dict
-
-            delay_dict = {}
-            for band, flagdict in result.flaggedSolnApplycaldelay.items():
-                delay_dict[f'{band}-band'] = int(flagdict['all']['flagged'])
-            if delay_dict:
-                d['delay.flagged'] = delay_dict
-
-        except Exception as e:
-            LOG.info(f"Some information missing from semiFinalBPdcalsResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: semiFinalBPdcals flagged solutions per band."
-        ps1 = PipelineStatistic(name="semifinalbpdcals_flagged",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class FinalcalsResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hifv_finalcals.
-
-    The extracted values are:
-       - number of flagged solutions for bandpass and delay
-    """
-    result_cls = FinalcalsResults
-    child_cls = None
-    generating_task = Finalcals
-
-    def handle(self, result: FinalcalsResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result: FinalcalsResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: FinalcalsResults object
-
-        Returns:
-            dict[str, int]
-        """
-        d = {}
-        try:
-            d['bandpass.flagged'] = int(result.flaggedSolnApplycalbandpass['all']['flagged'])
-            d['delay.flagged'] = int(result.flaggedSolnApplycaldelay['all']['flagged'])
-
-        except Exception as e:
-            LOG.info(f"Some information missing from FinalcalsResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: finalcals flagged solutions."
-        ps1 = PipelineStatistic(name="finalcals_flagged",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class SDBLFlagResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for sd_blfrag.
-
-    The extracted values are:
-       - the number of flagged and scanned rows before this task
-       - the number of flagged and scanned rows after this task
-       - QA scores
-    """
-    result_cls = SDBLFlagResults
-    child_cls = None
-    generating_task = SDBLFlag
-
-    def handle(self, result: SDBLFlagResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        vis = result.inputs['vis']
-        ps = self.create_stat(vis, val)
-        return ps
-
-    def calculate_value(self, result: SDBLFlagResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: SDBLFlagResults object
-        
-        Returns:
-            dict[str, Union[int, dict]]
-        """
-        d = {}
-        try:
-            flag_dict = {}
-            for summary in result.outcome['flagdata_summary']:
-                name = None
-                prop = None
-                for k, v in summary.items():
-                    if 'name' == k:
-                        name = v
-                    elif isinstance(v, dict):
-                        prop = v
-                if name is not None and prop is not None:
-                    flag_dict[f'num_rows_flagged.{name}'] = int(prop['flagged'])
-                    scan_dict = {}
-                    for scan_id, v in prop['scan'].items():
-                        scan_dict[f'scan_{scan_id}'] = int(v['flagged'])
-                    if scan_dict:
-                        flag_dict[f'scan.num_rows_flagged.{name}'] = scan_dict
-            if flag_dict:
-                d.update(flag_dict)
-
-        except Exception as e:
-            LOG.info(f"Some information missing from SDBLFlagResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: SD baseline flagging summaries and QA scores."
-        ps1 = PipelineStatistic(name="sd_blflag_flagging",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class SDImagingResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for sd_imaging.
-
-    The extracted values are:
-        - QA scores
-    """
-    result_cls = SDImagingResults
-    child_cls = None
-    generating_task = SDImaging
-
-    def handle(self, result: SDImagingResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        if not val:
-            return []
-        # For imaging, we may not have a single vis, so we need to handle it differently
-        # Try to get vis from context or result
-        vis = None
-        if hasattr(result, 'inputs') and 'vis' in result.inputs:
-            vis = result.inputs['vis']
-        elif hasattr(result, 'vislist') and result.vislist:
-            vis = result.vislist[0]
-        
-        if vis:
-            ps = self.create_stat(vis, val)
-            return ps
-        return []
-
-    def calculate_value(self, result: SDImagingResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: SDImagingResults object
-        
-        Returns:
-            dict[str, dict]
-        """
-        d = {}
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: SD imaging QA scores."
-        ps1 = PipelineStatistic(name="sd_imaging_qa",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class SDRestoredataResultsStatsExtractor(ResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for sd_restoredata.
-
-    The extracted values are:
-        - the number of flagged and scanned rows after this task
-        - QA scores
-    """
-    result_cls = SDRestoreDataResults
-    child_cls = None
-    generating_task = SDRestoreData
-
-    def handle(self, result: SDRestoreDataResults, context) -> list[tuple[str, PipelineStatistic]]:
-        val = self.calculate_value(result)
-        # For restoredata, we may have multiple sessions/mses
-        # Create stats for each session/ms combination
-        stats_list = []
-        try:
-            for session, mses in result.flagging_summaries.items():
-                for ms_name, ms in mses.items():
-                    session_val = {}
-                    for target_name, target in ms.items():
-                        if isinstance(target, dict):
-                            target_dict = {'num_rows_flagged': int(target['flagged'])}
-                            scan_dict = {}
-                            for scan_id, v in target['scan'].items():
-                                scan_dict[f'scan_{scan_id}'] = int(v['flagged'])
-                            if scan_dict:
-                                target_dict['scan'] = scan_dict
-                            session_val[f'target_{target_name}'] = target_dict
-                    
-                    if session_val:
-                        stats_list.extend(self.create_stat(ms_name, session_val))
-        except Exception as e:
-            LOG.info(f"Error processing SDRestoreDataResults: {e}")
-
-        return stats_list
-
-    def calculate_value(self, result: SDRestoreDataResults) -> dict:
-        """
-        Extract values for pipeline statistics.
-
-        Args:
-            result: SDRestoreDataResults object
-        
-        Returns:
-            dict[str, dict]
-        """
-        d = {}
-        try:
-            for session, mses in result.flagging_summaries.items():
-                for ms_name, ms in mses.items():
-                    for target_name, target in ms.items():
-                        if isinstance(target, dict):
-                            d[f'session_{session}.{ms_name}.target_{target_name}.num_rows_flagged'] = int(target['flagged'])
-                            for scan_id, v in target['scan'].items():
-                                d[f'session_{session}.{ms_name}.target_{target_name}.scan_{scan_id}.num_rows_flagged'] = int(v['flagged'])
-
-        except Exception as e:
-            LOG.info(f"Some information missing from SDRestoreDataResults: {e}")
-            d = {}
-
-        return d
-
-    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
-        longdescription = "Added for pipeline statistics: SD restoredata flagging summaries and QA scores."
-        ps1 = PipelineStatistic(name="sd_restoredata_flagging",
-                                value=val,
-                                longdesc=longdescription,
-                                level=PipelineStatisticLevel.EB)
-        return [(vis, ps1)]
-
-
-class NRORestoredataResultsStatsExtractor(SDRestoredataResultsStatsExtractor):
-    """
-    Pipeline statistics extractor for hsdn_restoredata.
-
-    It extends SDRestoredataResultsStatsExtractor to use the same extraction logic.
-    """
-    result_cls = NRORestoreDataResults
-    child_cls = None
-    generating_task = NRORestoreData
-
-
-def extract_qa_score_regression(result: Results) -> list:
-    """Extract QA scores from a TaskResults object, package them into stats objects, and return them in a list.
+        self.results_extractors: list[ResultsExtractor] = []
+        self.context_extractors: list[ContextExtractor] = []
+
+    def results(self, result_cls: type | tuple[type, ...], generating_task: type | None = None,
+                top_level_only: bool = False) -> Callable:
+        """Decorator registering a results extractor: func(result, context, emit)."""
+        def decorator(func):
+            self.results_extractors.append(ResultsExtractor(func, result_cls, generating_task, top_level_only))
+            return func
+        return decorator
+
+    def context(self, func: Callable) -> Callable:
+        """Decorator registering a context extractor: func(context, emit)."""
+        self.context_extractors.append(ContextExtractor(func))
+        return func
+
+
+registry = ExtractorRegistry()
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Collecting statistics
+# ---------------------------------------------------------------------------------------------------------------------
+
+@dataclasses.dataclass
+class StatsCollection:
+    """The records and extraction errors gathered from one pipeline run."""
+    records: list[StatRecord] = dataclasses.field(default_factory=list)
+    errors: list[dict] = dataclasses.field(default_factory=list)
+
+
+class _Emitter:
+    """The emit function handed to an extractor. Validates and stores records with the current stage and task."""
+
+    def __init__(self, collection: StatsCollection, definitions: dict[str, StatDefinition],
+                 stage: int | None = None, task: str | None = None):
+        self._collection = collection
+        self._definitions = definitions
+        self._stage = stage
+        self._task = task
+
+    def __call__(self, name: str, value: Any, *, stage: int | None = None, task: str | None = None, **dims) -> None:
+        if name not in self._definitions:
+            raise KeyError(f'No definition for pipeline statistic {name!r}')
+        unknown = set(dims) - set(DIMENSIONS)
+        if unknown:
+            raise KeyError(f'Unknown dimension(s) {sorted(unknown)} for pipeline statistic {name!r}')
+        record = StatRecord(
+            name=name,
+            value=to_serializable(value),
+            dims={k: _dimension_value(v) for k, v in dims.items() if v is not None},
+            stage=stage if stage is not None else self._stage,
+            task=task if task is not None else self._task,
+        )
+        self._collection.records.append(record)
+
+
+def _dimension_value(value: Any) -> str:
+    """Dimension values are strings so that flat and nested files (where they are JSON keys) agree."""
+    if isinstance(value, (set, frozenset, list, tuple)):
+        return ','.join(str(v) for v in sorted(value, key=_natural_key))
+    return str(value)
+
+
+def _run_extractor(collection: StatsCollection, extractor_name: str, func: Callable, args: tuple,
+                   emit: _Emitter, stage: int | None, task: str | None) -> None:
+    """Call an extractor, recording any exception in the errors section rather than raising it."""
+    n_before = len(collection.records)
+    try:
+        func(*args, emit)
+    except Exception as e:
+        # Discard partial output so a failed extractor never leaves half its values in the file.
+        del collection.records[n_before:]
+        LOG.warning('Pipeline statistics extractor %s failed for stage %s (%s): %s', extractor_name, stage, task, e)
+        LOG.debug(traceback.format_exc())
+        collection.errors.append({
+            'extractor': extractor_name,
+            'stage': stage,
+            'task': task,
+            'error': f'{type(e).__name__}: {e}',
+        })
+
+
+def stage_number(result: Results) -> int | None:
+    """Stage number of a Results or ResultsList."""
+    stage = getattr(result, 'stage_number', None)
+    if stage is None and isinstance(result, basetask.ResultsList) and len(result):
+        return stage_number(result[0])
+    return stage
+
+
+def task_name(result: Results) -> str | None:
+    """CASA task name (e.g. 'hifa_bandpass') of the task that produced a Results or ResultsList."""
+    if isinstance(result, basetask.FailedTaskResults):
+        task_cls = result.origtask_cls
+    elif isinstance(result, basetask.ResultsList):
+        return task_name(result[0]) if len(result) else None
+    else:
+        task_cls = getattr(result, 'task', None)
+    if task_cls is None:
+        return None
+    try:
+        return task_registry.get_casa_task(task_cls)
+    except KeyError:
+        return getattr(task_cls, '__name__', str(task_cls))
+
+
+def _walk_results(result: Results) -> Iterator[Results]:
+    """Yield a result and, for results containers, every Results it contains (depth first, children first)."""
+    if isinstance(result, collections.abc.Iterable) and not isinstance(result, (str, bytes, dict)):
+        for child in result:
+            if isinstance(child, (basetask.Results, basetask.ResultsList)):
+                yield from _walk_results(child)
+    yield result
+
+
+def collect_stats(context: Context, definitions: dict[str, StatDefinition] | None = None,
+                  extractor_registry: ExtractorRegistry | None = None) -> StatsCollection:
+    """Run every registered extractor over the context and its results."""
+    if definitions is None:
+        definitions = default_definitions()
+    if extractor_registry is None:
+        extractor_registry = default_registry()
+
+    collection = StatsCollection()
+
+    LOG.info('Gathering pipeline statistics from the context')
+    for extractor in extractor_registry.context_extractors:
+        emit = _Emitter(collection, definitions)
+        _run_extractor(collection, extractor.name, extractor.func, (context,), emit, None, None)
+
+    LOG.info('Gathering pipeline statistics from results')
+    for results_proxy in context.results:
+        top_level = results_proxy.read()
+        for result in _walk_results(top_level):
+            stage = stage_number(result)
+            if stage is None:
+                stage = stage_number(top_level)
+            task = task_name(result) or task_name(top_level)
+            for extractor in extractor_registry.results_extractors:
+                if extractor.top_level_only and result is not top_level:
+                    continue
+                if extractor.handles(result):
+                    emit = _Emitter(collection, definitions, stage=stage, task=task)
+                    _run_extractor(collection, extractor.name, extractor.func, (result, context), emit, stage, task)
+
+    return collection
+
+
+def default_definitions() -> dict[str, StatDefinition]:
+    from pipeline.infrastructure import pipeline_stats_definitions
+    return pipeline_stats_definitions.DEFINITIONS
+
+
+def default_registry() -> ExtractorRegistry:
+    # Importing the extractors module registers its extractors with the module-level registry.
+    from pipeline.infrastructure import pipeline_stats_extractors  # noqa: F401
+    return registry
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Building documents (the content of a stats file)
+# ---------------------------------------------------------------------------------------------------------------------
+
+def _generate_header(fmt: OutputFormat, audiences: frozenset[Audience], mous: str) -> dict:
+    now = datetime.datetime.now(datetime.timezone.utc)
+    return {
+        'version': FILE_FORMAT_VERSION,
+        'format': fmt.value,
+        'audiences': sorted(a.value for a in audiences),
+        'mous': mous,
+        'stats_file_creation_date': now.strftime('%Y/%m/%d %H:%M:%S %Z'),
+    }
+
+
+def build_document(collection: StatsCollection, definitions: dict[str, StatDefinition], mous: str,
+                   fmt: OutputFormat = OutputFormat.NESTED,
+                   audiences: Iterable[Audience] = (Audience.PRODUCT,)) -> dict:
+    """Build the JSON-serializable content of a stats file from collected statistics.
 
     Args:
-        result: TaskResults Object containing QA pool data to be processed.
+        collection: Records and errors from collect_stats.
+        definitions: Definitions by name.
+        mous: MOUS identifier; the key under which nested statistics are placed.
+        fmt: Flat or nested layout.
+        audiences: Only statistics for these audiences are included.
+    """
+    audiences = frozenset(audiences)
+    records = sorted((r for r in collection.records if definitions[r.name].audience in audiences),
+                     key=_record_sort_key)
+    used = sorted({r.name for r in records})
+
+    document = {
+        HEADER_KEY: _generate_header(fmt, audiences, mous),
+        DEFINITIONS_KEY: {name: definitions[name].to_dict() for name in used},
+        ERRORS_KEY: list(collection.errors),
+    }
+    if fmt is OutputFormat.FLAT:
+        document[STATS_KEY] = [r.to_dict() for r in records]
+    else:
+        document.update(_nest_records(records, definitions, mous))
+    return document
+
+
+def _nest_records(records: list[StatRecord], definitions: dict[str, StatDefinition], mous: str) -> dict:
+    """Nest records by dimension, in DIMENSIONS order, under the MOUS (or STAGE.<n> for per-stage statistics).
+
+    The leaf is {value, units, longdescription, origin (the task), stage}. If several records end up at the same
+    leaf (e.g. a statistic produced by two stages with the same dims), the leaf is a list of these dicts.
+    """
+    nested = {mous: {}}
+    for record in records:
+        definition = definitions[record.name]
+        if definition.per_stage and record.stage is not None:
+            node = nested.setdefault(STAGE_KEY, {}).setdefault(str(record.stage), {})
+        else:
+            node = nested[mous]
+        for dim in sorted(record.dims, key=list(DIMENSIONS).index):
+            node = node.setdefault(DIMENSIONS[dim], {}).setdefault(record.dims[dim], {})
+
+        leaf = {'value': record.value}
+        if definition.units:
+            leaf['units'] = definition.units
+        leaf['longdescription'] = definition.description
+        if record.task is not None:
+            leaf['origin'] = record.task
+        if record.stage is not None:
+            leaf['stage'] = record.stage
+
+        existing = node.get(record.name)
+        if existing is None:
+            node[record.name] = leaf
+        elif isinstance(existing, list):
+            existing.append(leaf)
+        else:
+            node[record.name] = [existing, leaf]
+    return nested
+
+
+def document_to_records(document: dict) -> list[StatRecord]:
+    """Read the records back out of a flat or nested stats document."""
+    if STATS_KEY in document:
+        return [StatRecord.from_dict(d) for d in document[STATS_KEY]]
+
+    records = []
+    for key, node in document.items():
+        if key == STAGE_KEY:
+            for stage, stage_node in node.items():
+                _unnest(stage_node, {}, int(stage), records)
+        elif key not in _RESERVED_KEYS:
+            _unnest(node, {}, None, records)
+    return records
+
+
+def _unnest(node: dict, dims: dict, stage: int | None, records: list[StatRecord]) -> None:
+    for key, value in node.items():
+        if key in _LABEL_TO_DIMENSION:
+            dim = _LABEL_TO_DIMENSION[key]
+            for dim_value, child in value.items():
+                _unnest(child, {**dims, dim: dim_value}, stage, records)
+        else:
+            for leaf in (value if isinstance(value, list) else [value]):
+                records.append(StatRecord(name=key, value=leaf.get('value'), dims=dict(dims),
+                                          stage=leaf.get('stage', stage), task=leaf.get('origin')))
+
+
+def document_definitions(document: dict) -> dict[str, StatDefinition]:
+    return {name: StatDefinition.from_dict(name, d) for name, d in document.get(DEFINITIONS_KEY, {}).items()}
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Writing and reading files
+# ---------------------------------------------------------------------------------------------------------------------
+
+def dumps_document(document: dict) -> str:
+    """Serialize a stats document.
+
+    Flat documents are written with one definition, error and record per line so that diffs of regression
+    reference files show the full address of every changed value. Nested documents are indented.
+    """
+    if STATS_KEY not in document:
+        return json.dumps(document, ensure_ascii=False, indent=4, sort_keys=True)
+
+    def one_per_line(items: list[str]) -> str:
+        if not items:
+            return ''
+        return '\n' + ',\n'.join(f'    {item}' for item in items) + '\n  '
+
+    def dumps(obj):
+        return json.dumps(obj, ensure_ascii=False, sort_keys=True)
+
+    header = json.dumps(document[HEADER_KEY], ensure_ascii=False, indent=4, sort_keys=True).replace('\n', '\n  ')
+    definitions = [f'{dumps(name)}: {dumps(d)}' for name, d in sorted(document[DEFINITIONS_KEY].items())]
+    errors = [dumps(e) for e in document[ERRORS_KEY]]
+    stats = [dumps(r) for r in document[STATS_KEY]]
+    return (
+        '{\n'
+        f'  {dumps(HEADER_KEY)}: {header},\n'
+        f'  {dumps(DEFINITIONS_KEY)}: {{{one_per_line(definitions)}}},\n'
+        f'  {dumps(ERRORS_KEY)}: [{one_per_line(errors)}],\n'
+        f'  {dumps(STATS_KEY)}: [{one_per_line(stats)}]\n'
+        '}\n'
+    )
+
+
+def generate_stats(context: Context, fmt: OutputFormat = OutputFormat.NESTED,
+                   audiences: Iterable[Audience] = (Audience.PRODUCT,)) -> dict:
+    """Gather statistics from the context and results and return the content of a stats file."""
+    definitions = default_definitions()
+    collection = collect_stats(context, definitions)
+    return build_document(collection, definitions, mous=context.get_oussid(), fmt=fmt, audiences=audiences)
+
+
+def write_stats_file(context: Context, filename: str, fmt: OutputFormat = OutputFormat.NESTED,
+                     audiences: Iterable[Audience] = (Audience.PRODUCT,)) -> str:
+    """Generate statistics for a pipeline run and write them to filename.
+
+    The defaults produce the delivered product file. Regression tests use fmt=OutputFormat.FLAT and
+    audiences=ALL_AUDIENCES.
 
     Returns:
-        dict: list of PipelineStatistic objects representing the extracted QA scores, structured for regression testing.
+        The filename written.
     """
-    qa = []
-
-    # Iterate through each QA score in the result's pool
-    for qa_score in result.qa.pool:
-        individual_score_dict = {}
-        # Extract and clean metric name for use in keys
-        metric_name = qa_score.origin.metric_name
-        # Remove all non-word characters (everything except numbers and letters)
-        metric_name = re.sub(r"[^\w\s]", '', metric_name)
-        # Replace all runs of whitespace with a single dash
-        metric_name = re.sub(r"\s+", '-', metric_name)
-
-        metric_score, score_value = qa_score.origin.metric_score, qa_score.score
-
-        individual_score_dict['metric_name'] = metric_name
-        individual_score_dict['metric'] = metric_score
-        individual_score_dict['score'] = score_value
-        # FIXME: better approach than casting to a list? Literally doing this here because they need to be serialized *eventually*. 
-        individual_score_dict['fields'] = list(qa_score.applies_to.field) if qa_score.applies_to and qa_score.applies_to.field else []
-        individual_score_dict['spws'] = list(qa_score.applies_to.spw) if qa_score.applies_to and qa_score.applies_to.spw else []
-
-        # TODO: consider adding the rest of the applies_to information as well (e.g. scans, intents) or other info from the QA score object 
-        # but only if relevant for regression testing and *after* everything else works. 
+    document = generate_stats(context, fmt=fmt, audiences=audiences)
+    n_errors = len(document[ERRORS_KEY])
+    if n_errors:
+        LOG.warning('%d pipeline statistics extractor(s) failed; see the errors section of %s', n_errors, filename)
+    LOG.info('Writing pipeline statistics to %s', filename)
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write(dumps_document(document))
+    return filename
 
 
-        qa.append((result.stage_number, individual_score_dict))
+def read_stats_file(filename: str) -> dict:
+    with open(filename, encoding='utf-8') as f:
+        return json.load(f)
 
-    return qa
 
-def union(input: list, new: dict | list[dict]) -> list[dict]:
+# ---------------------------------------------------------------------------------------------------------------------
+# Comparing stats files (regression tests)
+# ---------------------------------------------------------------------------------------------------------------------
+
+def compare_stats(reference: dict, new: dict, default_rel_tol: float = 1e-7,
+                  default_abs_tol: float = 1e-12) -> list[str]:
+    """Compare two stats documents (flat or nested) and return a list of differences; empty means they match.
+
+    Records are matched by address (name, stage, task, dims). Records sharing an address are matched in order.
+    Numbers are compared with the tolerances from the statistic's definition, falling back to the defaults.
+    Statistics whose definition has compare=False are ignored. Any extraction error recorded in the new document is
+    reported as a difference.
     """
-    Combines lst which is always a list, with new,
-    which could be a list of PipelineStatistic objects
-    or an individual PipelineStatistic object.
-    """
-    union = copy.deepcopy(input)
+    differences = [f'Extraction error in new results: {_format_error(e)}' for e in new.get(ERRORS_KEY, [])]
 
-    if isinstance(new, list):
-        for elt in new:
-            union.append(elt)
-    else:
-        union.append(new)
-    return union
+    definitions = {**document_definitions(reference), **document_definitions(new)}
+
+    def group(document):
+        grouped = collections.defaultdict(list)
+        for record in document_to_records(document):
+            definition = definitions.get(record.name)
+            if definition is None or definition.compare:
+                grouped[record.key].append(record.value)
+        return grouped
+
+    ref_records, new_records = group(reference), group(new)
+
+    for key in sorted(ref_records.keys() - new_records.keys(), key=format_address):
+        differences.append(f'Missing: {format_address(key)}')
+    for key in sorted(new_records.keys() - ref_records.keys(), key=format_address):
+        differences.append(f'Unexpected: {format_address(key)}')
+
+    for key in sorted(ref_records.keys() & new_records.keys(), key=format_address):
+        ref_values, new_values = ref_records[key], new_records[key]
+        address = format_address(key)
+        if len(ref_values) != len(new_values):
+            differences.append(f'{address}: expected {len(ref_values)} value(s), got {len(new_values)}')
+            continue
+        definition = definitions.get(key[0])
+        rel_tol = definition.rel_tol if definition and definition.rel_tol is not None else default_rel_tol
+        abs_tol = definition.abs_tol if definition and definition.abs_tol is not None else default_abs_tol
+        for ref_value, new_value in zip(ref_values, new_values):
+            for path, message in _compare_values(ref_value, new_value, rel_tol, abs_tol, ''):
+                differences.append(f'{address}{path}: {message}')
+
+    return differences
 
 
-def get_stats_from_results(context: Context, stats_collection: PipelineStatsCollection) -> None:
-    """
-    Gathers all possible pipeline statistics from results.
-    """
-    mous = context.get_oussid()
-
-    for results_proxy in context.results:
-        results = results_proxy.read()
-        extracted = registry.handle(results, context)
-        LOG.debug("Got stats from results: %s", extracted)
-        for eb, stat in extracted:
-            stats_collection.add_stat(stat, eb=eb, level=stat.level, mous=mous)
+def compare_stats_files(reference_file: str, new_file: str, default_rel_tol: float = 1e-7,
+                        default_abs_tol: float = 1e-12) -> list[str]:
+    """Compare two stats files. See compare_stats."""
+    return compare_stats(read_stats_file(reference_file), read_stats_file(new_file),
+                         default_rel_tol=default_rel_tol, default_abs_tol=default_abs_tol)
 
 
-def serialize_qa(context: Context) -> dict:
-    """Extract QA scores from all results and add to stages"""
-    qa_dict = {}
-    for results_proxy in context.results:
-        results = results_proxy.read()
-        if hasattr(results, 'qa') and results.qa and results.qa.pool:
-            qa_entries = extract_qa_score_regression(results)
-            for stage, qa in qa_entries:
-                if not qa_dict.get(stage):
-                    qa_dict[stage] = {"qa_scores": []}
-                qa_dict[stage]["qa_scores"].append(qa)
+def _format_error(error: dict) -> str:
+    return f"{error.get('extractor')} (stage {error.get('stage')}, {error.get('task')}): {error.get('error')}"
 
-    return qa_dict
 
-# This is the main interface for generating statistics.
-def generate_stats(context: Context) -> dict:
-    """
-    Gathers statistics from the context and results and returns a
-    representation of them as a dict.
-    """
-    # These don't need to be in any particular order
+def _is_number(value: Any) -> bool:
+    return isinstance(value, numbers.Real) and not isinstance(value, bool)
 
-    # 1. Gather context-based stats like project and pipeline run info
-    LOG.info("Gathering pipeline stats from context...")
-    stats_collection = get_stats_from_context(context)
 
-    # 2. Gather stats from results objects
-    LOG.info("Getting pipeline stats from results...")
-    get_stats_from_results(context, stats_collection)
+def _compare_values(ref: Any, new: Any, rel_tol: float, abs_tol: float, path: str) -> Iterator[tuple[str, str]]:
+    """Yield (path within the value, message) for every difference between two values."""
+    if _is_number(ref) and _is_number(new):
+        if math.isnan(ref) and math.isnan(new):
+            return
+        if not math.isclose(ref, new, rel_tol=rel_tol, abs_tol=abs_tol):
+            yield path, f'expected {ref}, got {new} (rel_tol={rel_tol}, abs_tol={abs_tol})'
+    elif isinstance(ref, list) and isinstance(new, list):
+        if len(ref) != len(new):
+            yield path, f'expected {len(ref)} element(s), got {len(new)}'
+            return
+        for i, (r, n) in enumerate(zip(ref, new)):
+            yield from _compare_values(r, n, rel_tol, abs_tol, f'{path}[{i}]')
+    elif isinstance(ref, dict) and isinstance(new, dict):
+        for k in sorted(ref.keys() - new.keys(), key=_natural_key):
+            yield f'{path}.{k}', 'missing'
+        for k in sorted(new.keys() - ref.keys(), key=_natural_key):
+            yield f'{path}.{k}', 'unexpected'
+        for k in sorted(ref.keys() & new.keys(), key=_natural_key):
+            yield from _compare_values(ref[k], new[k], rel_tol, abs_tol, f'{path}.{k}')
+    elif ref != new:
+        yield path, f'expected {ref!r}, got {new!r}'
 
-    # 3. Construct dictionary representation of all pipeline stats
-    LOG.info("Converting pipeline stats collection to dictionary...")
-    final_dict = stats_collection.to_dict()
 
-    # TODO: consider moving this to somewhere more logical
-    # 4. Serialize QA objects and add to pipeline stats file. 
-    LOG.info("Serializing QA objects and adding to pipeline stats file...")
-    qa_dict = serialize_qa(context)
-    stage_dict = final_dict.setdefault("STAGE", {})
-    for stage, stage_qa in qa_dict.items():
-        stage_dict.setdefault(stage, {}).update(stage_qa)
+# ---------------------------------------------------------------------------------------------------------------------
+# Helpers for extractors
+# ---------------------------------------------------------------------------------------------------------------------
 
-    LOG.info("Returning final pipeline stats dictionary...")
-
-    return final_dict
-
-# TODO: real function name needed, possibly move this to a more logical place as well
-def make_it_so(filename='pipeline_stats_TEST.json', context=None) -> None:
-    if context is None:
-        context = launcher.Pipeline(context='last').context
-    pipeline_stats = generate_stats(context)
-    with open(filename, 'w') as f:
-        LOG.info(f"Writing pipeline stats to {filename}...")
-        json.dump(pipeline_stats, f, ensure_ascii=False, indent=4, sort_keys=True)
+def vis_name(vis: str | list[str]) -> str:
+    """EB name used in the 'eb' dimension: the basename of the MS (the first one if given a list)."""
+    if isinstance(vis, (list, tuple)):
+        vis = vis[0]
+    return os.path.basename(os.path.normpath(vis))
