@@ -30,6 +30,11 @@ LOG = infrastructure.logging.get_logger(__name__)
 _current_test_name: str | None = None
 
 
+def pipeline_stats_reference_prefix(output_dir: str) -> str:
+    """Return the file name prefix of a test's pipeline stats reference files, given the test's output_dir."""
+    return f'pipeline_stats_{os.path.basename(os.path.normpath(output_dir))}.'
+
+
 def ensure_working_dir(pt: PipelineTester) -> None:
     """Ensure the working directory exists for a PipelineTester instance.
 
@@ -106,8 +111,9 @@ class PipelineTester:
             output_dir: Path to the output directory. If `None`, it is derived using `visname` and/or `project_id`.
             expectedoutput_file: Path to a file defining the expected test output. Overrides `expectedoutput_dir` if set.
             expectedoutput_dir: Path to a directory containing expected output files. Ignored if `expectedoutput_file` is set.
-            use_json: If True, compare against pipeline stats json reference files (pipeline_stats_*.json) instead of
-                      *.results.txt files.
+            use_json: If True, compare against the pipeline stats json reference file for this test
+                      (pipeline_stats_<output_dir>.casa-<version>-pipeline-<version>.json) instead of *.results.txt
+                      files.
 
         Raises:
             ValueError: For `mode='regression'`, if neither `recipe` nor `ppr` is provided.
@@ -137,6 +143,12 @@ class PipelineTester:
             self.output_dir = f'{self.project_id}__{self.visname[0]}_test_output'
         else:
             self.output_dir = f'{self.visname[0]}_test_output'
+        # JSON references are named after the test, so tests can share a directory; a .txt
+        # expectedoutput_file only tells a JSON comparison which directory to search.
+        if use_json and expectedoutput_file and not expectedoutput_file.endswith('.json'):
+            expectedoutput_dir = os.path.dirname(expectedoutput_file)
+            expectedoutput_file = None
+            self.expectedoutput_file = None
         if expectedoutput_file:
             self.expectedoutput_file = casa_tools.utils.resolve(expectedoutput_file)
         else:
@@ -144,7 +156,8 @@ class PipelineTester:
             # Find the reference file in expectedoutput_dir that matches the current CASA version and use that.
             if expectedoutput_dir:
                 if use_json:
-                    reference_data_files = glob.glob(casa_tools.utils.resolve(expectedoutput_dir)+'/pipeline_stats_*.json')
+                    reference_data_files = glob.glob(
+                        f'{casa_tools.utils.resolve(expectedoutput_dir)}/{pipeline_stats_reference_prefix(self.output_dir)}*.json')
                 else:
                     reference_data_files = glob.glob(casa_tools.utils.resolve(expectedoutput_dir)+'/*.results.txt')
                 if reference_data_files:
@@ -478,6 +491,9 @@ class PipelineTester:
             new_file : file path of the new pipeline stats file
             relative_tolerance : default relative tolerance of output values
         """
+        if not self.expectedoutput_file:
+            pytest.fail(f"No pipeline stats reference file found; new results were written to {os.path.abspath(new_file)}",
+                        pytrace=False)
         differences = pipeline_statistics.compare_stats_files(self.expectedoutput_file, new_file,
                                                               default_rel_tol=relative_tolerance)
         if differences:
