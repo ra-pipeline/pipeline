@@ -8,6 +8,7 @@ inherit from these base classes.
 from __future__ import annotations
 
 import collections.abc
+import itertools
 import os
 import shutil
 from typing import TYPE_CHECKING, Any
@@ -16,8 +17,10 @@ import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.sessionutils as sessionutils
 import pipeline.infrastructure.tablereader as tablereader
+import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
+from pipeline.h.heuristics.mstransform_freq_regrid import configure_frequency
 from pipeline.infrastructure import casa_tasks, exceptions, mpihelpers, task_registry
 from pipeline.infrastructure.mpihelpers import TaskQueue
 
@@ -54,6 +57,7 @@ class MstransformInputs(vdp.StandardInputs):
     width = vdp.VisDependentProperty(default='')
     nchan = vdp.VisDependentProperty(default=-1)
     per_spw = vdp.VisDependentProperty(default=False)
+    per_field = vdp.VisDependentProperty(default=False)
 
     parallel = sessionutils.parallel_inputs_impl(default=False)
 
@@ -82,6 +86,7 @@ class MstransformInputs(vdp.StandardInputs):
         width: str | None = None,
         nchan: int | None = None,
         per_spw: bool | None = None,
+        per_field: bool | None = None,
         parallel: bool | str | None = None,
     ) -> None:
         """Initialize Inputs.
@@ -104,6 +109,7 @@ class MstransformInputs(vdp.StandardInputs):
             width: Width of output channel for regridding.
             nchan: Number of output channels for regridding.
             per_spw: If True, execute mstransform separately for each spectral window in spw.
+            per_field: If True, execute mstransform separately for each field in field.
             parallel: Process multiple MeasurementSets in parallel using the casampi framework.
         """
         super().__init__()
@@ -125,6 +131,7 @@ class MstransformInputs(vdp.StandardInputs):
         self.width = width
         self.nchan = nchan
         self.per_spw = per_spw
+        self.per_field = per_field
         self.parallel = parallel
 
     def to_casa_args(self) -> dict[str, Any]:
@@ -143,7 +150,7 @@ class MstransformInputs(vdp.StandardInputs):
         else:
             d['timeaverage'] = False
 
-        for key in ('parallel', 'per_spw'):
+        for key in ('parallel', 'per_spw', 'per_field'):
             d.pop(key, None)
 
         return d
@@ -304,7 +311,51 @@ class Mstransform(sessionutils.ParallelTemplate):
 
     def _expand_task_args(self, valid_args_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Hook to expand task arguments, e.g. for per-spw or per-field splitting."""
-        if self.inputs.per_spw:
+        if self.inputs.per_spw and self.inputs.per_field:
+            valid_args_list_per_field_spw = []
+            observing_run = self.inputs.context.observing_run
+            do_regrid = sum(1 for args in valid_args_list if args.get('outframe') in ['LSRK', 'REST']) > 0
+            if do_regrid:
+                vis_list = utils.deduplicate([args.get('vis') for args in valid_args_list])
+                frequency_config = configure_frequency(
+                    observing_run,
+                    [observing_run.get_ms(vis) for vis in vis_list],
+                    utils.contains_single_dish(self.inputs.context)
+                )
+            else:
+                frequency_config = None
+
+            for args in valid_args_list:
+                spw_value = args.get('spw')
+                field_value = args.get('field')
+                if spw_value is None or field_value is None:
+                    valid_args_list_per_field_spw.append(args)
+                    continue
+
+                spw_list = [s.strip() for s in str(spw_value).split(',') if s.strip()]
+                field_list = [s.strip() for s in str(field_value).split(',') if s.strip()]
+
+                for spw, field in itertools.product(spw_list, field_list):
+                    args_field_spw = args.copy()
+                    ms = observing_run.get_ms(args_field_spw['vis'])
+                    vspw_id = observing_run.real2virtual_spw_id(int(spw), ms)
+                    fields = ms.get_fields(field)
+                    assert len(fields) == 1, f"Expected exactly one field for {field}, found {len(fields)}"
+                    source_name = fields[0].source.name
+                    args_field_spw['field'] = str(fields[0].id)
+                    args_field_spw['spw'] = spw
+                    base, ext = os.path.splitext(args_field_spw['outputvis'])
+                    args_field_spw['outputvis'] = f'{base}.{utils.fieldname_clean(fields[0].name)}.spw{spw}{ext}'
+                    if args.get('outframe') in ['LSRK', 'REST']:
+                        freq_config = frequency_config.get((source_name, vspw_id))
+                        args_field_spw['mode'] = "frequency"
+                        args_field_spw['start'] = "{value}{unit}".format(**freq_config["start"])
+                        args_field_spw['width'] = "{value}{unit}".format(**freq_config["width"])
+                        args_field_spw['nchan'] = freq_config['nchan']
+                    valid_args_list_per_field_spw.append(args_field_spw)
+            if len(valid_args_list_per_field_spw) > 0:
+                return valid_args_list_per_field_spw
+        elif self.inputs.per_spw:
             valid_args_list_per_spw = []
             for args in valid_args_list:
                 spw_value = args.get('spw')
@@ -321,6 +372,26 @@ class Mstransform(sessionutils.ParallelTemplate):
                     valid_args_list_per_spw.append(args_spw)
 
             return valid_args_list_per_spw
+        elif self.inputs.per_field:
+            valid_args_list_per_field = []
+            for args in valid_args_list:
+                field_value = args.get('field')
+                if field_value is None:
+                    valid_args_list_per_field.append(args)
+                    continue
+
+                ms = self.inputs.context.observing_run.get_ms(args['vis'])
+                field_list = [s.strip() for s in str(field_value).split(',') if s.strip()]
+                for field in field_list:
+                    args_field = args.copy()
+                    args_field['field'] = field
+                    base, ext = os.path.splitext(args_field['outputvis'])
+                    fields = ms.get_fields(field)
+                    assert len(fields) == 1, f"Expected exactly one field for {field}, found {len(fields)}"
+                    args_field['outputvis'] = f'{base}.{utils.fieldname_clean(fields[0].name)}{ext}'
+                    valid_args_list_per_field.append(args_field)
+
+            return valid_args_list_per_field
 
         return valid_args_list
 
