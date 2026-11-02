@@ -31,6 +31,7 @@ Contributors and Affiliations
 - Drew Brisbin (JAO, 2021-2023)
 - Luke Maud (ESO, 2020-current)
 - Ryan Loomis (NRAO, 2020-current)
+- Devaky Kunneriath (NRAO, 2020-current)
 - Rui Xue (NRAO, 2020-current)
 - Yoshito Shimajiri (NAOJ, 2020-2021)
 - Andrew Lipnicky (NRAO, 2020-2024)
