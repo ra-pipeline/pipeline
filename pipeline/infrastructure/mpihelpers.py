@@ -6,7 +6,8 @@ import pprint
 import tempfile
 from inspect import signature
 
-from pipeline.infrastructure import daskhelpers, exceptions, filenamer, logging
+from pipeline.infrastructure import daskhelpers, exceptions, filenamer
+from pipeline.infrastructure import logging as pipeline_logging
 from pipeline.infrastructure.utils import gen_hash, get_obj_size, human_file_size
 
 casampi_spec = importlib.util.find_spec('casampi')
@@ -30,7 +31,7 @@ USE_MPI = True
 ENABLE_TIER0_PLOTMS = True
 BUFFER_LIMIT = 100*1024*1024  # 100 MiB
 
-LOG = logging.get_logger(__name__)
+LOG = pipeline_logging.get_logger(__name__)
 
 
 class AsyncTask:
@@ -90,8 +91,18 @@ class AsyncTask:
                 os.unlink(ret_file)
             return ret
         else:
+            remote_traceback = response['traceback']
+            exception_line = remote_traceback.rstrip().splitlines()[-1]
+            early_exit_names = (
+                'PipelineEarlyExit',
+                f'{exceptions.PipelineEarlyExit.__module__}.PipelineEarlyExit',
+            )
+            if any(exception_line == name or exception_line.startswith(f'{name}:') for name in early_exit_names):
+                _, _, message = exception_line.partition(':')
+                raise exceptions.PipelineEarlyExit(message.strip())
+
             err_msg = 'Failure executing job on MPI server {}, with traceback\n {}'.format(
-                response['server'], response['traceback']
+                response['server'], remote_traceback
             )
             raise exceptions.PipelineException(err_msg)
 
@@ -185,6 +196,8 @@ class SyncTask:
                 else:
                     # for FunctionCall
                     return self.__task()
+        except exceptions.PipelineEarlyExit:
+            raise
         except Exception as e:
             import traceback
 

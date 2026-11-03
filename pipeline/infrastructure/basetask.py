@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import abc
 import collections
 import collections.abc
@@ -5,33 +7,42 @@ import copy
 import datetime
 import functools
 import inspect
-import matplotlib
 import os
 import pickle
 import re
 import textwrap
 import traceback
 import uuid
-
-from . import api
-from . import casa_tools
-from . import eventbus
-from . import filenamer
-from . import jobrequest
-from . import logging
-from . import pipelineqa
-from . import project
-from . import task_registry
-from . import utils
-from . import vdp
-
-from .eventbus import TaskStartedEvent, TaskCompleteEvent, TaskAbnormalExitEvent
-from .eventbus import ResultAcceptingEvent, ResultAcceptedEvent, ResultAcceptErrorEvent
-from .casa_tasks import CasaTasks
-
 from typing import Generic, TypeVar
 
-LOG = logging.get_logger(__name__)
+import matplotlib
+
+from . import (
+    api,
+    casa_tools,
+    eventbus,
+    exceptions,
+    filenamer,
+    jobrequest,
+    pipelineqa,
+    project,
+    task_registry,
+    utils,
+    vdp,
+)
+from . import logging as pipeline_logging
+from .casa_tasks import CasaTasks
+from .eventbus import (
+    ResultAcceptedEvent,
+    ResultAcceptErrorEvent,
+    ResultAcceptingEvent,
+    TaskAbnormalExitEvent,
+    TaskCompleteEvent,
+    TaskStartedEvent,
+    TaskStoppedEvent,
+)
+
+LOG = pipeline_logging.get_logger(__name__)
 
 # control generation of the weblog
 DISABLE_WEBLOG = False
@@ -338,7 +349,7 @@ class Results(api.Results):
             # If running at DEBUG loglevel and this is a top-level task result,
             # then store to disk a pickle of the context as it existed at the
             # end of this pipeline stage; this may be useful for debugging.
-            if task_completed and LOG.isEnabledFor(logging.DEBUG):
+            if task_completed and LOG.isEnabledFor(pipeline_logging.DEBUG):
                 basename = f'context-stage{result_to_append.stage_number}.pickle'
                 path = os.path.join(context.output_dir, context.name, 'saved_state', basename)
 
@@ -655,7 +666,7 @@ class StandardTaskTemplate(api.Task, abc.ABC):
 
         # create a new log handler that will capture all messages above
         # ATTENTION level.
-        handler = logging.CapturingHandler(logging.ATTENTION)
+        handler = pipeline_logging.CapturingHandler(pipeline_logging.ATTENTION)
 
         try:
 
@@ -679,7 +690,7 @@ class StandardTaskTemplate(api.Task, abc.ABC):
 
                 # register the capturing log handler, buffering all messages so that
                 # we can add them to the result - and subsequently, the weblog
-                logging.add_handler(handler)
+                pipeline_logging.add_handler(handler)
 
                 # get our result
                 result = self.prepare(**prepare_parameters)
@@ -702,6 +713,16 @@ class StandardTaskTemplate(api.Task, abc.ABC):
                 )
                 eventbus.send_message(event)
             return result
+
+        except exceptions.PipelineEarlyExit as exc:
+            if utils.is_top_level_task():
+                LOG.info('Pipeline task requested an early exit: %s', exc)
+                event = TaskStoppedEvent(
+                    context_name=self.inputs.context.name,
+                    stage_number=self.inputs.context.task_counter,
+                )
+                eventbus.send_message(event)
+            raise
 
         except Exception as ex:
             # Created a special result object for the failed task, but only if
@@ -747,7 +768,7 @@ class StandardTaskTemplate(api.Task, abc.ABC):
             # now that the WARNING and above messages have been attached to the
             # result, remove the capturing logging handler from all loggers
             if handler:
-                logging.remove_handler(handler)
+                pipeline_logging.remove_handler(handler)
 
             # delete the executor so that the pickled context can be released
             self._executor = None
