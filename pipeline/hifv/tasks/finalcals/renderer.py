@@ -65,15 +65,59 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
             ms = context.observing_run.get_ms(vis)
             filesizes[os.path.basename(vis)] = ms._calc_filesize()
 
+        # PIPE-2586: flagging per band, and per field per band
+        band_flags = {}
+        field_flags = {}
+        for r in result:
+            band_stats = getattr(r, 'band_flag_stats', None)
+            if not band_stats:
+                continue
+            ms = context.observing_run.get_ms(r.inputs['vis'])
+            band_flags[ms.basename] = self.band_flags_for_ms(ms, band_stats)
+            field_flags[ms.basename] = self.field_flags_for_ms(ms, band_stats)
+
         # return all agents so we get ticks and crosses against each one
         agents = ['before', 'applycal']
 
-        ctx.update({'flags'    : flag_totals,
+        ctx.update({'band_flags': band_flags,
+                    'field_flags': field_flags,
+                    'flags'    : flag_totals,
                     'calapps'  : calapps,
                     'caltypes' : caltypes,
                     'agents'   : agents,
                     'dirname'  : weblog_dir,
                     'filesizes': filesizes})
+
+    @staticmethod
+    def band_flags_for_ms(ms, band_stats):
+        """Return the flag counts per band, per intent, as {band: [(data selection, (before, after, total))]}."""
+        selections = [('All Data', None), ('Bandpass', 'BANDPASS'), ('Flux', 'AMPLITUDE'), ('Phase', 'PHASE'),
+                      ('Target', 'TARGET')]
+        band_flags = {}
+        for band, stats in band_stats.items():
+            rows = []
+            for label, intent in selections:
+                scan_ids = None if intent is None else [scan.id for scan in ms.get_scans(scan_intent=intent)]
+                rows.append((label, utils.sum_flag_counts(stats, 'scan', ids=scan_ids)))
+            band_flags[band] = rows
+        return band_flags
+
+    @staticmethod
+    def field_flags_for_ms(ms, band_stats):
+        """Return the flag counts per CGC and science target field per band.
+
+        Returns:
+            {field group title: [(field name, {band: (before, after, total)})]}
+        """
+        groups = [('Complex Gain Calibrators', 'PHASE'), ('Science Targets', 'TARGET')]
+        field_flags = {}
+        for title, intent in groups:
+            field_flags[title] = [
+                (field.name.strip('"'), {band: utils.sum_flag_counts(stats, 'spw', fields=[field.name.strip('"')])
+                                         for band, stats in band_stats.items()})
+                for field in ms.get_fields(intent=intent)
+            ]
+        return field_flags
 
     def create_science_plots(self, context, results, correlation):
         """

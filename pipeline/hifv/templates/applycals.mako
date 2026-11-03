@@ -122,6 +122,11 @@ def total_for_agent(agent, row, mses=flags.keys()):
 def space_comma(s):
 	return ', '.join(s.split(','))
 
+def format_frac(flagged, total):
+	if total == 0:
+		return 'N/A'
+	return '%0.3f%%' % (100.0 * flagged / total)
+
 %>
 
 <%block name="title">Apply calibration tables</%block>
@@ -232,6 +237,92 @@ def space_comma(s):
 %endfor
 	</tbody>
 </table>
+
+
+
+
+% for ms in band_flags:
+<h3>Flagged data per band${': %s' % ms if len(band_flags) > 1 else ''}</h3>
+<table class="table table-bordered table-striped"
+	   summary="Flagged data per band">
+	<thead>
+		<tr>
+			<th rowspan="2">Band</th>
+			<th rowspan="2">Data Selection</th>
+			<th colspan="3">% Flagged Data</th>
+		</tr>
+		<tr>
+			<th>Before</th>
+			<th>Additional</th>
+			<th>Total</th>
+		</tr>
+	</thead>
+	<tbody>
+	% for band, rows in band_flags[ms].items():
+		% for i, (label, (before, after, total)) in enumerate(rows):
+		<tr>
+			% if i == 0:
+			<th rowspan="${len(rows)}">${band}</th>
+			% endif
+			<th>${label}</th>
+			<td>${format_frac(before, total)}</td>
+			<td>${format_frac(after - before, total)}</td>
+			<td>${format_frac(after, total)}</td>
+		</tr>
+		% endfor
+	% endfor
+	</tbody>
+</table>
+% endfor
+
+% for ms in field_flags:
+<%
+bands = list(band_flags[ms].keys())
+%>
+<h3>Flagged data per field and band${': %s' % ms if len(field_flags) > 1 else ''}</h3>
+<div class="table-responsive">
+<table class="table table-bordered table-striped table-condensed"
+	   summary="Flagged data per field and band">
+	<thead>
+		<tr>
+			<th rowspan="2">Field</th>
+	% for band in bands:
+			<th colspan="3">${band} band</th>
+	% endfor
+		</tr>
+		<tr>
+	% for band in bands:
+			<th>Before</th>
+			<th>Additional</th>
+			<th>Total</th>
+	% endfor
+		</tr>
+	</thead>
+	<tbody>
+	% for title, rows in field_flags[ms].items():
+		% if rows:
+		<tr>
+			<th colspan="${1 + 3 * len(bands)}">${title}</th>
+		</tr>
+		% endif
+		% for field, counts in rows:
+		<tr>
+			<td>${html.escape(field, True)}</td>
+			% for band in bands:
+			<% before, after, total = counts[band] %>
+			<td>${format_frac(before, total)}</td>
+			<td>${format_frac(after - before, total)}</td>
+			<td>${format_frac(after, total)}</td>
+			% endfor
+		</tr>
+		% endfor
+	% endfor
+	</tbody>
+</table>
+</div>
+% endfor
+
+
 
 % if amp_vs_freq_plots or phase_vs_freq_plots or amp_vs_time_plots or amp_vs_uv_plots or phase_vs_uv_plots or phase_vs_time_plots:
 <h2>Plots</h2>
