@@ -140,12 +140,14 @@ class Applycals(applycal.SerialIFApplycal):
 
         # run a flagdata job to find the flagged state before applycal
         if inputs.flagsum:
-            # 20170406 TN
-            # flagdata task arguments are indirectly given so that sd applycal task is
-            # able to edit them
-            summary_args = dict(vis=inputs.vis, mode='summary')
-            flagdata_summary_job = casa_tasks.flagdata(**self._get_flagsum_arg(summary_args))
-            stats_before = self._executor.execute(flagdata_summary_job)
+            # PIPE-2586: alongside the summary of the whole MS, get per-field
+            # summaries for each band in the same pass over the data
+            ms = inputs.context.observing_run.get_ms(inputs.vis)
+            spw2band = ms.get_vla_spw2band()
+            band_spws = collections.defaultdict(list)
+            for spw in ms.get_spectral_windows(science_windows_only=True):
+                band_spws[spw2band[spw.id]].append(spw.id)
+            stats_before, band_stats_before = self._run_flag_summaries(band_spws)
             stats_before['name'] = 'before'
 
         if inputs.gainmap:
@@ -296,7 +298,7 @@ class Applycals(applycal.SerialIFApplycal):
         # run a final flagdata job to get the flagging statistics after
         # application of the potentially flagged caltables
         if inputs.flagsum:
-            stats_after = self._executor.execute(flagdata_summary_job)
+            stats_after, band_stats_after = self._run_flag_summaries(band_spws)
             stats_after['name'] = 'applycal'
 
         applied = [callibrary.CalApplication(calto, calfroms)
@@ -306,6 +308,8 @@ class Applycals(applycal.SerialIFApplycal):
 
         if inputs.flagsum:
             result.summaries = [stats_before, stats_after]
+            result.band_flag_stats = {band: self._merge_flag_counts(band_stats_before[band], band_stats_after[band])
+                                      for band in band_spws}
 
         # Flagging stats by spw and antenna
         if inputs.flagsum and inputs.flagdetailedsum:
@@ -376,6 +380,50 @@ class Applycals(applycal.SerialIFApplycal):
             result.flagsummary = flagsummary
 
         return result
+
+    def _run_flag_summaries(self, band_spws: dict[str, list[int]]) -> tuple[dict, dict]:
+        """Get flagging summaries for the whole MS and per field for each band in one flagdata call.
+
+        Args:
+            band_spws: science spw IDs per band.
+
+        Returns:
+            The flagdata summary of the whole MS, and the per-field summary of each band.
+        """
+        bands = list(band_spws)
+        flagcmds = ["mode='summary' name='summary'"]
+        flagcmds.extend(f"mode='summary' spw='{','.join(str(spw) for spw in band_spws[band])}' fieldcnt=True "
+                        f"name='band_{band}'" for band in bands)
+        job = casa_tasks.flagdata(vis=self.inputs.vis, mode='list', inpfile=flagcmds, flagbackup=False)
+        reports = self._executor.execute(job)
+
+        # flagdata does not nest the report when there is only one
+        if len(flagcmds) == 1:
+            reports = {'report0': reports}
+
+        stats = reports['report0']
+        band_stats = {band: reports[f'report{i + 1}'] for i, band in enumerate(bands)}
+        return stats, band_stats
+
+    @staticmethod
+    def _merge_flag_counts(before: dict, after: dict) -> dict:
+        """Merge per-field flagdata summaries from before and after applycal.
+
+        Returns:
+            {field: {'scan': {scan_id: (flagged before, flagged after, total)},
+                     'spw': {spw_id: (flagged before, flagged after, total)}}}
+        """
+        merged = {}
+        for field, after_stats in after.items():
+            # skip the 'name' and 'type' entries of the report
+            if not isinstance(after_stats, dict):
+                continue
+            merged[field.strip('"')] = {
+                axis: {int(i): (int(before[field][axis][i]['flagged']), int(counts['flagged']), int(counts['total']))
+                       for i, counts in after_stats[axis].items()}
+                for axis in ('scan', 'spw')
+            }
+        return merged
 
     def match_fields_scans(self):
         m = self.inputs.context.observing_run.get_ms(self.inputs.vis)

@@ -27,7 +27,7 @@ LOG = infrastructure.logging.get_logger(__name__)
 SCORE_THRESHOLD_ERROR = 0.33
 SCORE_THRESHOLD_WARNING = 0.66
 SCORE_THRESHOLD_SUBOPTIMAL = 0.9
-
+SCORE_THRESHOLD_OPTIMAL = 1.0
 
 def printTsysFlags(tsystable, htmlreport):
     """Method that implements a version of printTsysFlags by Todd Hunter.

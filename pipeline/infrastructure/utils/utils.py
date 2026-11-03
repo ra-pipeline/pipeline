@@ -89,6 +89,7 @@ __all__ = [
     'relative_path',
     'remove_trailing_string',
     'string_to_val',
+    'sum_flag_counts',
     'validate_url',
     'wrap_long_str',
 ]
@@ -1367,3 +1368,20 @@ def build_refantignore(refantignore: str = "", ignorerefant: list | None = None)
 
     parts = ([refantignore.strip()] if refantignore.strip() else []) + (ignorerefant or [])
     return ",".join(parts).strip(",")
+
+
+def sum_flag_counts(band_stats: dict, axis: str, ids=None, fields=None) -> tuple[int, int, int]:
+    """Sum the (flagged before, flagged after, total) counts of a band over the given scan or spw IDs and fields.
+
+    Args:
+        band_stats: per-field flag counts of one band, as stored in the hifv_applycals result.band_flag_stats.
+        axis: 'scan' or 'spw'.
+        ids: scan or spw IDs to include; all if None.
+        fields: field names to include; all if None.
+    """
+    before = after = total = 0
+    for field in band_stats if fields is None else fields:
+        for i, (b, a, t) in band_stats.get(field, {}).get(axis, {}).items():
+            if ids is None or i in ids:
+                before, after, total = before + b, after + a, total + t
+    return before, after, total

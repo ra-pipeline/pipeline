@@ -120,7 +120,11 @@ __all__ = ['score_polintents',                                # ALMA specific
            'score_testBPdcals_refant',
            'score_testBPdcals_delay',
            'score_spw_solint',
-           'score_contdat_applied']
+           'score_contdat_applied',
+           'applycal_score_total_flagged',
+           'applycal_score_additional_flagged',
+           'applycal_score_target_vs_cgc_additional',
+           'applycal_score_specline_spws_flagged']
 
 LOG = infrastructure.logging.get_logger(__name__)
 
@@ -5782,3 +5786,147 @@ def score_contdat_applied(vis: str)-> pqa.QAScore:
         origin=origin,
         applies_to=applies_to
     )
+
+
+# PIPE-2586: VLA applycal flagging QA scores
+def applycal_score_total_flagged(ms, summary_after):
+    """Score the fraction of all data flagged after applycal."""
+    frac = summary_after['flagged'] / summary_after['total'] if summary_after['total'] else 0.0
+    limit = 0.85
+    if frac > limit:
+        score = rendererutils.SCORE_THRESHOLD_ERROR
+    else:
+        score = rendererutils.SCORE_THRESHOLD_OPTIMAL
+
+    longmsg = f'{frac:.2%} of all data is flagged after applycal.'
+    shortmsg = f'{frac:.2%} of all data flagged'
+
+    origin = pqa.QAOrigin(metric_name='score_vla_applycal_total_flagged',
+                          metric_score=frac,
+                          metric_units='Fraction of all data flagged')
+
+    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin,
+                       applies_to=pqa.TargetDataSelection(vis={ms.basename}))
+
+
+def applycal_score_additional_flagged(ms, band_stats, cgc_fields, target_fields):
+    """Score the fraction of data newly flagged by applycal for each CGC and science target in each band."""
+    limit = 0.30
+    origin_kw = dict(metric_name='score_vla_applycal_additional_flagged_per_field',
+                     metric_units='Fraction of field data newly flagged')
+
+    scores = []
+    max_frac = 0.0
+    for band, stats in band_stats.items():
+        for kind, intent, fields in (('complex gain calibrator', 'PHASE', cgc_fields),
+                                     ('science target', 'TARGET', target_fields)):
+            flagged_fields = {}
+            for field in fields:
+                before, after, total = utils.sum_flag_counts(stats, 'spw', fields=[field])
+                if not total:
+                    continue
+                frac = (after - before) / total
+                max_frac = max(max_frac, frac)
+                if frac > limit:
+                    flagged_fields[field] = frac
+            if not flagged_fields:
+                continue
+
+            details = ', '.join(f'{field} ({frac:.2%})' for field, frac in flagged_fields.items())
+            longmsg = (f'More than {limit:.0%} of the data of {kind} {details} in '
+                       f'{band} band was newly flagged by applycal.')
+            shortmsg = f'>{limit:.0%} {kind} data newly flagged'
+            applies_to = pqa.TargetDataSelection(vis={ms.basename}, intent={intent},
+                                                 field={f.id for f in ms.get_fields(name=list(flagged_fields))})
+            score = rendererutils.SCORE_THRESHOLD_ERROR
+            scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename,
+                                      origin=pqa.QAOrigin(metric_score=max(flagged_fields.values()), **origin_kw),
+                                      applies_to=applies_to))
+
+    if not scores:
+        longmsg = (f'No complex gain calibrator or science target has more than {limit:.0%} of '
+                   f'its data newly flagged by applycal in any band.')
+        shortmsg = f'No field with >{limit:.0%} data newly flagged'
+        score = rendererutils.SCORE_THRESHOLD_OPTIMAL
+        scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename,
+                                  origin=pqa.QAOrigin(metric_score=max_frac, **origin_kw),
+                                  applies_to=pqa.TargetDataSelection(vis={ms.basename})))
+    return scores
+
+
+def applycal_score_target_vs_cgc_additional(ms, band_stats, cgc_fields, target_fields):
+    """Compare the fraction of science target and CGC data newly flagged by applycal in each band."""
+    ratio_limit = 1.1
+
+    scores = []
+    for band, stats in band_stats.items():
+        target_before, target_after, target_total = utils.sum_flag_counts(stats, 'spw', fields=target_fields)
+        cgc_before, cgc_after, cgc_total = utils.sum_flag_counts(stats, 'spw', fields=cgc_fields)
+        if not target_total or not cgc_total:
+            continue
+        target_frac = (target_after - target_before) / target_total
+        cgc_frac = (cgc_after - cgc_before) / cgc_total
+
+        if target_frac > ratio_limit * cgc_frac:
+            score = rendererutils.SCORE_THRESHOLD_ERROR
+            longmsg = (f'In {band} band, applycal newly flagged {target_frac:.2%} of the '
+                       f'science target data, more than {ratio_limit} times the {cgc_frac:.2%} of the complex '
+                       f'gain calibrator data.')
+            shortmsg = f'Target vs. CGC newly flagged data ({band} band)'
+        else:
+            score = rendererutils.SCORE_THRESHOLD_OPTIMAL
+            longmsg = (f'In {band} band, applycal newly flagged {target_frac:.2%} of the '
+                       f'science target data and {cgc_frac:.2%} of the complex gain calibrator data.')
+            shortmsg = f'Target vs. CGC newly flagged data ({band} band)'
+
+        origin = pqa.QAOrigin(metric_name='score_vla_applycal_target_vs_cgc_additional_flagged',
+                              metric_score=target_frac - cgc_frac,
+                              metric_units='Fraction of target minus fraction of CGC data newly flagged')
+        applies_to = pqa.TargetDataSelection(vis={ms.basename}, intent={'PHASE', 'TARGET'})
+        scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin,
+                                  applies_to=applies_to))
+    return scores
+
+
+def applycal_score_specline_spws_flagged(ms, band_stats, target_fields):
+    """Score spectral line windows that became completely flagged on a science target."""
+    specline_spws = {spw.id for spw in ms.get_spectral_windows(science_windows_only=True)
+                     if spw.specline_window}
+    if not specline_spws:
+        return []
+
+    origin_kw = dict(metric_name='score_vla_applycal_specline_spws_flagged',
+                     metric_units='Number of science target spectral line windows newly fully flagged')
+    spw2band = ms.get_vla_spw2band()
+    scores = []
+    for band, stats in band_stats.items():
+        band_specline_spws = sorted(spw for spw in specline_spws if spw2band[spw] == band)
+        flagged = collections.defaultdict(list)
+        for field in target_fields:
+            for spw in band_specline_spws:
+                before, after, total = utils.sum_flag_counts(stats, 'spw', ids=[spw], fields=[field])
+                if total and before < total and after == total:
+                    flagged[field].append(spw)
+        if not flagged:
+            continue
+
+        details = '; '.join(f'{field} (spw {utils.find_ranges(spws)})' for field, spws in flagged.items())
+        longmsg = (f'Spectral line windows became completely flagged by applycal on science targets in '
+                   f'{band} band: {details}.')
+        shortmsg = 'Spectral line windows fully flagged on target'
+        applies_to = pqa.TargetDataSelection(vis={ms.basename}, intent={'TARGET'},
+                                             spw={spw for spws in flagged.values() for spw in spws},
+                                             field={f.id for f in ms.get_fields(name=list(flagged))})
+        score = rendererutils.SCORE_THRESHOLD_ERROR
+        n_flagged = sum(len(spws) for spws in flagged.values())
+        scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename,
+                                  origin=pqa.QAOrigin(metric_score=n_flagged, **origin_kw),
+                                  applies_to=applies_to))
+    if not scores:
+        longmsg = f'No spectral line window became completely flagged on a science target.'
+        shortmsg = 'No spectral line window fully flagged on target'
+        score = rendererutils.SCORE_THRESHOLD_OPTIMAL
+        scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename,
+                                  origin=pqa.QAOrigin(metric_score=0, **origin_kw),
+                                  applies_to=pqa.TargetDataSelection(vis={ms.basename})))
+    return scores

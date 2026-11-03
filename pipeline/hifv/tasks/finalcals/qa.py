@@ -4,6 +4,9 @@ import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
+from pipeline.h.tasks.applycal.applycal import ApplycalResults
+
+from . import Applycals
 from . import Finalcals
 from . import FinalcalsResults
 
@@ -81,3 +84,39 @@ class FinalcalsListQAHandler(pqa.QAPlugin):
         # own QAscore list
         collated = utils.flatten([r.qa.pool for r in result])
         result.qa.pool.extend(collated)
+
+
+class ApplycalsQAHandler(pqa.QAPlugin):
+    """
+    PIPE-2586: VLA-specific QA on the data flagged by hifv_applycals.
+    """
+    result_cls = ApplycalResults
+    child_cls = None
+    generating_task = Applycals
+
+    def handle(self, context, result):
+        vis = result.inputs['vis']
+        ms = context.observing_run.get_ms(vis)
+
+        scores = []
+        summaries = getattr(result, 'summaries', None)
+        if summaries:
+            # If > 85% of all data are flagged: QA score < 0.5
+            scores.append(qacalc.applycal_score_total_flagged(ms, summaries[-1]))
+
+        band_stats = getattr(result, 'band_flag_stats', None)
+        if band_stats:
+            # Complex gain calibrator (CGC) and science target fields
+            cgc_fields = [f.name.strip('"') for f in ms.get_fields(intent='PHASE')]
+            target_fields = [f.name.strip('"') for f in ms.get_fields(intent='TARGET')]
+
+            # If >30% of additional data flagged per science target or per CGC (in any band): QA score < 0.5
+            scores.extend(qacalc.applycal_score_additional_flagged(ms, band_stats, cgc_fields, target_fields))
+
+            # If target flag change percentage > 1.1x the CGC flagging change: QA score < 0.5
+            scores.extend(qacalc.applycal_score_target_vs_cgc_additional(ms, band_stats, cgc_fields, target_fields))
+
+            # If spectral line windows become completely flagged on science target: QA score < 0.5
+            scores.extend(qacalc.applycal_score_specline_spws_flagged(ms, band_stats, target_fields))
+
+        result.qa.pool.extend(scores)
