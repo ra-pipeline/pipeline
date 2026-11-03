@@ -255,6 +255,8 @@ def _execute_task(task: Callable, task_args: dict) -> Any:
 
     try:
         result = task(**task_args)
+    except exceptions.PipelineEarlyExit:
+        raise
     except Exception:
         # Log message if an exception occurred that was not handled by
         # standardtask template (not turned into failed task result).
@@ -301,7 +303,11 @@ def run_named_tasks(tasks: list[tuple[str, dict[str, Any]]]) -> Context:
 
     for task_name, task_args in tasks:
         task = cli.get_pipeline_task_with_name(task_name=task_name)
-        result = _execute_task(task, task_args)
+        try:
+            result = _execute_task(task, task_args)
+        except exceptions.PipelineEarlyExit as exc:
+            LOG.info('Pipeline task %s requested an early exit: %s', task_name, exc)
+            break
 
         # If an unhandled exception occurred, return context early
         if result is None:
@@ -391,6 +397,8 @@ def reduce(
 
     except StopIteration:
         pass
+    except exceptions.PipelineEarlyExit as exc:
+        LOG.info('Pipeline recipe requested an early exit: %s', exc)
     finally:
         LOG.info('Saving context...')
         cli.h_save()
