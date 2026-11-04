@@ -20,7 +20,7 @@ Editing anything under `docs/`, adding architecture diagrams, or updating refere
 pixi run -e docs build-docs        # Full clean Sphinx build
 pixi run -e docs build-docs-fast  # Incremental (reuses doctrees and autosummary stubs)
 pixi run -e docs build-pdfs       # Task Reference Manual & User Guide (LaTeX)
-pixi run -e docs update-references# Refresh BibTeX from NASA/ADS public library
+pixi run -e docs update-references# Refresh BibTeX from NASA SciX (ADS) public library
 ```
 
 ## Diagrams

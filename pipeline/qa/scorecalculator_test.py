@@ -1,14 +1,16 @@
-"""
-scorecalculator_test.py : Unit tests for "qa/scorecalculator.py".
+"""Unit tests for the qa/scorecalculator.py module.
 
-Unit tests for "qa/scorecalculator.py"
+Covers line range and channel heuristics, QA score calculations, the log_qa
+decorator, and behavior when DISABLE_WEBLOG or DISABLE_QA is enabled.
 """
 
-import unittest.mock as mock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.qa.scorecalculator as qacalc
+from pipeline.infrastructure import basetask
 from pipeline.infrastructure.renderer import rendererutils
 
 
@@ -103,6 +105,93 @@ def test_channel_ranges_for_image(edge: tuple[int, int], nchan: int, sideband: i
     assert ranges_image == expected
 
 
+# --- Tests for log_qa decorator, DISABLE_WEBLOG, and DISABLE_QA handling ---
+
+
+@pytest.mark.parametrize(
+    'return_val, expected_infos, expected_warns',
+    [
+        # Single score: optimal vs suboptimal
+        (pqa.QAScore(1.0, longmsg='Opt', shortmsg='Opt'), ['Opt'], []),
+        (pqa.QAScore(0.5, longmsg='Sub', shortmsg='Sub'), [], ['Sub']),
+        # List of scores: verify each score is logged rather than only the first
+        ([pqa.QAScore(1.0, longmsg='S1'), pqa.QAScore(0.3, longmsg='S2')], ['S1'], ['S2']),
+        # Tuple with non-QAScore items
+        ((pqa.QAScore(0.95, longmsg='TupleOpt'), 123, 'extra'), ['TupleOpt'], []),
+        # Empty collections, None, and non-score returns
+        ([], [], []),
+        ((), [], []),
+        (None, [], []),
+        (0.85, [], []),
+    ],
+)
+def test_log_qa_weblog_disabled(return_val, expected_infos, expected_warns, monkeypatch):
+    monkeypatch.setattr(basetask, 'DISABLE_WEBLOG', True)
+
+    @qacalc.log_qa
+    def dummy(self):
+        return return_val
+
+    with patch.object(qacalc.LOG, 'info') as mock_info, patch.object(qacalc.LOG, 'warning') as mock_warn:
+        assert dummy(None) == return_val
+        assert [c.args[0] for c in mock_info.call_args_list] == expected_infos
+        assert [c.args[0] for c in mock_warn.call_args_list] == expected_warns
+
+
+def test_log_qa_weblog_enabled(monkeypatch):
+    monkeypatch.setattr(basetask, 'DISABLE_WEBLOG', False)
+    score = pqa.QAScore(0.5, longmsg='Sub', shortmsg='Sub')
+
+    @qacalc.log_qa
+    def dummy(self):
+        return score
+
+    with patch.object(qacalc.LOG, 'info') as mock_info, patch.object(qacalc.LOG, 'warning') as mock_warn:
+        assert dummy(None) is score
+        mock_info.assert_not_called()
+        mock_warn.assert_not_called()
+
+
+def test_score_amp_vs_time_plots_weblog_disabled(monkeypatch):
+    monkeypatch.setattr(basetask, 'DISABLE_WEBLOG', True)
+    assert qacalc.score_amp_vs_time_plots(None, None) == []
+
+
+class DummyResults(basetask.Results):
+    def __init__(self):
+        super().__init__()
+        self.stage_number = 1
+        self.timestamps = None
+        self.inputs = {}
+
+    def merge_with_context(self, context):
+        pass
+
+
+@pytest.mark.parametrize('disable_qa, should_call', [(True, False), (False, True)])
+def test_results_accept_respects_disable_qa(disable_qa, should_call, monkeypatch):
+    monkeypatch.setattr(basetask, 'DISABLE_WEBLOG', True)
+    monkeypatch.setattr(basetask, 'DISABLE_QA', disable_qa)
+
+    context = MagicMock()
+    context.results = []
+    results = DummyResults()
+
+    with (
+        patch.object(pqa.qa_registry, 'do_qa') as mock_do_qa,
+        patch.object(
+            basetask.ResultsProxy, 'write', autospec=True, side_effect=lambda self, r: setattr(self, 'uuid', r.uuid)
+        ),
+        patch('pipeline.infrastructure.basetask.write_pipeline_casa_tasks'),
+        patch('pipeline.infrastructure.eventbus.send_message'),
+    ):
+        results.accept(context)
+        if should_call:
+            mock_do_qa.assert_called_once_with(context, results)
+        else:
+            mock_do_qa.assert_not_called()
+
+
 @pytest.mark.parametrize(
     'flagged, expected',
     [
@@ -112,7 +201,7 @@ def test_channel_ranges_for_image(edge: tuple[int, int], nchan: int, sideband: i
     ]
 )
 def test_applycal_score_total_flagged(flagged, expected):
-    score = qacalc.applycal_score_total_flagged(mock.MagicMock(), {'flagged': flagged, 'total': 100})
+    score = qacalc.applycal_score_total_flagged(MagicMock(), {'flagged': flagged, 'total': 100})
     assert score.score == expected
 
 
@@ -131,7 +220,7 @@ def test_applycal_score_total_flagged(flagged, expected):
 )
 def test_applycal_score_additional_flagged(cgc_counts, target_counts, expected):
     band_stats = {'L': {'CGC': {'spw': {0: cgc_counts}}, 'T1': {'spw': {0: target_counts}}}}
-    scores = qacalc.applycal_score_additional_flagged(mock.MagicMock(), band_stats, ['CGC'], ['T1'])
+    scores = qacalc.applycal_score_additional_flagged(MagicMock(), band_stats, ['CGC'], ['T1'])
     assert [s.score for s in scores] == expected
 
 
@@ -148,7 +237,7 @@ def test_applycal_score_additional_flagged(cgc_counts, target_counts, expected):
 )
 def test_applycal_score_target_vs_cgc_additional(cgc_counts, target_counts, expected):
     band_stats = {'L': {'CGC': {'spw': {0: cgc_counts}}, 'T1': {'spw': {0: target_counts}}}}
-    scores = qacalc.applycal_score_target_vs_cgc_additional(mock.MagicMock(), band_stats, ['CGC'], ['T1'])
+    scores = qacalc.applycal_score_target_vs_cgc_additional(MagicMock(), band_stats, ['CGC'], ['T1'])
     assert [s.score for s in scores] == expected
 
 
@@ -164,8 +253,8 @@ def test_applycal_score_target_vs_cgc_additional(cgc_counts, target_counts, expe
     ]
 )
 def test_applycal_score_specline_spws_flagged(specline_window, target_counts, expected):
-    ms = mock.MagicMock()
-    ms.get_spectral_windows.return_value = [mock.MagicMock(id=0, specline_window=specline_window)]
+    ms = MagicMock()
+    ms.get_spectral_windows.return_value = [MagicMock(id=0, specline_window=specline_window)]
     ms.get_vla_spw2band.return_value = {0: 'L'}
     band_stats = {'L': {'T1': {'spw': {0: target_counts}}}}
     scores = qacalc.applycal_score_specline_spws_flagged(ms, band_stats, ['T1'])
