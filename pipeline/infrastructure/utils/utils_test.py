@@ -16,7 +16,7 @@ from pipeline.infrastructure.utils import caltable_tools
 from .utils import find_ranges, dict_merge, are_equal, approx_equal, flagged_intervals, \
     get_casa_quantity, fieldname_for_casa, fieldname_clean, \
     get_field_accessor, get_field_identifiers, get_receiver_type_for_spws, place_repr_source_first, \
-    get_taskhistory_fromimage, list_to_str, build_refantignore, wrap_long_str
+    get_taskhistory_fromimage, list_to_str, build_refantignore, wrap_long_str, sum_flag_counts
 
 if TYPE_CHECKING:
     from typing import Any
@@ -353,3 +353,18 @@ def test_build_refantignore(refantignore, ignorerefant, expected):
 def test_wrap_long_str(item_str, kwargs, expected):
     """Test wrap_long_str() and verify it is exported in pipeline.infrastructure.utils."""
     assert wrap_long_str(item_str, **kwargs) == expected
+
+
+@pytest.mark.parametrize(
+    'ids, fields, expected',
+    [
+        (None, None, (10, 80, 300)),
+        ([0], None, (10, 30, 200)),
+        (None, ['T1'], (10, 80, 200)),
+        (None, ['missing'], (0, 0, 0)),
+    ]
+)
+def test_sum_flag_counts(ids, fields, expected):
+    band_stats = {'T1': {'spw': {0: (10, 30, 100), 1: (0, 50, 100)}},
+                  'T2': {'spw': {0: (0, 0, 100)}}}
+    assert sum_flag_counts(band_stats, 'spw', ids=ids, fields=fields) == expected

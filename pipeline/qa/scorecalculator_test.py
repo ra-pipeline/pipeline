@@ -4,9 +4,12 @@ scorecalculator_test.py : Unit tests for "qa/scorecalculator.py".
 Unit tests for "qa/scorecalculator.py"
 """
 
+import unittest.mock as mock
+
 import pytest
 
 import pipeline.qa.scorecalculator as qacalc
+from pipeline.infrastructure.renderer import rendererutils
 
 
 @pytest.mark.parametrize(
@@ -98,3 +101,72 @@ def test_examine_sd_wide_lines(lines: list[tuple[int, int]], nchan: int, edge: t
 def test_channel_ranges_for_image(edge: tuple[int, int], nchan: int, sideband: int, ranges: list[tuple[int, int]], expected: list[tuple[int, int]]):
     ranges_image = qacalc.channel_ranges_for_image(edge, nchan, sideband, ranges)
     assert ranges_image == expected
+
+
+@pytest.mark.parametrize(
+    'flagged, expected',
+    [
+        (10, rendererutils.SCORE_THRESHOLD_OPTIMAL),
+        (85, rendererutils.SCORE_THRESHOLD_OPTIMAL),
+        (86, rendererutils.SCORE_THRESHOLD_ERROR),
+    ]
+)
+def test_applycal_score_total_flagged(flagged, expected):
+    score = qacalc.applycal_score_total_flagged(mock.MagicMock(), {'flagged': flagged, 'total': 100})
+    assert score.score == expected
+
+
+@pytest.mark.parametrize(
+    'cgc_counts, target_counts, expected',
+    [
+        ((0, 10, 100), (0, 10, 100), [rendererutils.SCORE_THRESHOLD_OPTIMAL]),
+        ((0, 10, 100), (0, 30, 100), [rendererutils.SCORE_THRESHOLD_OPTIMAL]),
+        ((0, 10, 100), (0, 31, 100), [rendererutils.SCORE_THRESHOLD_ERROR]),
+        ((0, 31, 100), (0, 10, 100), [rendererutils.SCORE_THRESHOLD_ERROR]),
+        # one score for the CGC and one for the target
+        ((0, 31, 100), (0, 31, 100), [rendererutils.SCORE_THRESHOLD_ERROR, rendererutils.SCORE_THRESHOLD_ERROR]),
+        # data flagged before applycal does not count
+        ((0, 10, 100), (50, 60, 100), [rendererutils.SCORE_THRESHOLD_OPTIMAL]),
+    ]
+)
+def test_applycal_score_additional_flagged(cgc_counts, target_counts, expected):
+    band_stats = {'L': {'CGC': {'spw': {0: cgc_counts}}, 'T1': {'spw': {0: target_counts}}}}
+    scores = qacalc.applycal_score_additional_flagged(mock.MagicMock(), band_stats, ['CGC'], ['T1'])
+    assert [s.score for s in scores] == expected
+
+
+@pytest.mark.parametrize(
+    'cgc_counts, target_counts, expected',
+    [
+        ((0, 10, 100), (0, 10, 100), [rendererutils.SCORE_THRESHOLD_OPTIMAL]),
+        ((0, 10, 100), (0, 11, 100), [rendererutils.SCORE_THRESHOLD_OPTIMAL]),
+        ((0, 10, 100), (0, 12, 100), [rendererutils.SCORE_THRESHOLD_ERROR]),
+        ((0, 0, 100), (0, 0, 100), [rendererutils.SCORE_THRESHOLD_OPTIMAL]),
+        # no CGC data in the band
+        ((0, 0, 0), (0, 10, 100), []),
+    ]
+)
+def test_applycal_score_target_vs_cgc_additional(cgc_counts, target_counts, expected):
+    band_stats = {'L': {'CGC': {'spw': {0: cgc_counts}}, 'T1': {'spw': {0: target_counts}}}}
+    scores = qacalc.applycal_score_target_vs_cgc_additional(mock.MagicMock(), band_stats, ['CGC'], ['T1'])
+    assert [s.score for s in scores] == expected
+
+
+@pytest.mark.parametrize(
+    'specline_window, target_counts, expected',
+    [
+        (True, (0, 10, 100), [rendererutils.SCORE_THRESHOLD_OPTIMAL]),
+        (True, (0, 100, 100), [rendererutils.SCORE_THRESHOLD_ERROR]),
+        # already fully flagged before applycal
+        (True, (100, 100, 100), [rendererutils.SCORE_THRESHOLD_OPTIMAL]),
+        # continuum windows are not scored
+        (False, (0, 100, 100), []),
+    ]
+)
+def test_applycal_score_specline_spws_flagged(specline_window, target_counts, expected):
+    ms = mock.MagicMock()
+    ms.get_spectral_windows.return_value = [mock.MagicMock(id=0, specline_window=specline_window)]
+    ms.get_vla_spw2band.return_value = {0: 'L'}
+    band_stats = {'L': {'T1': {'spw': {0: target_counts}}}}
+    scores = qacalc.applycal_score_specline_spws_flagged(ms, band_stats, ['T1'])
+    assert [s.score for s in scores] == expected
