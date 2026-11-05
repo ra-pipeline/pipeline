@@ -13,6 +13,11 @@ on:
         required: false
         default: "default"
         type: string
+      update_casa:
+        description: "Update CASA packages within manifest constraints before testing"
+        required: false
+        default: false
+        type: boolean
       test_data:
         description: "Type of test data to checkout (e.g., 'unit')"
         required: false
@@ -92,6 +97,15 @@ jobs:
           measures_auto_update = True
           data_auto_update = True
           PYEOF
+
+      - name: Update CASA snapshots
+        if: inputs.update_casa
+        shell: bash
+        env:
+          CASA_PIXI_ENV: ${{ inputs.pixi_env }}
+        run: |
+          pixi update --environment "$CASA_PIXI_ENV" \
+            casatools casatasks casashell casaplotms casampi
 
       - name: Cache casarundata
         uses: actions/cache@v5

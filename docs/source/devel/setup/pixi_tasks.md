@@ -51,6 +51,30 @@ Please note that updating `certifi` alone does not update pip's bundled certific
 
 ---
 
+## CASA Snapshots in GitHub CI
+
+The reusable GitHub CI workflow installs the committed lockfile first. Its optional
+`update_casa` boolean defaults to `false`. When enabled, it runs:
+
+```bash
+pixi update --environment <environment> casatools casatasks casashell casaplotms casampi
+```
+
+The unit-test workflow enables this step for development pushes and PRs. PRs
+use the target branch to decide the mode. Pushes to `release/*`, PRs targeting
+`release/*`, tags, and manual unit-test runs use the committed lockfile instead.
+Documentation builds, including Read the Docs, also keep locked installs.
+Existing push filters still apply; feature branches are tested through PRs.
+
+Snapshot updates stay within the manifest constraints and affect only the CI
+checkout. For example, `casashell ==6.7.4.*` stays within the 6.7.4 branch. To
+adopt tested snapshots for a release, update and commit `pixi.lock` through a
+reviewed change. Run the unit-test workflow manually on that revision for locked
+validation before releasing; a development snapshot test may use different
+versions from the committed lockfile.
+
+---
+
 ## CASA Versions & Python Variants
 
 Each [Pixi environment](https://pixi.prefix.dev/latest/workspace/environment/) pins a specific CASA release.  The `default` environment
