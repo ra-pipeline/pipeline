@@ -173,13 +173,14 @@ jobs:
           fi
 
           echo "Pulling LFS test files..."
-          retry_cmd git lfs pull || {
-            if [ -d "pl-unittest" ]; then
-              echo "::warning::LFS pull failed, but pl-unittest directory exists from cache. Proceeding with caution."
-            else
-              echo "::error::LFS pull failed and no cached test data is available."
-              exit 1
-            fi
+          LFS_INCLUDE=$(
+            sed 's|$|/**|' "$GITHUB_WORKSPACE/.github/testdata-paths.txt" |
+              paste -sd, -
+          )
+          retry_cmd git lfs pull --include="$LFS_INCLUDE" --exclude="" || {
+            echo "::error::Failed to download required LFS test data."
+            git lfs logs last || true
+            exit 1
           }
 
       - name: Run Pixi Task
