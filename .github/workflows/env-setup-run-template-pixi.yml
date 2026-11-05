@@ -48,28 +48,28 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Install Pixi
-        uses: prefix-dev/setup-pixi@v0.10.2
-        with:
-          pixi-version: v0.71.0
-          environments: ${{ inputs.pixi_env }}
-          # Caching is disabled to always use the latest dev snapshots on demand.
-          cache: false
-          # To enable caching in future, set `cache: true` and define an appropriate cache key,
-          # for example: v1-${{ runner.os }}-${{ inputs.pixi_env }}.
-          locked: false
-          activate-environment: ${{ inputs.pixi_env }}
-
-      - name: Enable post-link scripts
-        shell: bash
-        run: pixi config set --local run-post-link-scripts insecure
-
       - name: Install System Dependencies (Ubuntu)
         if: runner.os == 'Linux'
         shell: bash
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y git xvfb
+          sudo apt-get install -y ca-certificates git xvfb
+
+      - name: Install Pixi
+        uses: prefix-dev/setup-pixi@v0.10.2
+        with:
+          pixi-version: v0.83.0
+          environments: ${{ inputs.pixi_env }}
+          # Use the reviewed lockfile; refresh dev snapshots with pixi update.
+          cache: false
+          # To enable caching in future, set `cache: true` and define an appropriate cache key,
+          # for example: v1-${{ runner.os }}-${{ inputs.pixi_env }}.
+          locked: true
+          activate-environment: ${{ inputs.pixi_env }}
+
+      - name: Enable post-link scripts
+        shell: bash
+        run: pixi config set --local run-post-link-scripts insecure
 
       - name: Install System Dependencies (macOS)
         if: runner.os == 'macOS'

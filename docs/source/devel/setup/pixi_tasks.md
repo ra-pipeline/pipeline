@@ -25,13 +25,28 @@ git checkout PIPE-1234-my-feature      # existing branch
 Install pixi (one-time, no root required):
 
 ```bash
-curl -fsSL https://pixi.sh/install.sh | bash
+curl -fsSL https://pixi.sh/install.sh | PIXI_VERSION=v0.83.0 bash
 ```
 
 Install the environment:
 
 ```bash
-pixi install          # resolves and downloads all deps into .pixi/envs/
+pixi install --locked # installs reviewed dependencies into .pixi/envs/
+```
+
+---
+
+## Certificate Security
+
+```{important}
+To mitigate the [eMudhra/emSign incident](https://emudhra.we-have-a-problem.com/),
+use Pixi >=0.82.1. The project manifest requires patched versions of Python,
+pip, certifi, and the CA bundle. Also update host OS certificates and download
+tools to patched versions.
+
+For other Python environments, follow the secure upgrade steps in the
+[Python advisory](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576).
+Please note that updating `certifi` alone does not update pip's bundled certificates.
 ```
 
 ---
