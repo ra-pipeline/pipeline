@@ -4,12 +4,16 @@ on:
   push:
     branches:
       - "main"
+      - "release/**"
+    tags:
+      - "**"
     paths:
       - "docs/**"
       - "pipeline/**"
       - "tests/**"
       - "scripts/**"
       - ".github/workflows/**"
+      - ".github/testdata-paths.txt"
       - "pyproject.toml"
       - "pixi.lock"
       - "MANIFEST.in"
@@ -19,9 +23,9 @@ on:
   # Allow manual triggering
   workflow_dispatch:
 
-# Cancel in-progress runs for the same branch
+# Cancel older runs for the same event and PR or ref.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -42,6 +46,8 @@ jobs:
     with:
       os: ${{ matrix.os }}
       pixi_env: ${{ matrix.pixi_env }}
+      # PRs use the target branch; tags and manual validation use the committed lockfile.
+      update_casa: ${{ github.event_name != 'workflow_dispatch' && github.ref_type != 'tag' && !startsWith(github.base_ref || github.ref_name, 'release/') }}
       test_data: unit
       task: test-unit
       # Only upload artifacts for a single reference configuration:

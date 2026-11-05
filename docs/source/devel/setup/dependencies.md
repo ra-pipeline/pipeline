@@ -127,8 +127,9 @@ and availability are tracked via two status monitors:
 
 ### Environment Management
 
-- **Pixi** (>= v0.71.0): Multi-language environment and package manager. The project uses the "Rich Platforms" syntax (inline OS version constraints) which requires Pixi v0.71.0+.
+- **Pixi** (>= v0.82.1): Multi-language environment and package manager. The project uses the "Rich Platforms" syntax (inline OS version constraints) which requires Pixi v0.71.0+.
   - Reference: [Rich Platforms documentation](https://pixi.sh/latest/features/rich-platforms/)
+  - The security minimum is v0.82.1; see [certificate security](pixi_tasks.md#certificate-security).
   - Set via `pixi-version` in GitHub Actions workflows and required for local development with `pixi run` commands.
 
 ### Packaging

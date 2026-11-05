@@ -25,14 +25,53 @@ git checkout PIPE-1234-my-feature      # existing branch
 Install pixi (one-time, no root required):
 
 ```bash
-curl -fsSL https://pixi.sh/install.sh | bash
+curl -fsSL https://pixi.sh/install.sh | PIXI_VERSION=v0.83.0 bash
 ```
 
 Install the environment:
 
 ```bash
-pixi install          # resolves and downloads all deps into .pixi/envs/
+pixi install --locked # installs reviewed dependencies into .pixi/envs/
 ```
+
+---
+
+## Certificate Security
+
+```{important}
+To mitigate the [eMudhra/emSign incident](https://emudhra.we-have-a-problem.com/),
+use Pixi >=0.82.1. The project manifest requires patched versions of Python,
+pip, certifi, and the CA bundle. Also update host OS certificates and download
+tools to patched versions.
+
+For other Python environments, follow the secure upgrade steps in the
+[Python advisory](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576).
+Please note that updating `certifi` alone does not update pip's bundled certificates.
+```
+
+---
+
+## CASA Snapshots in GitHub CI
+
+The reusable GitHub CI workflow installs the committed lockfile first. Its optional
+`update_casa` boolean defaults to `false`. When enabled, it runs:
+
+```bash
+pixi update --environment <environment> casatools casatasks casashell casaplotms casampi
+```
+
+The unit-test workflow enables this step for development pushes and PRs. PRs
+use the target branch to decide the mode. Pushes to `release/*`, PRs targeting
+`release/*`, tags, and manual unit-test runs use the committed lockfile instead.
+Documentation builds, including Read the Docs, also keep locked installs.
+Existing push filters still apply; feature branches are tested through PRs.
+
+Snapshot updates stay within the manifest constraints and affect only the CI
+checkout. For example, `casashell ==6.7.4.*` stays within the 6.7.4 branch. To
+adopt tested snapshots for a release, update and commit `pixi.lock` through a
+reviewed change. Run the unit-test workflow manually on that revision for locked
+validation before releasing; a development snapshot test may use different
+versions from the committed lockfile.
 
 ---
 
