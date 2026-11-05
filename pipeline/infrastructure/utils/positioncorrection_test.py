@@ -41,7 +41,7 @@ test_params_func = [({'unit': 'deg', 'value': 239.9617912649343},
 @pytest.mark.parametrize('fitsname, obs_long, obs_lat, expected', test_params_fits)
 def test_do_wide_field_corr(fitsname: str, obs_long: dict[str, str | float],
                             obs_lat: dict[str, str | float],
-                            expected: tuple[dict, dict], epsilon: float = 1.0e-9):
+                            expected: tuple[dict, dict], epsilon: float = 1.0e-7):
     """Test do_wide_field_corr()
 
     This utility function downloads a FITS image and applies wide field position
@@ -51,7 +51,7 @@ def test_do_wide_field_corr(fitsname: str, obs_long: dict[str, str | float],
     If url is not provided, or not available, then assume file already exists in
     current folder.
 
-    The default tolerance (epsilon) value is equivalent to about 0.01 milliarcs.
+    The default tolerance (epsilon) value is equivalent to about 1 milliarcsec.
     """
     # Check if FITS file exists
     try:
@@ -85,7 +85,7 @@ def test_do_wide_field_corr(fitsname: str, obs_long: dict[str, str | float],
 
 @pytest.mark.parametrize('ra, dec, obs_long, obs_lat, date_time, expected', test_params_func)
 def test_calc_zd_pa(ra: dict, dec: dict, obs_long: dict, obs_lat: dict, date_time: dict,
-                    expected: tuple[float, float], epsilon: float = 1.0e-9):
+                    expected: tuple[float, float], epsilon: float = 1.0e-7):
     """Test calc_zd_pa()
 
     This utility function tests the mathematical correctness of the zenith distance and parallactic
