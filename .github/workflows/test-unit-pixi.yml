@@ -13,6 +13,7 @@ on:
       - "tests/**"
       - "scripts/**"
       - ".github/workflows/**"
+      - ".github/testdata-paths.txt"
       - "pyproject.toml"
       - "pixi.lock"
       - "MANIFEST.in"

@@ -142,8 +142,9 @@ jobs:
         id: cache-testdata
         with:
           path: pipeline-testdata
-          key: pipeline-testdata-unit-${{ steps.testdata-commit.outputs.sha }}
+          key: pipeline-testdata-unit-${{ hashFiles('.github/testdata-paths.txt') }}-${{ steps.testdata-commit.outputs.sha }}
           restore-keys: |
+            pipeline-testdata-unit-${{ hashFiles('.github/testdata-paths.txt') }}-
             pipeline-testdata-unit-
 
       - name: Checkout and LFS pull test data
@@ -158,11 +159,11 @@ jobs:
             echo "No existing cache found. Performing sparse clone..."
             retry_cmd git clone --filter=blob:none --sparse "$TESTDATA_URL" pipeline-testdata
             cd pipeline-testdata
-            git sparse-checkout set pl-unittest
+            git sparse-checkout set --stdin < "$GITHUB_WORKSPACE/.github/testdata-paths.txt"
           else
             echo "Existing cache restored. Updating incrementally..."
             cd pipeline-testdata
-            git sparse-checkout set pl-unittest
+            git sparse-checkout set --stdin < "$GITHUB_WORKSPACE/.github/testdata-paths.txt"
             retry_cmd git remote set-url origin "$TESTDATA_URL" || true
             if ! retry_cmd git fetch origin; then
               echo "::warning::Incremental fetch from Bitbucket failed; using restored cache data."
