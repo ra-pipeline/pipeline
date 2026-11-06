@@ -111,7 +111,9 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             stats = job.execute()  # returns stat in meter
 
             # Get means of spectral windows with data in the selected uvrange
-            spws_means = [v['mean'] for (k, v) in stats.items() if np.isfinite(v['mean'])]
+            spws_means = [v['mean'] for v in stats.values() if v.get('npts', 0) > 0 and np.isfinite(v['mean'])]
+            if not spws_means:
+                raise ValueError(f'No unflagged data in uvrange {uvrange}')
 
             # Determine mean and 95% percentile
             mean = np.mean(spws_means)
@@ -188,6 +190,11 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             LOG.debug(e)
             LOG.info("Data selection error   Field: {!s}, spw: {!s}.   uvrange set to >0.0klambda ".format(
                 str(field), real_spwids_str))
+            return '>0.0klambda', 1.0
+
+        if mean_MBL <= 0.0:
+            LOG.info("Mean amplitude in uvrange %s is %s for Field: %s, spw: %s. uvrange set to >0.0klambda",
+                     uvrange_MBL, mean_MBL, field, real_spwids_str)
             return '>0.0klambda', 1.0
 
         # Compare amplitudes and decide on return value
