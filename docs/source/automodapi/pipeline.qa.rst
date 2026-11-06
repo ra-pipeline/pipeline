@@ -3,12 +3,15 @@ pipeline.qa
 
 QA score calculation modules and quality assurance algorithms.
 
+.. note::
+   ``pipeline.qa.scorecalculator`` is maintained as a backward-compatible facade
+   re-exporting all scoring functions from the specialized modules below.
+
 .. autosummary::
    :toctree: ../_autosummary
    :template: custom-module-template.rst
    :recursive:
 
-   pipeline.qa.scorecalculator
    pipeline.qa.common_scores
    pipeline.qa.hif_scores
    pipeline.qa.hifa_scores
