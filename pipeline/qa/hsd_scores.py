@@ -13,7 +13,7 @@ from scipy import interpolate
 
 import pipeline.infrastructure.pipelineqa as pqa
 from pipeline import infrastructure
-from pipeline.infrastructure import casa_tasks, casa_tools, utils
+from pipeline.infrastructure import basetask, casa_tasks, casa_tools, utils
 from pipeline.qa.common_scores import (
     linear_score,
     log_qa,
@@ -60,7 +60,6 @@ __all__ = [
     'score_sdimage_masked_pixels',
     'score_sdimage_sensitivity_ratio',
     'score_sdtotal_data_flagged',
-    'score_sdtotal_data_flagged_old',
     'select_deviation_masks',
 ]
 
@@ -108,43 +107,6 @@ def score_sdtotal_data_flagged(
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=selection)
 
 
-@log_qa
-def score_sdtotal_data_flagged_old(name, ant, spw, pol, frac_flagged, field=None):
-    """Calculate a score for the flagging task based on the total fraction of
-    data flagged.
-
-    0%-5% flagged   -> 1
-    5%-50% flagged  -> 0.5
-    50-100% flagged -> 0
-    """
-    if frac_flagged > 0.5:
-        score = 0
-    else:
-        score = linear_score(frac_flagged, 0.05, 0.5, 1.0, 0.5)
-
-    percent = 100.0 * frac_flagged
-    if field is None:
-        longmsg = '%0.2f%% of data in %s (Ant=%s, SPW=%d, Pol=%d) was flagged' % (percent, name, ant, spw, pol)
-    else:
-        longmsg = '%0.2f%% of data in %s (Ant=%s, Field=%s, SPW=%d, Pol=%s) was flagged' % (
-            percent,
-            name,
-            ant,
-            field,
-            spw,
-            pol,
-        )
-    shortmsg = '%0.2f%% data flagged' % percent
-
-    origin = pqa.QAOrigin(
-        metric_name='score_sdtotal_data_flagged_old',
-        metric_score=frac_flagged,
-        metric_units='Fraction of data newly flagged',
-    )
-
-    return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=os.path.basename(name), origin=origin)
-
-
 def get_line_ranges(lines: list[list[float | bool]]) -> list[tuple[int, int]]:
     """Get valid line ranges from list of line properties.
 
@@ -167,7 +129,6 @@ def get_line_ranges(lines: list[list[float | bool]]) -> list[tuple[int, int]]:
     return line_ranges
 
 
-@log_qa
 def examine_sd_edge_lines(line_ranges: list[tuple[int, int]], nchan: int, edge: tuple[int, int] = (0, 0)) -> float:
     """Examine the existence of lines at edge channels.
 
@@ -191,7 +152,6 @@ def examine_sd_edge_lines(line_ranges: list[tuple[int, int]], nchan: int, edge: 
     return chan_leftmost <= edge[0] or nchan - 1 - edge[1] <= chan_rightmost
 
 
-@log_qa
 def examine_sd_wide_lines(line_ranges: list[tuple[int, int]], nchan: int, edge: tuple[int, int] = (0, 0)) -> float:
     """Examine the existence of wide lines.
 
@@ -961,6 +921,7 @@ def score_sdimage_masked_pixels(context: Context, result: SDImagingResultItem) -
     return pqa.QAScore(score, longmsg=lmsg, shortmsg=smsg, origin=origin, applies_to=selection)
 
 
+@log_qa
 def score_sd_line_emission_off_range_at_peak(context: Context, result: SDImagingResultItem) -> pqa.QAScore:
     """Evaluate QA score based on the detection of off-line-range emission at peak.
 
@@ -998,6 +959,7 @@ def score_sd_line_emission_off_range_at_peak(context: Context, result: SDImaging
     return pqa.QAScore(score, longmsg=lmsg, shortmsg=smsg, origin=origin, applies_to=selection)
 
 
+@log_qa
 def score_sd_line_emission_off_range_extended(context: Context, result: SDImagingResultItem) -> pqa.QAScore:
     """Evaluate QA score based on the detetion of off-line-range extended emission.
 
@@ -1269,6 +1231,10 @@ def score_amp_vs_time_plots(context: Context, result: SDApplycalResults) -> list
     Returns:
         A List which contains QAScore objects..
     """
+    if basetask.DISABLE_WEBLOG:
+        # skip scoring if weblog is disabled
+        return []
+
     vis = os.path.basename(result.inputs['vis'])
     ms = context.observing_run.get_ms(vis)
     spwids = [spw.id for spw in ms.get_spectral_windows()]
@@ -1345,6 +1311,7 @@ def score_amp_vs_time_plots(context: Context, result: SDApplycalResults) -> list
     return scores
 
 
+@log_qa
 def score_pointing_outlier(
     ms: MeasurementSet, pointing: bool, pointing_outlier_stats: dict[tuple[int, int], PointingOutlierStats]
 ) -> list[pqa.QAScore]:

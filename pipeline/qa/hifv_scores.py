@@ -79,6 +79,7 @@ def calc_vla_science_frac_total_flagged(summaries, agents=None, scanids=None):
     return frac_flagged
 
 
+@log_qa
 def score_vla_science_data_flagged_by_agents(ms, summaries, min_frac, max_frac, agents, intents=None):
     """Calculate a score for the agentflagger summaries based on the fraction of
     VLA science data flagged by certain flagging agents. If intents are provided, then
@@ -603,22 +604,25 @@ def score_testBPdcals_refant(vis: str, bad_refant: list, bandname: str) -> pqa.Q
 def score_testBPdcals_delay(vis: str, caltable: str, bandname: str) -> pqa.QAScore:
     """Evaluate QA score based on median delay per baseband."""
     applies_to = pqa.TargetDataSelection(vis={vis})
-    # PIPE-2580: if median delay per baseband > 15 ms, QA score < 0.5
+    # PIPE-2580: if median delay per baseband > 15 ns, QA score < 0.5
     with casa_tools.TableReader(caltable) as tb:
         fpar = tb.getcol('FPARAM')
         delays = np.abs(fpar)
-        median_delay = np.median(delays)
-    qa = casa_tools.quanta
-    median_delay_val = qa.convert(qa.quantity(median_delay, 'ns'), 'ms')['value']
 
-    if median_delay_val > 15:
+    if delays.size == 0:
         score = rendererutils.SCORE_THRESHOLD_ERROR
-        longmsg = f'Median delay > 15 ms for {bandname} band'
-        shortmsg = f'Median delay > 15 ms for {bandname} band'
+        longmsg = f'Empty delay data for {bandname} band'
+        shortmsg = f'Empty delay data for {bandname} band'
     else:
-        score = 1.0
-        longmsg = f'Median delay < 15 ms for {bandname} band'
-        shortmsg = f'Median delay < 15 ms for {bandname} band'
+        median_delay = np.median(delays)
+        if median_delay > 15:
+            score = rendererutils.SCORE_THRESHOLD_ERROR
+            longmsg = f'Median delay > 15 ns for {bandname} band'
+            shortmsg = f'Median delay > 15 ns for {bandname} band'
+        else:
+            score = 1.0
+            longmsg = f'Median delay <= 15 ns for {bandname} band'
+            shortmsg = f'Median delay <= 15 ns for {bandname} band'
 
     origin = pqa.QAOrigin(metric_name='score_testBPdcals_delay', metric_score=score, metric_units='')
     qa_score = pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin, applies_to=applies_to)

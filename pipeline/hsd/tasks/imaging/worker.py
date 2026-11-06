@@ -636,6 +636,7 @@ class SDImagingWorker(basetask.StandardTaskTemplate):
 
         # execute job
         image_args['specmode'] = specmode
+        image_args['overwrite'] = True
         image_job = casa_tasks.tsdimaging(**image_args)
         self._executor.execute(image_job)
         # tsdimaging changes the image filename, workaround to revert it

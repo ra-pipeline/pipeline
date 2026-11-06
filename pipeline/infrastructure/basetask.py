@@ -35,6 +35,10 @@ LOG = logging.get_logger(__name__)
 
 # control generation of the weblog
 DISABLE_WEBLOG = False
+
+# control generation of QA scores
+DISABLE_QA = False
+
 VISLIST_RESET_KEY = '_do_not_reset_vislist'
 
 
@@ -278,7 +282,7 @@ class Results(api.Results):
             self.merge_with_context(context)
 
             # perform QA if accepting this result from a top-level task
-            if task_completed:
+            if task_completed and not DISABLE_QA:
                 pipelineqa.qa_registry.do_qa(context, self)
 
         # If an exception happened during the acceptance of a top-level

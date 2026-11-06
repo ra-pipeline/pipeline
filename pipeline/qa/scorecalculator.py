@@ -135,7 +135,6 @@ from pipeline.qa.hsd_scores import (
     score_sdimage_masked_pixels,
     score_sdimage_sensitivity_ratio,
     score_sdtotal_data_flagged,
-    score_sdtotal_data_flagged_old,
     select_deviation_masks,
 )
 
@@ -236,7 +235,6 @@ __all__ = [
     'score_sdimage_masked_pixels',
     'score_sdimage_sensitivity_ratio',
     'score_sdtotal_data_flagged',
-    'score_sdtotal_data_flagged_old',
     'score_separation_angles',
     'score_setjy_measurements',
     'score_solint',

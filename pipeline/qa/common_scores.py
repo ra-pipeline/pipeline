@@ -69,14 +69,21 @@ def log_qa(method):
         # get the size of the CASA log before task execution
         qascore = method(self, *args, **kw)
         if basetask.DISABLE_WEBLOG:
-            if isinstance(qascore, tuple):
-                _qascore = qascore[0]
+
+            def _log_qa_message(x: Any):
+                if not isinstance(x, pqa.QAScore):
+                    return
+
+                if x.score >= rendererutils.SCORE_THRESHOLD_SUBOPTIMAL:
+                    LOG.info(x.longmsg)
+                else:
+                    LOG.warning(x.longmsg)
+
+            if isinstance(qascore, (tuple, list)):
+                for _qascore in qascore:
+                    _log_qa_message(_qascore)
             else:
-                _qascore = qascore
-            if _qascore.score >= rendererutils.SCORE_THRESHOLD_SUBOPTIMAL:
-                LOG.info(_qascore.longmsg)
-            else:
-                LOG.warning(_qascore.longmsg)
+                _log_qa_message(qascore)
         return qascore
 
     return f
@@ -193,6 +200,7 @@ def linear_score(x: float, x1: float, x2: float, y1: float = 0.0, y2: float = 1.
     return y1 + (y2 - y1) * (x_clipped - x1) / (x2 - x1)
 
 
+@log_qa
 def score_data_flagged_by_agents(ms, summaries, min_frac, max_frac, agents=None, intents=None):
     """Calculate a score for the agentflagger summaries based on the fraction of
     data flagged by certain flagging agents. If intents are provided, then
@@ -236,6 +244,7 @@ def score_data_flagged_by_agents(ms, summaries, min_frac, max_frac, agents=None,
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename, origin=origin)
 
 
+@log_qa
 def score_ms_model_data_column_present(all_mses, mses_with_column):
     """Give a score for a group of mses based on the number with modeldata
     columns present.
@@ -886,6 +895,7 @@ def score_images_exist(filesdir, imaging_products_only, calimages, targetimages)
     return pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, origin=origin)
 
 
+@log_qa
 def score_renorm(result):
     if result.renorm_applied:
         msg = 'Restore successful with renormalization applied'

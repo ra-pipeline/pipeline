@@ -920,22 +920,23 @@ class Selfcal(basetask.StandardTaskTemplate):
     def _check_scaltargets(self, scal_targets):
         """Filter out the sources that the selfcal heuristics should not process.
 
-        PIPE-1447/PIPE-1915: we do not execute selfcal heuristics for mosaic or ephemeris sources.
+        PIPE-1447/PIPE-1915: we do not execute selfcal heuristics for ephemeris sources.
+        PIPE-684/PIPE-2943: disable selfcal heuristics for VLA mosaic observations (multiple pointings / "composite source").
         """
         final_scal_target = []
         for scal_target in scal_targets:
-            disable_mosaic = False
+            disable_mosaic = scal_target.get('sc_telescope') in ('VLA', 'EVLA', 'JVLA')
             if disable_mosaic and scal_target['is_mosaic']:
                 LOG.warning(
-                    'The self-calibration heuristics do not fully support mosaic yet. Skipping target=%r spw=%r.',
-                    scal_target['field'],
-                    scal_target['spw'])
+                    'The self-calibration heuristics do not support VLA mosaic yet. Skipping target=%r spw=%r.',
+                    utils.condense_field_names(scal_target['field'], max_chars=30),
+                    utils.find_ranges(scal_target['spw']))
                 continue
             if scal_target['is_eph_obj']:
                 LOG.warning(
                     'The self-calibration heuristics do not fully support ephemeris sources yet. Skipping target=%r spw=%r.',
-                    scal_target['field'],
-                    scal_target['spw'])
+                    utils.condense_field_names(scal_target['field'], max_chars=30),
+                    utils.find_ranges(scal_target['spw']))
                 continue
             final_scal_target.append(scal_target)
 

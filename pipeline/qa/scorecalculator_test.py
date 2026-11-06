@@ -1,11 +1,20 @@
-"""scorecalculator_test.py : Unit tests for "qa/scorecalculator.py".
+"""Unit tests for the qa/scorecalculator.py module.
 
-Unit tests for "qa/scorecalculator.py"
+Covers line range and channel heuristics, QA score calculations, the log_qa
+decorator, and behavior when DISABLE_WEBLOG or DISABLE_QA is enabled.
 """
 
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+import numpy as np
 import pytest
 
+import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.qa.scorecalculator as qacalc
+from pipeline.infrastructure import basetask
+from pipeline.qa import common_scores
 
 
 @pytest.mark.parametrize(
@@ -105,16 +114,119 @@ def test_channel_ranges_for_image(
     assert ranges_image == expected
 
 
-def test_scorecalculator_exports():
-    """Verify that scorecalculator re-exports all expected symbols."""
-    assert len(qacalc.__all__) == 117
-    for name in qacalc.__all__:
-        assert hasattr(qacalc, name), f'Missing symbol on scorecalculator: {name}'
+# --- Tests for log_qa decorator, DISABLE_WEBLOG, and DISABLE_QA handling ---
+
+
+@pytest.mark.parametrize(
+    'return_val, expected_infos, expected_warns',
+    [
+        # Single score: optimal vs suboptimal
+        (pqa.QAScore(1.0, longmsg='Opt', shortmsg='Opt'), ['Opt'], []),
+        (pqa.QAScore(0.5, longmsg='Sub', shortmsg='Sub'), [], ['Sub']),
+        # List of scores: verify each score is logged rather than only the first
+        ([pqa.QAScore(1.0, longmsg='S1'), pqa.QAScore(0.3, longmsg='S2')], ['S1'], ['S2']),
+        # Tuple with non-QAScore items
+        ((pqa.QAScore(0.95, longmsg='TupleOpt'), 123, 'extra'), ['TupleOpt'], []),
+        # Empty collections, None, and non-score returns
+        ([], [], []),
+        ((), [], []),
+        (None, [], []),
+        (0.85, [], []),
+    ],
+)
+def test_log_qa_weblog_disabled(return_val, expected_infos, expected_warns, monkeypatch):
+    monkeypatch.setattr(basetask, 'DISABLE_WEBLOG', True)
+
+    @qacalc.log_qa
+    def dummy(self):
+        return return_val
+
+    with patch.object(common_scores.LOG, 'info') as mock_info, patch.object(common_scores.LOG, 'warning') as mock_warn:
+        assert dummy(None) == return_val
+        assert [c.args[0] for c in mock_info.call_args_list] == expected_infos
+        assert [c.args[0] for c in mock_warn.call_args_list] == expected_warns
+
+
+def test_log_qa_weblog_enabled(monkeypatch):
+    monkeypatch.setattr(basetask, 'DISABLE_WEBLOG', False)
+    score = pqa.QAScore(0.5, longmsg='Sub', shortmsg='Sub')
+
+    @qacalc.log_qa
+    def dummy(self):
+        return score
+
+    with patch.object(common_scores.LOG, 'info') as mock_info, patch.object(common_scores.LOG, 'warning') as mock_warn:
+        assert dummy(None) is score
+        mock_info.assert_not_called()
+        mock_warn.assert_not_called()
+
+
+def test_score_amp_vs_time_plots_weblog_disabled(monkeypatch):
+    monkeypatch.setattr(basetask, 'DISABLE_WEBLOG', True)
+    assert qacalc.score_amp_vs_time_plots(None, None) == []
+
+
+class DummyResults(basetask.Results):
+    def __init__(self):
+        super().__init__()
+        self.stage_number = 1
+        self.timestamps = None
+        self.inputs = {}
+
+    def merge_with_context(self, context):
+        pass
+
+
+@pytest.mark.parametrize('disable_qa, should_call', [(True, False), (False, True)])
+def test_results_accept_respects_disable_qa(disable_qa, should_call, monkeypatch):
+    monkeypatch.setattr(basetask, 'DISABLE_WEBLOG', True)
+    monkeypatch.setattr(basetask, 'DISABLE_QA', disable_qa)
+
+    context = MagicMock()
+    context.results = []
+    results = DummyResults()
+
+    with (
+        patch.object(pqa.qa_registry, 'do_qa') as mock_do_qa,
+        patch.object(basetask.LOG, 'isEnabledFor', return_value=False),
+        patch.object(
+            basetask.ResultsProxy, 'write', autospec=True, side_effect=lambda self, r: setattr(self, 'uuid', r.uuid)
+        ),
+        patch('pipeline.infrastructure.basetask.write_pipeline_casa_tasks'),
+        patch('pipeline.infrastructure.eventbus.send_message'),
+    ):
+        results.accept(context)
+        if should_call:
+            mock_do_qa.assert_called_once_with(context, results)
+        else:
+            mock_do_qa.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    'delays, expected_score, expected_message',
+    [
+        ([0.0], 1.0, 'Median delay <= 15 ns'),
+        ([15.0, -15.0], 1.0, 'Median delay <= 15 ns'),
+        ([16.0, -16.0], 0.33, 'Median delay > 15 ns'),
+        ([], 0.33, 'Empty delay data'),
+    ],
+)
+def test_score_testBPdcals_delay(delays, expected_score, expected_message):
+    """Preserve main's nanosecond threshold and handling of empty delay tables."""
+    from pipeline.qa import hifv_scores
+
+    with patch.object(hifv_scores.casa_tools, 'TableReader') as reader:
+        reader.return_value.__enter__.return_value.getcol.return_value = np.array(delays)
+        score = qacalc.score_testBPdcals_delay('test_small.ms', 'test_delay.cal', 'L')
+
+    assert score.score == expected_score
+    assert score.longmsg == f'{expected_message} for L band'
 
 
 def test_submodule_exports():
     """Verify that all submodule symbols are present both in the submodule and the facade."""
-    from pipeline.qa import common_scores, hif_scores, hifa_scores, hifv_scores, hsd_scores
+    from pipeline.qa import (common_scores, hif_scores, hifa_scores,
+                             hifv_scores, hsd_scores)
 
     submodules = [common_scores, hif_scores, hifa_scores, hifv_scores, hsd_scores]
     total_symbols = 0
@@ -128,6 +240,13 @@ def test_submodule_exports():
                 f'{sym} on qacalc is not identical to {mod.__name__}.{sym}'
             )
     assert total_symbols == len(qacalc.__all__)
+
+
+def test_scorecalculator_exports():
+    """Verify that scorecalculator re-exports all expected symbols."""
+    assert len(qacalc.__all__) == 116
+    for name in qacalc.__all__:
+        assert hasattr(qacalc, name), f'Missing symbol on scorecalculator: {name}'
 
 
 def test_linear_score_calculation():

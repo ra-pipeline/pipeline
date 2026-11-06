@@ -131,6 +131,10 @@
                 <Value xmlns="">cube</Value>
             </Parameter>
             <Parameter>
+                <Keyword xmlns="">editmode</Keyword>
+                <Value xmlns="">replace</Value>
+            </Parameter>
+            <Parameter>
                 <Keyword xmlns="">field</Keyword>
                 <Value xmlns="">{{{field}}}</Value>
             </Parameter>
@@ -240,6 +244,10 @@
             <Parameter>
                 <Keyword xmlns="">specmode</Keyword>
                 <Value xmlns="">cube</Value>
+            </Parameter>
+            <Parameter>
+                <Keyword xmlns="">editmode</Keyword>
+                <Value xmlns="">replace</Value>
             </Parameter>
             <Parameter>
                 <Keyword xmlns="">field</Keyword>

@@ -25,14 +25,53 @@ git checkout PIPE-1234-my-feature      # existing branch
 Install pixi (one-time, no root required):
 
 ```bash
-curl -fsSL https://pixi.sh/install.sh | bash
+curl -fsSL https://pixi.sh/install.sh | PIXI_VERSION=v0.83.0 bash
 ```
 
 Install the environment:
 
 ```bash
-pixi install          # resolves and downloads all deps into .pixi/envs/
+pixi install --locked # installs reviewed dependencies into .pixi/envs/
 ```
+
+---
+
+## Certificate Security
+
+```{important}
+To mitigate the [eMudhra/emSign incident](https://emudhra.we-have-a-problem.com/),
+use Pixi >=0.82.1. The project manifest requires patched versions of Python,
+pip, certifi, and the CA bundle. Also update host OS certificates and download
+tools to patched versions.
+
+For other Python environments, follow the secure upgrade steps in the
+[Python advisory](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576).
+Please note that updating `certifi` alone does not update pip's bundled certificates.
+```
+
+---
+
+## CASA Snapshots in GitHub CI
+
+The reusable GitHub CI workflow installs the committed lockfile first. Its optional
+`update_casa` boolean defaults to `false`. When enabled, it runs:
+
+```bash
+pixi update --environment <environment> casatools casatasks casashell casaplotms casampi
+```
+
+The unit-test workflow enables this step for development pushes and PRs. PRs
+use the target branch to decide the mode. Pushes to `release/*`, PRs targeting
+`release/*`, tags, and manual unit-test runs use the committed lockfile instead.
+Documentation builds, including Read the Docs, also keep locked installs.
+Existing push filters still apply; feature branches are tested through PRs.
+
+Snapshot updates stay within the manifest constraints and affect only the CI
+checkout. For example, `casashell ==6.7.4.*` stays within the 6.7.4 branch. To
+adopt tested snapshots for a release, update and commit `pixi.lock` through a
+reviewed change. Run the unit-test workflow manually on that revision for locked
+validation before releasing; a development snapshot test may use different
+versions from the committed lockfile.
 
 ---
 
@@ -63,9 +102,6 @@ tracks the latest supported CASA snapshot.
 * - `casa677-py313`
   - 6.7.7
   - 3.13 (linux-64 + osx-arm64)
-* - `casa674-py312`
-  - 6.7.4
-  - 3.12
 * - `docs`
   - 6.7.4
   - 3.12 (docs extras)
@@ -74,7 +110,7 @@ tracks the latest supported CASA snapshot.
 Select a non-default environment with `--environment` / `-e`:
 
 ```bash
-pixi run -e casa671-py312 test-unit
+pixi run -e casa676-py312 test-unit
 ```
 
 ---
@@ -85,11 +121,25 @@ pixi run -e casa671-py312 test-unit
 
 #### `casa` — launch interactive CASA shell
 
-Launches an interactive CASA shell (`casashell`) for interactive data inspection,
+Launches an interactive CASA shell (`casashell`) for data inspection,
 testing, and development.
 
+The session starts in the directory where `pixi run` is invoked (`$INIT_CWD`),
+ensuring log files (`casa-*.log`) and temporary datasets remain in your current
+working directory.
+
+**Threading & Environment:**
+
+- Dynamically clamps default OpenMP and OpenBLAS thread pools to $\min(\text{available\_cpus}, 4)$ using `nproc` (Linux), `sysctl` / `getconf` (macOS), or a fallback default of 4.
+- Preserves explicit user environment variables (e.g. `OMP_NUM_THREADS=8`).
+- Sets `OMP_PLACES=threads`, `OMP_PROC_BIND=false`, and `PYTHONNOUSERSITE=1`.
+
 ```bash
+# Launch interactive shell in current directory (defaults to min(cpus, 4) threads)
 pixi run casa
+
+# Launch with explicit thread override
+OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8 pixi run casa
 
 # With a specific CASA version
 pixi run -e casa677-py312 casa
@@ -104,20 +154,32 @@ Combines three operations: `--update-all`, `--summary`, and `--current-data`.
 pixi run update-data
 ```
 
+#### `bundle-assets` — bundle and minify weblog static assets
+
+Bundles and minifies weblog static CSS and JavaScript assets using `scripts/bundle_assets.py`.
+
+```bash
+pixi run bundle-assets
+```
+
 #### `casampi` — launch CASA with MPI support
 
-Launches CASA in MPI mode with proper safety flags for parallel processing.
+Launches CASA in MPI mode with safety flags for parallel processing.
 Default: 4 processes. Override with environment variable `CASA_NPROCS`.
+
+The MPI launcher and all worker ranks execute directly in the directory where
+`pixi run` is invoked (`$INIT_CWD`) via `-wdir "${INIT_CWD:-.}"`.
 
 **Configuration:**
 
 - Disables InfiniBand (`--mca btl ^openib`)
 - Binds to all available threads (`--bind-to none`)
 - Sets thread affinity and suppresses pmix warnings
+- Sets rank working directory: `-wdir "${INIT_CWD:-.}"`
 - Environment: `OMP_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1` (prevents oversubscription)
 
 ```bash
-# Launch with default 4 processes
+# Launch with default 4 processes in current directory
 pixi run casampi
 
 # Override process count
@@ -246,15 +308,24 @@ pixi run build-pdf-taskdocs
 pixi run build-pdf-userguide
 ```
 
+#### `update-references` — update BibTeX references from NASA SciX (ADS)
+
+Updates BibTeX literature citations in the documentation from the NASA SciX
+(formerly NASA/ADS) public library using `scripts/update_references.py`.
+
+```bash
+pixi run update-references
+```
+
 ---
 
 ## Environment & Workflow Configuration
 
 ### Managing Task Output & Working Directories
 
-All test tasks (`test-unit`, `test-regression`, `test-pltest1`) start with
+All interactive, testing, and execution tasks (`casa`, `casampi`, `test-unit`, `test-regression`, `test-pltest1`) start with
 `cd $INIT_CWD`, where `$INIT_CWD` is the directory from which `pixi run` was
-invoked.  This means CASA log files (`casa-*.log`), pipeline output
+invoked (with OpenMPI worker ranks directed via `-wdir "${INIT_CWD:-.}"`). This means CASA log files (`casa-*.log`), pipeline output
 directories, and coverage artifacts land in your working directory — not in
 the source tree.
 
@@ -286,8 +357,8 @@ pixi run --manifest-path /path/to/pipeline/pyproject.toml test-pltest1
 # Smoke-test with CASA 6.7.4
 pixi run -e casa674-py312 test-pltest1
 
-# Full regression with CASA 6.7.1 / Python 3.12
-pixi run -e casa671-py312 test-regression
+# Full regression with CASA 6.7.6 / Python 3.12
+pixi run -e casa676-py312 test-regression
 ```
 
 ### Interactive Environment Access
@@ -296,7 +367,7 @@ Drop into an interactive shell with the environment activated:
 
 ```bash
 pixi shell                  # default environment
-pixi shell -e casa671-py312 # specific environment
+pixi shell -e casa676-py312 # specific environment
 ```
 
 ---
@@ -353,9 +424,9 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
-  - openmpi>=5.0
+  - openmpi-mpicxx>=5.0
   - pip:
-    - casatasks>=6.6.6
+    - casatasks>=6.7.4.2
 ```
 
 ```toml
@@ -365,10 +436,10 @@ channels = ["conda-forge"]
 
 [tool.pixi.dependencies]
 python = "3.12.*"
-openmpi = ">=5.0"
+openmpi-mpicxx = ">=5.0"
 
 [tool.pixi.pypi-dependencies]
-casatasks = { version = ">=6.6.6", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
+casatasks = { version = ">=6.7.4.2", index = "https://casa-pip.nrao.edu/repository/pypi-group/simple" }
 ```
 
 > **Tip:** Pixi version constraints use `">=x.y"` (string) rather than conda's
@@ -419,7 +490,7 @@ Or add it manually to the exported file:
 - pip:
   - --extra-index-url https://casa-pip.nrao.edu/repository/pypi-group/simple
   - casashell==6.7.4.*
-  - casatasks>=6.6.6
+  - casatasks>=6.7.4.2
   - ...
 ```
 
@@ -439,13 +510,16 @@ in the export.
   - Output cwd
 * - Launch CASA shell
   - `pixi run casa`
-  - interactive
+  - `$INIT_CWD` (invocation dir)
 * - Update CASA data
   - `pixi run update-data`
   - varies
-* - Launch CASA MPI (4 processes)
-  - `CASA_NPROCS=8 pixi run casampi`
-  - interactive
+* - Bundle weblog assets
+  - `pixi run bundle-assets`
+  - project root
+* - Launch CASA MPI (default 4 ranks)
+  - `pixi run casampi`
+  - `$INIT_CWD` (invocation dir)
 * - Unit tests
   - `pixi run test-unit`
   - `$INIT_CWD` (invocation dir)
@@ -470,4 +544,7 @@ in the export.
 * - Build User's Guide PDF
   - `pixi run build-pdf-userguide`
   - `docs/`
+* - Update BibTeX references
+  - `pixi run update-references`
+  - project root
 ```

@@ -13,6 +13,11 @@ on:
         required: false
         default: "default"
         type: string
+      update_casa:
+        description: "Update CASA packages within manifest constraints before testing"
+        required: false
+        default: false
+        type: boolean
       test_data:
         description: "Type of test data to checkout (e.g., 'unit')"
         required: false
@@ -48,28 +53,28 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Install Pixi
-        uses: prefix-dev/setup-pixi@v0.10.2
-        with:
-          pixi-version: v0.71.0
-          environments: ${{ inputs.pixi_env }}
-          # Caching is disabled to always use the latest dev snapshots on demand.
-          cache: false
-          # To enable caching in future, set `cache: true` and define an appropriate cache key,
-          # for example: v1-${{ runner.os }}-${{ inputs.pixi_env }}.
-          locked: false
-          activate-environment: ${{ inputs.pixi_env }}
-
-      - name: Enable post-link scripts
-        shell: bash
-        run: pixi config set --local run-post-link-scripts insecure
-
       - name: Install System Dependencies (Ubuntu)
         if: runner.os == 'Linux'
         shell: bash
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y git xvfb
+          sudo apt-get install -y ca-certificates git xvfb
+
+      - name: Install Pixi
+        uses: prefix-dev/setup-pixi@v0.10.2
+        with:
+          pixi-version: v0.83.0
+          environments: ${{ inputs.pixi_env }}
+          # Use the reviewed lockfile; refresh dev snapshots with pixi update.
+          cache: false
+          # To enable caching in future, set `cache: true` and define an appropriate cache key,
+          # for example: v1-${{ runner.os }}-${{ inputs.pixi_env }}.
+          locked: true
+          activate-environment: ${{ inputs.pixi_env }}
+
+      - name: Enable post-link scripts
+        shell: bash
+        run: pixi config set --local run-post-link-scripts insecure
 
       - name: Install System Dependencies (macOS)
         if: runner.os == 'macOS'
@@ -92,6 +97,15 @@ jobs:
           measures_auto_update = True
           data_auto_update = True
           PYEOF
+
+      - name: Update CASA snapshots
+        if: inputs.update_casa
+        shell: bash
+        env:
+          CASA_PIXI_ENV: ${{ inputs.pixi_env }}
+        run: |
+          pixi update --environment "$CASA_PIXI_ENV" \
+            casatools casatasks casashell casaplotms casampi
 
       - name: Cache casarundata
         uses: actions/cache@v5
@@ -128,8 +142,9 @@ jobs:
         id: cache-testdata
         with:
           path: pipeline-testdata
-          key: pipeline-testdata-unit-${{ steps.testdata-commit.outputs.sha }}
+          key: pipeline-testdata-unit-${{ hashFiles('.github/testdata-paths.txt') }}-${{ steps.testdata-commit.outputs.sha }}
           restore-keys: |
+            pipeline-testdata-unit-${{ hashFiles('.github/testdata-paths.txt') }}-
             pipeline-testdata-unit-
 
       - name: Checkout and LFS pull test data
@@ -144,11 +159,11 @@ jobs:
             echo "No existing cache found. Performing sparse clone..."
             retry_cmd git clone --filter=blob:none --sparse "$TESTDATA_URL" pipeline-testdata
             cd pipeline-testdata
-            git sparse-checkout set pl-unittest
+            git sparse-checkout set --stdin < "$GITHUB_WORKSPACE/.github/testdata-paths.txt"
           else
             echo "Existing cache restored. Updating incrementally..."
             cd pipeline-testdata
-            git sparse-checkout set pl-unittest
+            git sparse-checkout set --stdin < "$GITHUB_WORKSPACE/.github/testdata-paths.txt"
             retry_cmd git remote set-url origin "$TESTDATA_URL" || true
             if ! retry_cmd git fetch origin; then
               echo "::warning::Incremental fetch from Bitbucket failed; using restored cache data."
@@ -158,13 +173,14 @@ jobs:
           fi
 
           echo "Pulling LFS test files..."
-          retry_cmd git lfs pull || {
-            if [ -d "pl-unittest" ]; then
-              echo "::warning::LFS pull failed, but pl-unittest directory exists from cache. Proceeding with caution."
-            else
-              echo "::error::LFS pull failed and no cached test data is available."
-              exit 1
-            fi
+          LFS_INCLUDE=$(
+            sed 's|$|/**|' "$GITHUB_WORKSPACE/.github/testdata-paths.txt" |
+              paste -sd, -
+          )
+          retry_cmd git lfs pull --include="$LFS_INCLUDE" --exclude="" || {
+            echo "::error::Failed to download required LFS test data."
+            git lfs logs last || true
+            exit 1
           }
 
       - name: Run Pixi Task

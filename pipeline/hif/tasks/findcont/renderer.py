@@ -86,21 +86,21 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         mako_context.update({'contdat_path_link': contdat_path_link})
 
-    def _get_imaging_summary(self, result) -> list[ImagingTR]:
-        """Format imaging_summary list into display rows.
+    def _get_imaging_summary(self, result) -> list[tuple[str, ...]]:
+        """Format imaging_summary list into merged display rows.
 
         Args:
             result: Task result object containing imaging_summary attribute.
 
         Returns:
-            List of ImagingTR namedtuples for rendering.
+            List of tuples containing merged HTML <td> elements for rendering.
         """
         rows = []
         for entry in getattr(result, 'imaging_summary', []) or []:
             if not isinstance(entry, dict):
                 continue
             rows.append(ImagingTR(
-                field=self._format_summary_value(entry.get('field')),
+                field=utils.wrap_long_str(self._format_summary_value(entry.get('field')), newline='<br>'),
                 spw=self._format_summary_value(entry.get('spw')),
                 datatype=self._format_summary_value(entry.get('datatype')),
                 phasecenter=self._format_summary_value(entry.get('phasecenter')),
@@ -114,7 +114,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                 perchanweightdensity=self._format_summary_value(entry.get('perchanweightdensity')),
                 nbins=self._format_summary_value(entry.get('nbins')),
             ))
-        return rows
+        return utils.merge_td_columns(rows)
 
     @staticmethod
     def _get_imaging_skip_reason(imaging_summary: list[dict]) -> str:
@@ -178,6 +178,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
 
         rows = []
         for field in sorted(set(ranges_dict.keys())):
+            row_field = utils.wrap_long_str(field, newline='<br>')
             for spw in map(str, sorted(map(int, set(ranges_dict[field].keys())))):
                 momdiffsnr = self._get_momdiffsnr(result, field, spw)
                 plotfile = self._get_plotfile(context, result, field, spw)
@@ -194,7 +195,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                     flags_for_spw = []
 
                 if ranges_for_spw in non_detection:
-                    rows.append(TR(field='<b>{:s}</b>'.format(field), spw=spw, min='None', max='',
+                    rows.append(TR(field='<b>{:s}</b>'.format(row_field), spw=spw, min='None', max='',
                                    frame='None', status=status, momdiffsnr=-999.0, spectrum=plotfile, jointmask=jointmaskplot))
                 else:
                     raw_ranges_for_spw = [item['range'] for item in ranges_for_spw if isinstance(item, dict)]
@@ -215,7 +216,7 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
                         # units of cont_ranges values
                         min_freq = measures.Frequency(range_min).str_to_precision(5)
                         max_freq = measures.Frequency(range_max).str_to_precision(5)
-                        rows.append(TR(field='<b>{:s}</b>'.format(field), spw=spw, min=min_freq, max=max_freq, frame=refer, status=status,
+                        rows.append(TR(field='<b>{:s}</b>'.format(row_field), spw=spw, min=min_freq, max=max_freq, frame=refer, status=status,
                                        momdiffsnr=momdiffsnr, spectrum=plotfile, jointmask=jointmaskplot))
 
         return utils.merge_td_columns(rows), rows
@@ -282,7 +283,11 @@ class T2_4MDetailsFindContRenderer(basetemplates.T2_4MDetailsDefaultRenderer):
             info = image.miscinfo()
             info['type'] = masktype
             info['virtspw'] = spw
-            info['field'] = field
+            # PIPE-3247: Use first field name of a composite field specification for the joint mask image header
+            if field:
+                info['field'] = field.split(',')[0].replace('"', '')
+            else:
+                info['field'] = field
             image.setmiscinfo(info)
 
         # create a plot object so we can access (thus generate) the thumbnail
