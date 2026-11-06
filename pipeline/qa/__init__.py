@@ -1,3 +1,27 @@
-__all__ = ['utility', 'bpcal', 'checksource', 'gpcal', 'scorecalculator']
+"""QA score calculation modules."""
 
-from . import utility, bpcal, checksource, gpcal, scorecalculator
+__all__ = [
+    'utility',
+    'bpcal',
+    'checksource',
+    'gpcal',
+    'scorecalculator',
+    'common_scores',
+    'hif_scores',
+    'hifa_scores',
+    'hifv_scores',
+    'hsd_scores',
+]
+
+from . import (
+    bpcal,
+    checksource,
+    common_scores,
+    gpcal,
+    hif_scores,
+    hifa_scores,
+    hifv_scores,
+    hsd_scores,
+    scorecalculator,
+    utility,
+)
