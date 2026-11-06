@@ -225,28 +225,21 @@ def test_score_testBPdcals_delay(delays, expected_score, expected_message):
 
 def test_submodule_exports():
     """Verify that all submodule symbols are present both in the submodule and the facade."""
-    from pipeline.qa import (common_scores, hif_scores, hifa_scores,
-                             hifv_scores, hsd_scores)
+    from pipeline.qa import common_scores, hif_scores, hifa_scores, hifv_scores, hsd_scores
 
     submodules = [common_scores, hif_scores, hifa_scores, hifv_scores, hsd_scores]
-    total_symbols = 0
+    exported_names = []
     for mod in submodules:
         assert hasattr(mod, '__all__')
         assert len(mod.__all__) > 0
-        total_symbols += len(mod.__all__)
+        exported_names.extend(mod.__all__)
         for sym in mod.__all__:
             assert hasattr(mod, sym), f'{mod.__name__} missing symbol {sym}'
             assert getattr(qacalc, sym) is getattr(mod, sym), (
                 f'{sym} on qacalc is not identical to {mod.__name__}.{sym}'
             )
-    assert total_symbols == len(qacalc.__all__)
-
-
-def test_scorecalculator_exports():
-    """Verify that scorecalculator re-exports all expected symbols."""
-    assert len(qacalc.__all__) == 116
-    for name in qacalc.__all__:
-        assert hasattr(qacalc, name), f'Missing symbol on scorecalculator: {name}'
+    assert len(exported_names) == len(set(exported_names)), 'Duplicate submodule exports'
+    assert sorted(exported_names) == qacalc.__all__
 
 
 def test_linear_score_calculation():
