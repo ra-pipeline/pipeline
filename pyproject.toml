@@ -10,6 +10,7 @@ requires-python = ">= 3.12"
 dynamic = ["version"]
 dependencies = [
     # -- Core Runtime Dependencies --
+    "certifi>=2026.10.19",
     "numpy>=2.0",
     "astropy~=8.0",
     "cachetools~=6.2",
@@ -219,6 +220,7 @@ tmp_path_retention_policy = "none"
 # Pixi Configuration
 
 [tool.pixi.workspace]
+requires-pixi = ">=0.82.1"
 # 'nodefaults' is not needed as Pixi does not implicitly add the defaults (Anaconda) channel
 channels = ["conda-forge"]
 # The inline "Rich Platforms" syntax (with OS version constraints) requires Pixi >= v0.71.0
@@ -230,12 +232,13 @@ platforms = ["linux-64", { platform = "osx-arm64", osx = "15.0" }]
 [tool.pixi.dependencies]
 conda-ecosystem-user-package-isolation = "*"
 ipython = "*"
-pip = ">=23.0"
+pip = ">=26.2.2"
 # Note: openmpi="*" is sufficient for non-gpu builds
 # But casatools+hpg builds are linked against C++ MPI bindings.
 openmpi-mpicxx = ">=5.0"
 mpi4py = ">=3.1.5"
-certifi = "*"
+certifi = ">=2026.10.19"
+ca-certificates = ">=2026.10.23"
 poppler = "*"            # required by Pipeline
 imagemagick = "*"        # required by Pipeline (Jupyter notebook → RST conversion)
 
@@ -351,10 +354,10 @@ PYTHONPATH = "$PIXI_PROJECT_ROOT/scripts/stubs"
 
 # Python versions and CASA branches are composed in the environments below.
 [tool.pixi.feature.py312.dependencies]
-python = "3.12.*"
+python = ">=3.12.16,<3.13"
 
 [tool.pixi.feature.py313.dependencies]
-python = "3.13.*"
+python = ">=3.13.18,<3.14"
 
 [tool.pixi.feature.casa674.pypi-dependencies]
 casashell = "==6.7.4.*"
@@ -367,7 +370,7 @@ casashell = "==6.7.7.*"
 
 # Docs build extras
 [tool.pixi.feature.docs.dependencies]
-python = "3.12.*"
+python = ">=3.12.16,<3.13"
 pandoc = "*"      # required by nbsphinx (Jupyter notebook → RST conversion)
 
 [tool.pixi.feature.docs.pypi-dependencies]
