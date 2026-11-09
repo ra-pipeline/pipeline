@@ -407,6 +407,7 @@ def test_imstat_items_pct_threshold():
     ]
 )
 def test_sum_flag_counts(ids, fields, expected):
+    """Test sum_flag_counts with and without id and field selections."""
     band_stats = {'T1': {'spw': {0: (10, 30, 100), 1: (0, 50, 100)}},
                   'T2': {'spw': {0: (0, 0, 100)}}}
     assert sum_flag_counts(band_stats, 'spw', ids=ids, fields=fields) == expected

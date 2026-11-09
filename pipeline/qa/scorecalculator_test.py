@@ -14,8 +14,8 @@ import pytest
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.qa.scorecalculator as qacalc
 from pipeline.infrastructure import basetask
-from pipeline.qa import common_scores
 from pipeline.infrastructure.renderer import rendererutils
+from pipeline.qa import common_scores
 
 
 @pytest.mark.parametrize(
@@ -262,6 +262,7 @@ def test_linear_score_calculation():
     ]
 )
 def test_applycal_score_total_flagged(flagged, expected):
+    """Test applycal_score_total_flagged against the 85% total flagged limit."""
     score = qacalc.applycal_score_total_flagged(MagicMock(), {'flagged': flagged, 'total': 100})
     assert score.score == expected
 
@@ -280,6 +281,7 @@ def test_applycal_score_total_flagged(flagged, expected):
     ]
 )
 def test_applycal_score_additional_flagged(cgc_counts, target_counts, expected):
+    """Test applycal_score_additional_flagged against the 30% per-field additional flagging limit."""
     band_stats = {'L': {'CGC': {'spw': {0: cgc_counts}}, 'T1': {'spw': {0: target_counts}}}}
     scores = qacalc.applycal_score_additional_flagged(MagicMock(), band_stats, ['CGC'], ['T1'])
     assert [s.score for s in scores] == expected
@@ -297,6 +299,7 @@ def test_applycal_score_additional_flagged(cgc_counts, target_counts, expected):
     ]
 )
 def test_applycal_score_target_vs_cgc_additional(cgc_counts, target_counts, expected):
+    """Test applycal_score_target_vs_cgc_additional against the 1.1x target vs. CGC limit."""
     band_stats = {'L': {'CGC': {'spw': {0: cgc_counts}}, 'T1': {'spw': {0: target_counts}}}}
     scores = qacalc.applycal_score_target_vs_cgc_additional(MagicMock(), band_stats, ['CGC'], ['T1'])
     assert [s.score for s in scores] == expected
@@ -314,6 +317,7 @@ def test_applycal_score_target_vs_cgc_additional(cgc_counts, target_counts, expe
     ]
 )
 def test_applycal_score_specline_spws_flagged(specline_window, target_counts, expected):
+    """Test applycal_score_specline_spws_flagged for spectral line windows fully flagged on targets."""
     ms = MagicMock()
     ms.get_spectral_windows.return_value = [MagicMock(id=0, specline_window=specline_window)]
     ms.get_vla_spw2band.return_value = {0: 'L'}

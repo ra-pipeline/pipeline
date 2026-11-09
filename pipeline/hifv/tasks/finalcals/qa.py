@@ -3,7 +3,7 @@ import collections.abc
 import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
-import pipeline.qa.hifv_scores as qacalc
+import pipeline.qa.scorecalculator as qacalc
 from pipeline.h.tasks.applycal.applycal import ApplycalResults
 
 from . import Applycals
