@@ -201,6 +201,15 @@ class SerialSDApplycal(SerialApplycal):
         return [row + " intent='OBSERVE_TARGET#ON_SOURCE'" for row in template]
 
     def prepare(self):
+        """Apply calibration tables to single-dish spectral data.
+
+        In addition to common applycal process, which is implemented in
+        the superclass (h_applycal), flagging status and Tsys values in
+        the DataTable are synced with MeasurementSets after applycal.
+
+        Returns:
+            SDApplycalResuts instance
+        """
         # execute Applycal
         results = super().prepare()
 
