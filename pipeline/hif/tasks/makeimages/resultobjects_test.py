@@ -62,3 +62,15 @@ def test_make_images_result_repr_handles_none_attributes() -> None:
     assert len(lines) == 3
     assert "['0,1']" in lines[2]
     assert len(lines[1]) == len(lines[2])
+
+
+def test_make_images_result_repr_empty_targets() -> None:
+    """Verify MakeImagesResult.__repr__ prints header line when targets is empty."""
+    result = MakeImagesResult()
+    rendered = repr(result)
+    lines = rendered.splitlines()
+
+    assert len(lines) == 2
+    assert lines[0] == 'MakeImages:'
+    assert 'field' in lines[1]
+    assert 'outcome' in lines[1]

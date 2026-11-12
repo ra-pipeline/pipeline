@@ -105,7 +105,7 @@ class MakeImagesResult(basetask.Results):
                 pass
 
     def __repr__(self):
-        repr = 'MakeImages:'
+        repr_str = 'MakeImages:'
 
         columns = [
             ('field', lambda t: str(t['field'])),
@@ -120,11 +120,11 @@ class MakeImagesResult(basetask.Results):
         rows = [[getter(target) for _, getter in columns] for target in self.targets]
         widths = [max([len(header)] + [len(row[idx]) for row in rows]) + 1 for idx, (header, _) in enumerate(columns)]
 
-        repr += '\n'
-        repr += ''.join(f'{header:{width}}' for (header, _), width in zip(columns, widths))
+        repr_str += '\n'
+        repr_str += ''.join(f'{header:{width}}' for (header, _), width in zip(columns, widths))
 
         for row in rows:
-            repr += '\n'
-            repr += ''.join(f'{val:{width}}' for val, width in zip(row, widths))
+            repr_str += '\n'
+            repr_str += ''.join(f'{val:{width}}' for val, width in zip(row, widths))
 
-        return repr
+        return repr_str

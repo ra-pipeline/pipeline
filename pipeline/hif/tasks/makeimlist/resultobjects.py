@@ -80,11 +80,11 @@ class MakeImListResult(basetask.Results):
         self._expected_num_targets = expected_num_targets
 
     def __repr__(self):
-        repr = 'MakeImList:'
+        repr_str = 'MakeImList:'
 
         if len(self.targets) == 0:
-            repr += '\n is empty'
-            return repr
+            repr_str += '\n is empty'
+            return repr_str
 
         columns = [
             ('field', lambda t: str(t['field'])),
@@ -105,11 +105,11 @@ class MakeImListResult(basetask.Results):
         rows = [[getter(target) for _, getter in columns] for target in self.targets]
         widths = [max([len(header)] + [len(row[idx]) for row in rows]) + 1 for idx, (header, _) in enumerate(columns)]
 
-        repr += '\n'
-        repr += ''.join(f'{header:{width}}' for (header, _), width in zip(columns, widths))
+        repr_str += '\n'
+        repr_str += ''.join(f'{header:{width}}' for (header, _), width in zip(columns, widths))
 
         for row in rows:
-            repr += '\n'
-            repr += ''.join(f'{val:{width}}' for val, width in zip(row, widths))
+            repr_str += '\n'
+            repr_str += ''.join(f'{val:{width}}' for val, width in zip(row, widths))
 
-        return repr
+        return repr_str
