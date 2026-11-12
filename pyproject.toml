@@ -169,17 +169,19 @@ junit_family = "legacy"
 [tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["linux-64", "osx-arm64"]
+requires-pixi = ">=0.82.1"
 
 # Common dependencies (shared by ALL environments via solve-groups)
 
 [tool.pixi.dependencies]
 conda-ecosystem-user-package-isolation = "*"
+ca-certificates = ">=2026.10.19"
 ipython = "*"
 pip = ">=23.0"
 # Note: openmpi="*" is sufficient for non-gpu builds
 openmpi-mpicxx = ">=5.0"
 mpi4py = ">=3.1.5"
-certifi = "*"
+certifi = ">=2026.10.19"
 poppler = "*"
 imagemagick = "*"
 pandoc = "*"
