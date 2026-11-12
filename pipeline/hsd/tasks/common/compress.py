@@ -1,28 +1,67 @@
+"""Compression helpers for objects stored in single-dish pipeline results."""
+
+from __future__ import annotations
+
 import bz2
 import pickle
 import time
+from typing import Any
+from logging import Logger
 
-from pipeline.infrastructure.utils import get_obj_size
 import pipeline.infrastructure.logging as logging
+from pipeline.infrastructure.utils import get_obj_size
 
-LOG = logging.get_logger(__name__)
+LOG: Logger = logging.get_logger(__name__)
 
 
 # object compression/decopmpression utility
 class CompressedObj:
-    def __init__(self, obj, protocol=pickle.HIGHEST_PROTOCOL, compresslevel=9):
-        self.compressed = compress_object(obj, protocol=protocol, compresslevel=compresslevel)
+    """Store an object in compressed form and provide access to its value."""
 
-    def decompress(self):
+    def __init__(
+        self,
+        obj: Any,
+        protocol: int = pickle.HIGHEST_PROTOCOL,
+        compresslevel: int = 9,
+    ):
+        """Generate compressed object instance from given object.
+
+        Compression is done by serializing the object with pickle
+        and then compressing the serialized data with bz2 module.
+        The object is immediately compressed.
+
+        Args:
+            obj: Any picklable object.
+            protocol: Protocol flag for pickling. Defaults to pickle.HIGHEST_PROTOCOL.
+            compresslevel: Compression level. Defaults to 9.
+        """
+        self.compressed: Any = compress_object(obj, protocol=protocol, compresslevel=compresslevel)
+
+    def decompress(self) -> Any:
+        """Return the uncompressed object."""
         return decompress_object(self.compressed)
 
 
-def compress_object(obj, protocol=pickle.HIGHEST_PROTOCOL, compresslevel=9):
+def compress_object(
+    obj: Any,
+    protocol: int = pickle.HIGHEST_PROTOCOL,
+    compresslevel: int = 9,
+) -> Any:
+    """Compress an object, returning it unchanged if compression fails.
+
+    Args:
+        obj: Any picklable object.
+        protocol: Protocol flag for pickling. Defaults to pickle.HIGHEST_PROTOCOL.
+        compresslevel: Compression level. Defaults to 9.
+
+    Returns:
+        The compressed object, or the original object if compression fails.
+    """
     size_org = get_obj_size(obj)
     start = time.time()
     try:
         compressed = bz2.compress(pickle.dumps(obj, protocol), compresslevel=compresslevel)
-    except:
+    except Exception:
         compressed = obj
     end = time.time()
     size_comp = get_obj_size(compressed)
@@ -31,7 +70,15 @@ def compress_object(obj, protocol=pickle.HIGHEST_PROTOCOL, compresslevel=9):
     return compressed
 
 
-def decompress_object(obj):
+def decompress_object(obj: bytes) -> Any:
+    """Decompress bytes and deserialize the contained object.
+
+    Args:
+        obj: Compressed bytes representing a pickled object.
+
+    Returns:
+        The original uncompressed object.
+    """
     size_comp = get_obj_size(obj)
     start = time.time()
     decompressed = pickle.loads(bz2.decompress(obj))
@@ -43,11 +90,19 @@ def decompress_object(obj):
 
 
 class CompressedIter:
-    def __init__(self, obj):
-        self.obj = obj
-        self._count = 0
+    """Iterate over a list, decompressing any compressed objects it contains."""
 
-    def __next__(self):
+    def __init__(self, obj: list[Any]):
+        """Initialize the iterator with a list of objects.
+
+        Args:
+            obj: A list of objects, some of which may be instances of CompressedObj.
+        """
+        self.obj: list[Any] = obj
+        self._count: int = 0
+
+    def __next__(self) -> Any:
+        """Return the next value, decompressing it when necessary."""
         if self._count < len(self.obj):
             v = self.obj[self._count]
             self._count += 1
@@ -60,5 +115,8 @@ class CompressedIter:
 
 
 class CompressedList(list):
-    def __iter__(self):
+    """A list that decompresses its members during iteration."""
+
+    def __iter__(self) -> CompressedIter:
+        """Return an iterator that decompresses compressed members."""
         return CompressedIter(self)
