@@ -65,8 +65,8 @@ def compress_object(
         compressed = obj
     end = time.time()
     size_comp = get_obj_size(compressed)
-    LOG.debug('compress: size before {0} after {1} ({2} %)'.format(size_org, size_comp, float(size_comp)/float(size_org) * 100))
-    LOG.debug('elapsed {0} sec'.format(end - start))
+    LOG.trace('compress: size before %s after %s (%s %)', size_org, size_comp, float(size_comp)/float(size_org) * 100)
+    LOG.trace('elapsed %s sec', end - start)
     return compressed
 
 
@@ -84,8 +84,8 @@ def decompress_object(obj: bytes) -> Any:
     decompressed = pickle.loads(bz2.decompress(obj))
     end = time.time()
     size_org = get_obj_size(decompressed)
-    LOG.debug('decompress: size before {0} after {1} ({2} %)'.format(size_org, size_comp, float(size_comp)/float(size_org) * 100))
-    LOG.debug('elapsed {0} sec'.format(end - start))
+    LOG.trace('decompress: size before %s after %s (%s %)', size_org, size_comp, float(size_comp)/float(size_org) * 100)
+    LOG.trace('elapsed %s sec', end - start)
     return decompressed
 
 
