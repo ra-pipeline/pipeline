@@ -1455,6 +1455,24 @@ class StateTable:
 
 class FieldTable:
     @staticmethod
+    def _get_non_sqld_times(msmd: Any) -> NDArray | None:
+        """Return unique sorted timestamps across all non-SQLD spectral windows.
+
+        Returns None when the MS has no SQLD spectral windows or no non-SQLD
+        spectral windows, so callers use msmd.timesforfield() directly.
+        """
+        sqld_spws = set(msmd.almaspws(sqld=True))
+        if not sqld_spws:
+            return None
+
+        non_sqld_spws = [i for i in range(msmd.nspw()) if i not in sqld_spws]
+        if not non_sqld_spws:
+            return None
+
+        times_by_spw = msmd.timesforspws(non_sqld_spws)
+        return np.unique(np.concatenate(list(times_by_spw.values())))
+
+    @staticmethod
     def _read_table(msmd: Any) -> list[tuple]:
         num_fields = msmd.nfields()
         field_names = msmd.namesforfields()
@@ -1469,6 +1487,15 @@ class FieldTable:
 
         if not fields_with_scans:
             return []
+
+        non_sqld_times = FieldTable._get_non_sqld_times(msmd)
+
+        def _times_for_field(field_id: int) -> NDArray:
+            times = msmd.timesforfield(field_id)
+            if non_sqld_times is None:
+                return times
+            filtered = np.intersect1d(times, non_sqld_times, assume_unique=True)
+            return filtered if len(filtered) > 0 else times
 
         LOG.trace('Opening FIELD table to read FIELD.SOURCE_TYPE')
         field_table = os.path.join(msmd.name(), 'FIELD')
@@ -1485,7 +1512,7 @@ class FieldTable:
                 field_id,
                 field_names[field_id],
                 msmd.sourceidforfield(field_id),
-                msmd.timesforfield(field_id),
+                _times_for_field(field_id),
                 source_types[field_id] if source_types is not None else None,
                 msmd.phasecenter(field_id),
             )
