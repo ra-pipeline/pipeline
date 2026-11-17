@@ -345,7 +345,7 @@ class MeasurementSetReader:
         cached_states = StatesCache(1000)
 
         for spw in ms.spectral_windows:
-            scan_ids = scansforspws[str(spw.id)]
+            scan_ids = scansforspws.get(str(spw.id), ())
             state_ids = [cached_states[i] for i in scan_ids]
             state_ids = set(itertools.chain(*state_ids))
             states = [s for s in ms.states if s.id in state_ids] 
