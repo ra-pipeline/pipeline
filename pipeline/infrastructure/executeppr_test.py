@@ -38,11 +38,16 @@ test_parameter_values = [(r"1,2,3", '1,2,3'),
                          (r"[[0,0,1,1],[0,1,0,1]]", [[0, 0, 1, 1], [0, 1, 0, 1]])]
 
 
-def test_executeppr_early_exit_saves_without_errorfile(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An early exit follows the normal PPR completion path."""
+@pytest.mark.parametrize('create_errorfile', [False, True])
+def test_executeppr_early_exit(
+    monkeypatch: pytest.MonkeyPatch,
+    create_errorfile: bool,
+) -> None:
+    """An early exit follows its requested ALMA PPR completion policy."""
     context = SimpleNamespace()
     saved = []
     resolved_tasks = []
+    early_exit_files = []
 
     info = [
         ('proposal_code', ('Proposal code: ', 'synthetic')),
@@ -63,7 +68,7 @@ def test_executeppr_early_exit_saves_without_errorfile(monkeypatch: pytest.Monke
         resolved_tasks.append(task_name)
 
         def request_early_exit() -> None:
-            raise exceptions.PipelineEarlyExit('review required')
+            raise exceptions.PipelineEarlyExit('review required', create_errorfile=create_errorfile)
 
         return request_early_exit
 
@@ -86,11 +91,17 @@ def test_executeppr_early_exit_saves_without_errorfile(monkeypatch: pytest.Monke
         'write_errorexit_file',
         lambda *args, **kwargs: pytest.fail('early exit wrote an errorexit file'),
     )
+    monkeypatch.setattr(
+        executeppr.utils,
+        'write_pipeline_early_exit_file',
+        lambda *args, **kwargs: early_exit_files.append((args, kwargs)),
+    )
 
     executeppr.executeppr('synthetic-ppr.xml', importonly=False, breakpoint='')
 
     assert resolved_tasks == ['request_review']
     assert saved == [True]
+    assert bool(early_exit_files) is create_errorfile
 
 
 def create_example_alma_ppr(input_parameter_str):

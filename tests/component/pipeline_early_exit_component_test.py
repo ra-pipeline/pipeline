@@ -43,7 +43,9 @@ class _WorkflowControlTask(basetask.StandardTaskTemplate):
         _INVOCATIONS.append(action)
 
         if action == 'early_exit':
-            raise exceptions.PipelineEarlyExit('synthetic review required')
+            result = basetask.Results()
+            result.request_pipeline_early_exit('synthetic review required')
+            return result
         if action == 'failure':
             raise RuntimeError('synthetic task failure')
 
@@ -116,6 +118,15 @@ def _load_saved_context(directory: Path) -> Any:
         return pickle.load(context_file)
 
 
+def _assert_early_exit_weblog(directory: Path) -> None:
+    """Assert that the first stage detail page explains the workflow stop."""
+    detail_pages = list(directory.rglob('stage1/t2-4m_details.html'))
+    assert len(detail_pages) == 1
+    detail_page = detail_pages[0].read_text(encoding='utf-8')
+    assert 'Pipeline execution stopped after this task.' in detail_page
+    assert 'synthetic review required' in detail_page
+
+
 def _configure_ppr(monkeypatch: pytest.MonkeyPatch, action: str) -> None:
     info = [
         ('proposal_code', ('Proposal code: ', 'synthetic')),
@@ -162,6 +173,9 @@ def test_recipe_early_exit_saves_context_and_skips_later_stage(
     assert not list(tmp_path.rglob('errorexit-*.txt'))
     assert context.task_counter == 1
     assert saved_context.task_counter == 1
+    assert saved_context.pipeline_early_exit_active
+    assert str(saved_context.pipeline_early_exit) == 'synthetic review required'
+    _assert_early_exit_weblog(tmp_path)
 
 
 def test_ppr_early_exit_saves_context_without_errorfile(
@@ -181,6 +195,9 @@ def test_ppr_early_exit_saves_context_without_errorfile(
     assert _INVOCATIONS == ['early_exit']
     assert not list(tmp_path.rglob('errorexit-*.txt'))
     assert saved_context.task_counter == 1
+    assert saved_context.pipeline_early_exit_active
+    assert str(saved_context.pipeline_early_exit) == 'synthetic review required'
+    _assert_early_exit_weblog(tmp_path)
 
 
 def test_ppr_ordinary_failure_still_creates_errorfile(

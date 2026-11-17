@@ -95,15 +95,6 @@ class TaskAbnormalExitEvent(TaskLifecycleEvent):
         super().__init__(context_name, stage_number, 'abnormal exit')
 
 
-class TaskStoppedEvent(TaskLifecycleEvent):
-    """Emitted when a pipeline task requests an intentional early exit."""
-
-    topic = 'lifecycle.task.stopped'
-
-    def __init__(self, context_name: str, stage_number: int) -> None:
-        super().__init__(context_name, stage_number, 'stopped')
-
-
 class WebLogLifecycleEvent(Event):
     """
     Base class for events related to weblog generation.

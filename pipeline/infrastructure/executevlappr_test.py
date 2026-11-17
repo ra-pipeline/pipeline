@@ -10,11 +10,16 @@ import pytest
 from . import exceptions, executevlappr
 
 
-def test_executeppr_early_exit_saves_without_errorfile(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An early exit follows the normal VLA PPR completion path."""
+@pytest.mark.parametrize('create_errorfile', [False, True])
+def test_executeppr_early_exit(
+    monkeypatch: pytest.MonkeyPatch,
+    create_errorfile: bool,
+) -> None:
+    """An early exit follows its requested VLA PPR completion policy."""
     context = SimpleNamespace()
     saved: list[bool] = []
     resolved_tasks: list[str] = []
+    early_exit_files = []
     info = [
         ('proposal_code', ('Proposal code: ', 'synthetic')),
         ('observatory', ('Observatory: ', 'VLA')),
@@ -26,7 +31,7 @@ def test_executeppr_early_exit_saves_without_errorfile(monkeypatch: pytest.Monke
         resolved_tasks.append(task_name)
 
         def request_early_exit() -> None:
-            raise exceptions.PipelineEarlyExit('review required')
+            raise exceptions.PipelineEarlyExit('review required', create_errorfile=create_errorfile)
 
         return request_early_exit
 
@@ -49,8 +54,14 @@ def test_executeppr_early_exit_saves_without_errorfile(monkeypatch: pytest.Monke
         'write_errorexit_file',
         lambda *args, **kwargs: pytest.fail('early exit wrote an errorexit file'),
     )
+    monkeypatch.setattr(
+        executevlappr.utils,
+        'write_pipeline_early_exit_file',
+        lambda *args, **kwargs: early_exit_files.append((args, kwargs)),
+    )
 
     executevlappr.executeppr('synthetic-ppr.xml', importonly=False)
 
     assert resolved_tasks == ['request_review']
     assert saved == [True]
+    assert bool(early_exit_files) is create_errorfile

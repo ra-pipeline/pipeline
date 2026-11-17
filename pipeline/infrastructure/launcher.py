@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 
 from pipeline import domain, environment
 
-from . import callibrary, casa_tools, eventbus, imagelibrary, logging, project, utils
+from . import callibrary, casa_tools, eventbus, exceptions, imagelibrary, logging, project, utils
 from .eventbus import ContextCreatedEvent, ContextResumedEvent
 
 if TYPE_CHECKING:
@@ -90,6 +90,9 @@ class Context:
             imaging product size.
         subimlist: An `ImageLibrary` object for cutout images of science targets.
         synthesized_beams: A dictionary containing computed synthesized beam data.
+        pipeline_early_exit: The current workflow stop request, if any.
+        pipeline_early_exit_overridden: Whether the current stop request was
+            explicitly overridden for continued interactive execution.
     """
     def __init__(self, name: str | None = None) -> None:
         """Initialize a Context object.
@@ -124,6 +127,8 @@ class Context:
         self.results = []
         self.task_counter = 0
         self.subtask_counter = 0
+        self.pipeline_early_exit: exceptions.PipelineEarlyExit | None = None
+        self.pipeline_early_exit_overridden = False
         LOG.trace('Pipeline stage counter set to {0}'.format(self.stage))
 
         # Define list of processing intents.
@@ -166,6 +171,31 @@ class Context:
     def stage(self) -> str:
         """Return task and sub-task stage number."""
         return f'{self.task_counter}_{self.subtask_counter}'
+
+    @property
+    def pipeline_early_exit_active(self) -> bool:
+        """Return whether a non-overridden workflow stop request is active."""
+        return (
+            getattr(self, 'pipeline_early_exit', None) is not None
+            and not getattr(self, 'pipeline_early_exit_overridden', False)
+        )
+
+    def request_pipeline_early_exit(self, early_exit: exceptions.PipelineEarlyExit) -> None:
+        """Record a workflow stop request on this context.
+
+        Args:
+            early_exit: Stop request raised after the current result is rendered.
+        """
+        self.pipeline_early_exit = early_exit
+        self.pipeline_early_exit_overridden = False
+
+    def override_pipeline_early_exit(self) -> None:
+        """Allow interactive task execution to continue after a stop request."""
+        if getattr(self, 'pipeline_early_exit', None) is None:
+            raise exceptions.PipelineException('No pipeline early-exit request is available to override.')
+
+        LOG.warning('Overriding pipeline early-exit request: %s', self.pipeline_early_exit)
+        self.pipeline_early_exit_overridden = True
 
     @property
     def products_dir(self) -> str:
