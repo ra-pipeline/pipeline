@@ -149,7 +149,9 @@ def get_sidebar_style_for_task(result):
 
 
 def get_symbol_badge(result):
-    if get_failures_badge(result):
+    if basetask.get_pipeline_early_exit(result) is not None:
+        symbol = '<span class="glyphicon glyphicon-stop alert-danger transparent-bg" aria-hidden="true"></span>'
+    elif get_failures_badge(result):
         symbol = '<span class="glyphicon glyphicon-minus-sign alert-danger transparent-bg" aria-hidden="true"></span>'
     elif get_errors_badge(result):
         symbol = '<span class="glyphicon glyphicon-remove-sign alert-danger transparent-bg" aria-hidden="true"></span>'

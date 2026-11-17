@@ -39,7 +39,6 @@ from .eventbus import (
     TaskAbnormalExitEvent,
     TaskCompleteEvent,
     TaskStartedEvent,
-    TaskStoppedEvent,
 )
 
 LOG = pipeline_logging.get_logger(__name__)
@@ -223,6 +222,25 @@ class Results(api.Results):
         # destined for the weblog. Currently a dict, but could change.
         self._metadata = {}
 
+        # Optional request to stop workflow execution after this result has
+        # been accepted and rendered.
+        self.pipeline_early_exit: exceptions.PipelineEarlyExit | None = None
+
+    def request_pipeline_early_exit(self, message: str, *, create_errorfile: bool = False) -> None:
+        """Request that workflow execution stop after this result is rendered.
+
+        This method can be called during task analysis or QA calculation.
+
+        Args:
+            message: Reason workflow execution should stop.
+            create_errorfile: Whether the workflow entry point should create
+                an ``errorexit`` sentinel.
+        """
+        self.pipeline_early_exit = exceptions.PipelineEarlyExit(
+            message,
+            create_errorfile=create_errorfile,
+        )
+
     @property
     def uuid(self):
         """
@@ -295,6 +313,10 @@ class Results(api.Results):
             # perform QA if accepting this result from a top-level task
             if task_completed and not DISABLE_QA:
                 pipelineqa.qa_registry.do_qa(context, self)
+
+            early_exit = get_pipeline_early_exit(self)
+            if task_completed and early_exit is not None:
+                context.request_pipeline_early_exit(early_exit)
 
         # If an exception happened during the acceptance of a top-level
         # pipeline task, then create a new FailedTaskResults that contains
@@ -540,6 +562,28 @@ class ResultsList(Results, Generic[T]):
             return None
 
 
+def get_pipeline_early_exit(result: object) -> exceptions.PipelineEarlyExit | None:
+    """Return the first workflow stop request contained in a result.
+
+    Args:
+        result: A result or nested result collection.
+
+    Returns:
+        The first stop request, or ``None`` if the result has none.
+    """
+    early_exit = getattr(result, 'pipeline_early_exit', None)
+    if early_exit is not None:
+        return early_exit
+
+    if isinstance(result, (list, tuple, ResultsList)):
+        for child in result:
+            early_exit = get_pipeline_early_exit(child)
+            if early_exit is not None:
+                return early_exit
+
+    return None
+
+
 class StandardTaskTemplate(api.Task, abc.ABC):
     """
     StandardTaskTemplate is a template class for pipeline reduction tasks whose
@@ -713,16 +757,6 @@ class StandardTaskTemplate(api.Task, abc.ABC):
                 )
                 eventbus.send_message(event)
             return result
-
-        except exceptions.PipelineEarlyExit as exc:
-            if utils.is_top_level_task():
-                LOG.info('Pipeline task requested an early exit: %s', exc)
-                event = TaskStoppedEvent(
-                    context_name=self.inputs.context.name,
-                    stage_number=self.inputs.context.task_counter,
-                )
-                eventbus.send_message(event)
-            raise
 
         except Exception as ex:
             # Created a special result object for the failed task, but only if

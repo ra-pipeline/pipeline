@@ -306,7 +306,18 @@ def run_named_tasks(tasks: list[tuple[str, dict[str, Any]]]) -> Context:
         try:
             result = _execute_task(task, task_args)
         except exceptions.PipelineEarlyExit as exc:
+            pipeline = h_cli.stack.get(h_cli.PIPELINE_NAME)
+            context = getattr(pipeline, 'context', None)
+            if context is not None and hasattr(context, 'request_pipeline_early_exit'):
+                context.request_pipeline_early_exit(exc)
             LOG.info('Pipeline task %s requested an early exit: %s', task_name, exc)
+            if exc.create_errorfile and context is not None:
+                utils.write_pipeline_early_exit_file(
+                    context.output_dir,
+                    exc,
+                    task_name=task_name,
+                    stage_number=context.task_counter,
+                )
             break
 
         # If an unhandled exception occurred, return context early
@@ -398,7 +409,16 @@ def reduce(
     except StopIteration:
         pass
     except exceptions.PipelineEarlyExit as exc:
+        if hasattr(context, 'request_pipeline_early_exit'):
+            context.request_pipeline_early_exit(exc)
         LOG.info('Pipeline recipe requested an early exit: %s', exc)
+        if exc.create_errorfile:
+            utils.write_pipeline_early_exit_file(
+                context.output_dir,
+                exc,
+                task_name=getattr(task, '__name__', None),
+                stage_number=context.task_counter,
+            )
     finally:
         LOG.info('Saving context...')
         cli.h_save()

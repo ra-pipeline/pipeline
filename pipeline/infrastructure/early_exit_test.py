@@ -2,96 +2,94 @@
 
 from __future__ import annotations
 
+import pickle
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from . import basetask, exceptions, mpihelpers
-from .eventbus import TaskStartedEvent, TaskStoppedEvent
+from pipeline.h.cli import utils as cli_utils
+
+from . import basetask, exceptions, launcher
+from .eventbus import ResultAcceptedEvent
 
 
-class _Inputs:
-    def __init__(self, context: SimpleNamespace) -> None:
-        self.context = context
-        self.vis = 'uid___A002_X000000_X000.ms'
-        self._pipeline_casa_task = None
-
-    def as_dict(self) -> dict[str, object]:
-        return {}
-
-
-class _EarlyExitTask(basetask.StandardTaskTemplate):
-    Inputs = _Inputs
-
-    def prepare(self, **parameters: object) -> None:
-        raise exceptions.PipelineEarlyExit('review required')
-
-    def analyse(self, result: object) -> object:
-        return result
-
-
-def test_standard_task_propagates_early_exit(
+def test_qa_can_request_early_exit_after_result_acceptance(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """A task early exit bypasses failed-result conversion."""
-    casa_log = tmp_path / 'casa.log'
-    casa_log.write_text('', encoding='utf-8')
+    """A QA stop request is stored and reported after accepting its result."""
+    result = basetask.Results()
+    result.stage_number = 1
+    result.inputs = {}
 
-    monkeypatch.setattr(basetask.utils, 'is_top_level_task', lambda: True)
-    monkeypatch.setattr(basetask.utils, 'pickle_copy', lambda value: value)
-    monkeypatch.setattr(basetask, '_log_task', lambda task: None)
-    monkeypatch.setattr(basetask.pipeline_logging, 'add_handler', lambda handler: None)
-    monkeypatch.setattr(basetask.pipeline_logging, 'remove_handler', lambda handler: None)
-    monkeypatch.setattr(basetask.casa_tools.log, 'logfile', lambda: str(casa_log))
-    monkeypatch.setattr(basetask, 'Executor', lambda context: object())
-    monkeypatch.setattr(basetask, 'CasaTasks', lambda executor: object())
+    context = object.__new__(launcher.Context)
+    context.name = 'qa-early-exit'
+    context.output_dir = str(tmp_path)
+    context.results = []
+    context.pipeline_early_exit = None
+    context.pipeline_early_exit_overridden = False
 
     events = []
+    monkeypatch.setattr(basetask.utils, 'task_depth', lambda: 0)
+    monkeypatch.setattr(basetask, 'write_pipeline_casa_tasks', lambda context: None)
+    monkeypatch.setattr(basetask, 'DISABLE_WEBLOG', True)
     monkeypatch.setattr(basetask.eventbus, 'send_message', events.append)
-
-    context = SimpleNamespace(name='early-exit', task_counter=0, subtask_counter=0)
-    task = _EarlyExitTask(_Inputs(context))
-
-    with pytest.raises(exceptions.PipelineEarlyExit, match='review required'):
-        task.execute()
-
-    assert [type(event) for event in events] == [TaskStartedEvent, TaskStoppedEvent]
-
-
-def test_sync_task_propagates_early_exit() -> None:
-    """The synchronous execution adapter preserves an early exit."""
-    def request_early_exit() -> None:
-        raise exceptions.PipelineEarlyExit('review required')
-
-    task = mpihelpers.SyncTask(request_early_exit)
-
-    with pytest.raises(exceptions.PipelineEarlyExit, match='review required'):
-        task.get_result()
-
-
-def test_async_task_reconstructs_remote_early_exit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The MPI execution adapter reconstructs a remote early exit."""
-    task = object.__new__(mpihelpers.AsyncTask)
-    task._AsyncTask__pid = 'request-1'
-    response = [
-        {
-            'successful': False,
-            'server': 2,
-            'traceback': (
-                'Traceback (most recent call last):\n'
-                'pipeline.infrastructure.exceptions.PipelineEarlyExit: review required\n'
-            ),
-            'id': 'request-1',
-            'parameters': {'tier0_executable': 'test-executable'},
-        }
-    ]
     monkeypatch.setattr(
-        mpihelpers,
-        'mpiclient',
-        SimpleNamespace(get_command_response=lambda *args, **kwargs: response),
+        basetask.pipelineqa.qa_registry,
+        'do_qa',
+        lambda context, qa_result: qa_result.request_pipeline_early_exit('QA review required'),
     )
 
+    result.accept(context)
+
+    assert context.pipeline_early_exit_active
+    assert str(context.pipeline_early_exit) == 'QA review required'
+    assert isinstance(events[-1], ResultAcceptedEvent)
+
+
+def test_context_can_override_early_exit() -> None:
+    """An explicit override permits later interactive tasks to run."""
+    context = object.__new__(launcher.Context)
+    context.pipeline_early_exit = None
+    context.pipeline_early_exit_overridden = False
+    context.request_pipeline_early_exit(exceptions.PipelineEarlyExit('review required'))
+
+    assert context.pipeline_early_exit_active
+
+    context.override_pipeline_early_exit()
+
+    assert not context.pipeline_early_exit_active
+    assert str(context.pipeline_early_exit) == 'review required'
+
+
+def test_early_exit_preserves_errorfile_request_when_pickled() -> None:
+    """A saved stop request retains its error-sentinel policy."""
+    early_exit = exceptions.PipelineEarlyExit('processing failed', create_errorfile=True)
+
+    restored = pickle.loads(pickle.dumps(early_exit))
+
+    assert str(restored) == 'processing failed'
+    assert restored.create_errorfile
+
+
+def test_cli_raises_early_exit_after_result_merge(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The CLI exposes a stop request only after accepting its result."""
+    result = basetask.Results()
+    result.request_pipeline_early_exit('review required')
+    context = SimpleNamespace(pipeline_early_exit_active=False)
+    calls = []
+
+    monkeypatch.setattr(cli_utils, '_get_task_inputs', lambda *args: object())
+    monkeypatch.setattr(cli_utils, '_execute_task', lambda *args: result)
+
+    def merge_results(context: SimpleNamespace, result: basetask.Results) -> None:
+        calls.append('merge')
+        context.pipeline_early_exit_active = True
+
+    monkeypatch.setattr(cli_utils, '_merge_results', merge_results)
+
     with pytest.raises(exceptions.PipelineEarlyExit, match='review required'):
-        task.get_result()
+        cli_utils.execute_task(context, 'h_test', {})
+
+    assert calls == ['merge']
