@@ -34,6 +34,7 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
         )
     dbservice = vdp.VisDependentProperty(default=False)
     createmms = vdp.VisDependentProperty(default='false')
+    exclude_spw = vdp.VisDependentProperty(default='*#SQLD')
     # sets threshold for polcal parallactic angle coverage. See PIPE-597
     minparang = vdp.VisDependentProperty(default=0.0)
     parallel = sessionutils.parallel_inputs_impl(default=False)
@@ -58,6 +59,7 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
         datacolumns: dict[str, str] | None = None,
         minparang: float | None = None,
         parallel: bool | None = None,
+        exclude_spw: str | None = None,
     ):
         """Initialize Inputs.
 
@@ -152,7 +154,8 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
                          process_caldevice=process_caldevice, session=session,
                          overwrite=overwrite, nocopy=nocopy, bdfflags=bdfflags, lazy=lazy,
                          save_flagonline=save_flagonline, createmms=createmms,
-                         ocorr_mode=ocorr_mode, datacolumns=datacolumns)
+                         ocorr_mode=ocorr_mode, datacolumns=datacolumns,
+                         exclude_spw=exclude_spw)
         self.dbservice = dbservice
         self.minparang = minparang
         self.parallel = parallel

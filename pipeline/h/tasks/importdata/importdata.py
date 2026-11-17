@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import contextlib
+import inspect
 import os
 import shutil
 import tarfile
 from typing import TYPE_CHECKING
+
+import casatasks
 
 from pipeline import domain, environment, infrastructure
 from pipeline.domain.datatype import DataType
@@ -14,6 +17,8 @@ from pipeline.infrastructure import basetask, casa_tasks, casa_tools, mpihelpers
 from . import fluxes
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from pipeline.domain import ObservingRun, MeasurementSet
     from pipeline.h.tasks.common.commonfluxresults import FluxCalibrationResults
     from pipeline.infrastructure.launcher import Context
@@ -32,6 +37,7 @@ class ImportDataInputs(vdp.StandardInputs):
     bdfflags = vdp.VisDependentProperty(default=True)
     createmms = vdp.VisDependentProperty(default='automatic')
     datacolumns = vdp.VisDependentProperty(default={})
+    exclude_spw = vdp.VisDependentProperty(default='')
     lazy = vdp.VisDependentProperty(default=False)
     nocopy = vdp.VisDependentProperty(default=False)
     ocorr_mode = vdp.VisDependentProperty(default='ca')
@@ -57,6 +63,7 @@ class ImportDataInputs(vdp.StandardInputs):
             createmms: str | None = None,
             ocorr_mode: str | None = None,
             datacolumns: dict[str, str] | None = None,
+            exclude_spw: str | None = None,
             ):
         """Initialize Inputs.
 
@@ -134,6 +141,7 @@ class ImportDataInputs(vdp.StandardInputs):
         self.bdfflags = bdfflags
         self.createmms = createmms
         self.datacolumns = datacolumns
+        self.exclude_spw = exclude_spw
         self.lazy = lazy
         self.nocopy = nocopy
         self.ocorr_mode = ocorr_mode
@@ -523,6 +531,11 @@ class ImportData(basetask.StandardTaskTemplate):
         # False.
         with_pointing_correction = getattr(inputs, 'with_pointing_correction', False)
 
+        importasdm_kwargs: dict[str, Any] = {}
+        exclude_spw = getattr(inputs, 'exclude_spw', '')
+        if exclude_spw and 'exclude_spw' in inspect.signature(casatasks.importasdm.__call__).parameters:
+            importasdm_kwargs['exclude_spw'] = exclude_spw
+
         # Create importasdm task.
         task = casa_tasks.importasdm(asdm=asdm,
                                      vis=vis,
@@ -535,7 +548,8 @@ class ImportData(basetask.StandardTaskTemplate):
                                      lazy=inputs.lazy,
                                      with_pointing_correction=with_pointing_correction,
                                      ocorr_mode=inputs.ocorr_mode,
-                                     createmms=createmms)
+                                     createmms=createmms,
+                                     **importasdm_kwargs)
         try:
             self._executor.execute(task)
         except Exception as ee:
