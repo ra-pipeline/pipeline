@@ -68,12 +68,23 @@ def test_uvrange_falls_back_without_usable_data(
     assert result == ('>0.0klambda', 1.0)
 
 
-def test_uvrange_ignores_empty_spw_in_multi_spw_bin(heuristics: ImageParamsHeuristicsVLA) -> None:
-    """Verify a spw with no unflagged data in a bin does not bias the amplitude ratio."""
-    sbl = {'DATA_DESC_ID=1': GOOD_AMP, 'DATA_DESC_ID=2': GOOD_AMP}
+@pytest.mark.parametrize(
+    'sbl_mean, expected_uvrange, expected_ratio',
+    [
+        pytest.param(1.5, '>1.5klambda', 3.0, id='above_threshold'),
+        pytest.param(1.0, '>0.0klambda', 2.0, id='at_threshold'),
+    ],
+)
+def test_uvrange_ignores_empty_spw_in_multi_spw_bin(
+    heuristics: ImageParamsHeuristicsVLA, sbl_mean: float, expected_uvrange: str, expected_ratio: float
+) -> None:
+    """Verify an empty spw does not bias the ratio and only a ratio above 2 restricts the uvrange.
+    """
+    sbl_amp = {'mean': sbl_mean, 'npts': 1000.0}
+    sbl = {'DATA_DESC_ID=1': sbl_amp, 'DATA_DESC_ID=2': sbl_amp}
     mbl = {'DATA_DESC_ID=1': GOOD_AMP, 'DATA_DESC_ID=2': EMPTY_AMP}
 
     uvrange, ratio = run_uvrange(heuristics, sbl, mbl, spwspec='1,2')
 
-    assert uvrange == '>0.0klambda'
-    assert ratio == pytest.approx(1.0)
+    assert uvrange == expected_uvrange
+    assert ratio == pytest.approx(expected_ratio)
