@@ -39,6 +39,12 @@ from pipeline.hifv.tasks.semiFinalBPdcals.semiFinalBPdcals import semiFinalBPdca
 from pipeline.hifv.tasks.setmodel.vlasetjy import VLASetjy
 from pipeline.hifv.tasks.statwt.statwt import Statwt, StatwtResults
 from pipeline.hifv.tasks.testBPdcals.testBPdcals import testBPdcals, testBPdcalsResults
+from pipeline.hsd.tasks.applycal.applycal import SDApplycal
+from pipeline.hsd.tasks.baselineflag.baselineflag import SDBLFlag, SDBLFlagResults
+from pipeline.hsd.tasks.imaging.imaging import SDImaging
+from pipeline.hsd.tasks.imaging.resultobjects import SDImagingResults
+from pipeline.hsd.tasks.restoredata.restoredata import SDRestoreData, SDRestoreDataResults
+from pipeline.hsdn.tasks.restoredata.restoredata import NRORestoreData, NRORestoreDataResults
 from pipeline.infrastructure.renderer import regression
 
 LOG = infrastructure.logging.get_logger(__name__)
@@ -1695,6 +1701,189 @@ class FinalcalsResultsStatsExtractor(ResultsStatsExtractor):
                                 longdesc=longdescription,
                                 level=PipelineStatisticLevel.EB)
         return [(vis, ps1)]
+
+
+class SDApplycalResultsStatsExtractor(ApplycalResultsStatsExtractor):
+    """
+    Pipeline statistics extractor for sd_applycal.
+    
+    It extends ApplycalResultsStatsExtractor to use the same extraction logic.
+    """
+    result_cls = ApplycalResults
+    child_cls = None
+    generating_task = SDApplycal
+
+
+class SDBLFlagResultsStatsExtractor(ResultsStatsExtractor):
+    """
+    Pipeline statistics extractor for sd_blfrag.
+
+    The extracted values are:
+       - the number of flagged and scanned rows before this task
+       - the number of flagged and scanned rows after this task
+       - QA scores
+    """
+    result_cls = SDBLFlagResults
+    child_cls = None
+    generating_task = SDBLFlag
+
+    def handle(self, result: SDBLFlagResults, context) -> list[tuple[str, PipelineStatistic]]:
+        val = self.calculate_value(result)
+        vis = result.inputs['vis']
+        ps = self.create_stat(vis, val)
+        return ps
+
+    def calculate_value(self, result: SDBLFlagResults) -> dict:
+        """
+        Extract values for pipeline statistics.
+
+        Args:
+            result: SDBLFlagResults object
+        
+        Returns:
+            dict[str, Union[int, dict]]
+        """
+        d = {}
+        try:
+            flag_dict = {}
+            for summary in result.outcome['flagdata_summary']:
+                name = None
+                prop = None
+                for k, v in summary.items():
+                    if 'name' == k:
+                        name = v
+                    elif isinstance(v, dict):
+                        prop = v
+                if name is not None and prop is not None:
+                    flag_dict[f'num_rows_flagged.{name}'] = int(prop['flagged'])
+                    scan_dict = {}
+                    for scan_id, v in prop['scan'].items():
+                        scan_dict[f'scan_{scan_id}'] = int(v['flagged'])
+                    if scan_dict:
+                        flag_dict[f'scan.num_rows_flagged.{name}'] = scan_dict
+            if flag_dict:
+                d.update(flag_dict)
+
+        except Exception as e:
+            LOG.info(f"Some information missing from SDBLFlagResults: {e}")
+            d = {}
+
+        return d
+
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
+        longdescription = "Added for pipeline statistics: SD baseline flagging summaries and QA scores."
+        ps1 = PipelineStatistic(name="sd_blflag_flagging",
+                                value=val,
+                                longdesc=longdescription,
+                                level=PipelineStatisticLevel.EB)
+        return [(vis, ps1)]
+
+
+class SDImagingResultsStatsExtractor(ResultsStatsExtractor):
+    """
+    Pipeline statistics extractor for sd_imaging.
+
+    The extracted values are:
+        - QA scores
+    """
+    result_cls = SDImagingResults
+    child_cls = None
+    generating_task = SDImaging
+
+    def handle(self, result: SDImagingResults, context) -> list[tuple[str, PipelineStatistic]]:
+        val = self.calculate_value(result)
+        if not val:
+            return []
+        # For imaging, we may not have a single vis, so we need to handle it differently
+        # Try to get vis from context or result
+        vis = None
+        if hasattr(result, 'inputs') and 'vis' in result.inputs:
+            vis = result.inputs['vis']
+        elif hasattr(result, 'vislist') and result.vislist:
+            vis = result.vislist[0]
+        
+        if vis:
+            ps = self.create_stat(vis, val)
+            return ps
+        return []
+
+    def calculate_value(self, result: SDImagingResults) -> dict:
+        """
+        Extract values for pipeline statistics.
+
+        Args:
+            result: SDImagingResults object
+        
+        Returns:
+            dict[str, dict]
+        """
+        d = {}
+        return d
+
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
+        longdescription = "Added for pipeline statistics: SD imaging QA scores."
+        ps1 = PipelineStatistic(name="sd_imaging_qa",
+                                value=val,
+                                longdesc=longdescription,
+                                level=PipelineStatisticLevel.EB)
+        return [(vis, ps1)]
+
+
+class SDRestoredataResultsStatsExtractor(ResultsStatsExtractor):
+    """
+    Pipeline statistics extractor for sd_restoredata.
+
+    The extracted values are:
+        - the number of flagged and scanned rows after this task
+        - QA scores
+    """
+    result_cls = SDRestoreDataResults
+    child_cls = None
+    generating_task = SDRestoreData
+
+    def handle(self, result: SDRestoreDataResults, context) -> list[tuple[str, PipelineStatistic]]:
+        # For restoredata, we may have multiple sessions/mses
+        # Create stats for each session/ms combination
+        stats_list = []
+        try:
+            for session, mses in result.flagging_summaries.items():
+                for ms_name, ms in mses.items():
+                    session_val = {}
+                    for target_name, target in ms.items():
+                        if isinstance(target, dict):
+                            target_dict = {'num_rows_flagged': int(target['flagged'])}
+                            scan_dict = {}
+                            for scan_id, v in target['scan'].items():
+                                scan_dict[f'scan_{scan_id}'] = int(v['flagged'])
+                            if scan_dict:
+                                target_dict['scan'] = scan_dict
+                            session_val[f'target_{target_name}'] = target_dict
+                    
+                    if session_val:
+                        stats_list.extend(self.create_stat(ms_name, session_val))
+        except Exception as e:
+            LOG.info(f"Error processing SDRestoreDataResults: {e}")
+
+        return stats_list
+
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
+        longdescription = "Added for pipeline statistics: SD restoredata flagging summaries and QA scores."
+        ps1 = PipelineStatistic(name="sd_restoredata_flagging",
+                                value=val,
+                                longdesc=longdescription,
+                                level=PipelineStatisticLevel.EB)
+        return [(vis, ps1)]
+
+
+class NRORestoredataResultsStatsExtractor(SDRestoredataResultsStatsExtractor):
+    """
+    Pipeline statistics extractor for hsdn_restoredata.
+
+    It extends SDRestoredataResultsStatsExtractor to use the same extraction logic.
+    """
+    result_cls = NRORestoreDataResults
+    child_cls = None
+    generating_task = NRORestoreData
 
 
 def _plain(value):
