@@ -217,6 +217,8 @@ class PipelineStatsCollection:
         # #           }
         # #       }
         # #    }
+        # #    "STAGE": {
+        # #       stage_name: {}
         # #  }
         # #  header: {version: 0.1, creation_date: YYMMDD-HH:MM:SS Z}
         # # }
@@ -847,6 +849,58 @@ class FlagDeterALMAResultsExtractor(ResultsStatsExtractor):
         return stats
 
 
+def _plain_sorted(values) -> list:
+    """Return the values as a sorted list of plain Python types, so json can write them in a consistent order."""
+    return sorted(v.item() if isinstance(v, np.generic) else v for v in values)
+
+
+def extract_qa_score_regression(result: Results) -> list:
+    """Extract QA scores from a TaskResults object, package them into stats objects, and return them in a list.
+
+    Args:
+        result: TaskResults Object containing QA pool data to be processed.
+
+    Returns:
+        dict: list of PipelineStatistic objects representing the extracted QA scores
+    """
+    # TODO: Consider adding applies_to or other QA Score info
+    # TODO: This approach adapts the regression test approach to json. A better solution may exist.
+
+    qa = []
+
+    # Iterate through each QA score in the result's pool
+    for qa_score in result.qa.pool:
+        individual_score_dict = {}
+
+        # Extract and normalize metric name for use in keys
+        metric_name = qa_score.origin.metric_name
+
+        # Remove all non-word characters (everything except numbers and letters)
+        metric_name = re.sub(r"[^\w\s]", '', metric_name)
+
+        # Replace all whitespace with a single dash
+        metric_name = re.sub(r"\s+", '-', metric_name)
+
+        metric_score, score_value = qa_score.origin.metric_score, qa_score.score
+
+        # json cannot write numpy scalars such as np.float32 or np.int64
+        if isinstance(metric_score, np.generic):
+            metric_score = metric_score.item()
+        if isinstance(score_value, np.generic):
+            score_value = score_value.item()
+
+        individual_score_dict['metric_name'] = metric_name
+        individual_score_dict['metric'] = metric_score
+        individual_score_dict['score'] = score_value
+        applies_to = qa_score.applies_to
+        individual_score_dict['fields'] = _plain_sorted(applies_to.field) if applies_to else []
+        individual_score_dict['spws'] = _plain_sorted(applies_to.spw) if applies_to else []
+
+        qa.append((result.stage_number, individual_score_dict))
+
+    return qa
+
+
 def union(input: list, new: dict | list[dict]) -> list[dict]:
     """
     Combines lst which is always a list, with new,
@@ -877,6 +931,21 @@ def get_stats_from_results(context: Context, stats_collection: PipelineStatsColl
             stats_collection.add_stat(stat, eb=eb, level=stat.level, mous=mous)
 
 
+def serialize_qa(context: Context) -> dict:
+    """Extract QA scores from all results and add to stages"""
+    qa_dict = {}
+    for results_proxy in context.results:
+        results = results_proxy.read()
+        if hasattr(results, 'qa') and results.qa and results.qa.pool:
+            qa_entries = extract_qa_score_regression(results)
+            for stage, qa in qa_entries:
+                if not qa_dict.get(stage):
+                    qa_dict[stage] = {"qa_scores": []}
+                qa_dict[stage]["qa_scores"].append(qa)
+
+    return qa_dict
+
+
 # This is the main interface for generating statistics.
 def generate_stats(context: Context) -> dict:
     """
@@ -896,6 +965,13 @@ def generate_stats(context: Context) -> dict:
     # 3. Construct dictionary representation of all pipeline stats
     LOG.info("Converting pipeline stats collection to dictionary...")
     final_dict = stats_collection.to_dict()
+
+    # 4. Serialize QA objects and add to pipeline stats file.
+    LOG.info("Serializing QA objects and adding to pipeline stats file...")
+    qa_dict = serialize_qa(context)
+    stage_dict = final_dict.setdefault("STAGE", {})
+    for stage, stage_qa in qa_dict.items():
+        stage_dict.setdefault(stage, {}).update(stage_qa)
 
     LOG.info("Returning final pipeline stats dictionary...")
 
