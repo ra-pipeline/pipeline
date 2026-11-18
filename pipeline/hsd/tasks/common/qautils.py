@@ -443,7 +443,7 @@ class QAScoreSorter:
         """
         self.sort_keys = sort_keys
 
-    def score_color(self, qascore: int) -> str:
+    def score_color(self, qascore: pqa.QAScore) -> str:
         """
         Returns the 'color' associated with the score of a QAScore object
 
