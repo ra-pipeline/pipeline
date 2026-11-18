@@ -2,128 +2,111 @@
 
 Records exact output values from main at commit c79f0ba71 to guard against
 regressions when optimising the CASA measures-based implementation.
+
+Updated for PIPE-3189: timestamps are decimated onto a uniform ~1s target
+grid to avoid the unnecessarily dense SQLD sampling grid, with a floor of
+50 retained timestamps so a short field keeps its resolution.
 """
 import datetime
 
+import numpy as np
 import pytest
 
 from pipeline.infrastructure import casa_tools
 from pipeline.infrastructure.tablereader import MeasurementSetReader
-from pipeline.infrastructure.renderer.htmlrenderer import compute_zd_telmjd_for_ms
+from pipeline.infrastructure.renderer.htmlrenderer import (
+    _decimate_timestamps,
+    compute_zd_telmjd_for_ms,
+)
 
 MS_NAME = casa_tools.utils.resolve(
     "pl-unittest/uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small.ms"
 )
 
-# Expected zenith-distance values (degrees) recorded from main @ c79f0ba71.
+# Expected zenith-distance values (degrees) after decimation onto the ~1s
+# target grid (PIPE-3189).
 # fmt: off
 _ZDS = [
-    22.674321246538103,
-    22.674547323664278,
-    22.674773638800218,
-    22.6750001936626,
-    22.675226987505773,
-    22.67545401982791,
-    22.675681291610363,
-    22.675908802104164,
-    22.67613655154938,
-    22.676364540187038,
-    22.677393444930132,
-    22.67762274738366,
-    22.677852288984226,
-    22.67808206922486,
-    22.678312088097567,
-    22.67854234659727,
-    22.678772843463832,
-    22.679003579191097,
-    22.67923455377173,
-    22.67946576745012,
-    22.680509183393994,
-    22.6807417105961,
-    22.68097447659696,
-    22.681207481389333,
-    22.681440724457733,
-    22.681674206810243,
-    22.68190792767756,
-    22.682141887306177,
-    22.68237608594386,
-    22.68261052307326,
-    22.68825856682092,
-    22.68867934176151,
-    22.689100848825053,
-    22.689523084824845,
-    22.689946052608132,
-    22.690157809755036,
-    22.690369749239522,
-    22.690794177840203,
-    22.691219335995385,
-    22.691645224455133,
-    22.6920718434438,
-    22.69249919292144,
-    22.69292727124929,
-    22.693356081582145,
-    22.693785620144723,
-    22.694215890099983,
-    22.69443129856834,
-    22.69464688980339,
-    22.695078619480597,
-    22.695511079089847,
-    22.695944268858895,
-    22.69637818712668,
-    22.69681283709108,
-    22.697248215196414,
-    22.697684324107087,
-    22.698121161611056,
-    22.69855872983959,
-    22.69877778728255,
-    22.698997026846037,
-    22.699436054223632,
-    22.699875810565366,
-    22.70031629664852,
-    22.700757511608074,
-    22.701199457324204,
-    22.701642130454502,
-    22.70208553425867,
-    22.702529667041908,
-    22.70297452875998,
-    22.70319723333681,
-    22.703420119923308,
-    22.703866439934547,
-    22.70431348874919,
-    22.704761267995085,
-    22.70520977428568,
+    22.674321225165677,
+    22.674773617423011,
+    22.675000172283028,
+    22.675453998443540,
+    22.675908780715012,
+    22.676364519041385,
+    22.677393423525434,
+    22.677852267574703,
+    22.678312066683262,
+    22.678772821793711,
+    22.679003557769615,
+    22.679465746275614,
+    22.680509162209933,
+    22.680741689156665,
+    22.681207459691386,
+    22.681440703265075,
+    22.681907905971624,
+    22.682376064232631,
+    22.682610501614711,
+    22.688258545305636,
+    22.688679320242041,
+    22.689100827039013,
+    22.689523063034240,
+    22.689946030812887,
+    22.690157788220976,
+    22.690794156299898,
+    22.691219314450919,
+    22.691645203171596,
+    22.692071821625476,
+    22.692499171364517,
+    22.692927249954650,
+    22.693356059749938,
+    22.693785598575307,
+    22.694431277260762,
+    22.694646867957381,
+    22.695078597629955,
+    22.695511056965412,
+    22.695944247268717,
+    22.696378165802447,
+    22.696812815221968,
+    22.697248193864752,
+    22.697684302500281,
+    22.698121140000090,
+    22.698777765665348,
+    22.698997004953945,
+    22.699436032600186,
+    22.699875788664055,
+    22.700316274742651,
+    22.700757489972187,
+    22.701199435409116,
+    22.701642109085881,
+    22.702085512886388,
+    22.702529645389504,
+    22.703197211678173,
+    22.703420097985255,
+    22.703866418269691,
+    22.704313467358521,
+    22.704761246043255,
+    22.705209752608432,
 ]
 # fmt: on
 
 _TELMJDS = [
     "2017-09-11T06:22:06.192000+00:00",
-    "2017-09-11T06:22:06.768001+00:00",
     "2017-09-11T06:22:07.344000+00:00",
     "2017-09-11T06:22:07.920000+00:00",
-    "2017-09-11T06:22:08.496000+00:00",
     "2017-09-11T06:22:09.072000+00:00",
-    "2017-09-11T06:22:09.648000+00:00",
     "2017-09-11T06:22:10.224000+00:00",
-    "2017-09-11T06:22:10.800000+00:00",
     "2017-09-11T06:22:11.376000+00:00",
     "2017-09-11T06:22:13.968000+00:00",
-    "2017-09-11T06:22:14.544000+00:00",
     "2017-09-11T06:22:15.120000+00:00",
-    "2017-09-11T06:22:15.696000+00:00",
     "2017-09-11T06:22:16.271999+00:00",
-    "2017-09-11T06:22:16.848000+00:00",
     "2017-09-11T06:22:17.424000+00:00",
     "2017-09-11T06:22:18+00:00",
-    "2017-09-11T06:22:18.576000+00:00",
     "2017-09-11T06:22:19.152000+00:00",
     "2017-09-11T06:22:21.743999+00:00",
     "2017-09-11T06:22:22.320000+00:00",
-    "2017-09-11T06:22:22.896000+00:00",
     "2017-09-11T06:22:23.472000+00:00",
     "2017-09-11T06:22:24.048000+00:00",
-    "2017-09-11T06:22:24.624000+00:00",
     "2017-09-11T06:22:25.200000+00:00",
-    "2017-09-11T06:22:25.776000+00:00",
     "2017-09-11T06:22:26.352000+00:00",
     "2017-09-11T06:22:26.928000+00:00",
     "2017-09-11T06:22:40.632001+00:00",
@@ -132,7 +115,6 @@ _TELMJDS = [
     "2017-09-11T06:22:43.655999+00:00",
     "2017-09-11T06:22:44.664001+00:00",
     "2017-09-11T06:22:45.168000+00:00",
-    "2017-09-11T06:22:45.671999+00:00",
     "2017-09-11T06:22:46.680000+00:00",
     "2017-09-11T06:22:47.688000+00:00",
     "2017-09-11T06:22:48.696000+00:00",
@@ -141,7 +123,6 @@ _TELMJDS = [
     "2017-09-11T06:22:51.719999+00:00",
     "2017-09-11T06:22:52.728001+00:00",
     "2017-09-11T06:22:53.735999+00:00",
-    "2017-09-11T06:22:54.744000+00:00",
     "2017-09-11T06:22:55.248000+00:00",
     "2017-09-11T06:22:55.752000+00:00",
     "2017-09-11T06:22:56.760000+00:00",
@@ -152,7 +133,6 @@ _TELMJDS = [
     "2017-09-11T06:23:01.800000+00:00",
     "2017-09-11T06:23:02.808001+00:00",
     "2017-09-11T06:23:03.815999+00:00",
-    "2017-09-11T06:23:04.824000+00:00",
     "2017-09-11T06:23:05.328000+00:00",
     "2017-09-11T06:23:05.831999+00:00",
     "2017-09-11T06:23:06.840000+00:00",
@@ -163,7 +143,6 @@ _TELMJDS = [
     "2017-09-11T06:23:11.879999+00:00",
     "2017-09-11T06:23:12.888000+00:00",
     "2017-09-11T06:23:13.896000+00:00",
-    "2017-09-11T06:23:14.904000+00:00",
     "2017-09-11T06:23:15.408000+00:00",
     "2017-09-11T06:23:15.912000+00:00",
     "2017-09-11T06:23:16.920000+00:00",
@@ -185,8 +164,15 @@ class TestZdTelmjd:
     def test_zd_values(self, ms):
         result = compute_zd_telmjd_for_ms(ms)
         field = result[3]
+        # Tolerance absorbs CASA measures-data refreshes: the shared measurespath
+        # geodetic tables were updated on 2026-10-05 and shifted every ZD by a
+        # constant ~2.1e-08 deg (this test also fails on unmodified main then).
+        # rel=1e-5 is ~10,000x that drift yet still 17x tighter than the ~4e-3 deg
+        # that a one-second timestamp error would produce, so it keeps catching
+        # real regressions. Timestamps themselves are asserted exactly in
+        # test_telmjd_exact, which measures data cannot perturb.
         for i, (actual, expected) in enumerate(zip(field['zd'], _ZDS)):
-            assert actual == pytest.approx(expected, rel=5e-10), (
+            assert actual == pytest.approx(expected, rel=1e-5), (
                 f"zd[{i}] mismatch: {actual:.16f} != {expected:.16f}, "
                 f"diff={abs(actual-expected):.2e}"
             )
@@ -197,8 +183,8 @@ class TestZdTelmjd:
 
     def test_timestamp_count(self, ms):
         result = compute_zd_telmjd_for_ms(ms)
-        assert len(result[3]['zd']) == 74
-        assert len(result[3]['telmjd']) == 74
+        assert len(result[3]['zd']) == 59
+        assert len(result[3]['telmjd']) == 59
 
     def test_telmjd_exact(self, ms):
         result = compute_zd_telmjd_for_ms(ms)
@@ -211,3 +197,103 @@ class TestZdTelmjd:
             assert actual == expected, (
                 f"telmjd[{i}] exact mismatch: {actual!r} != {expected!r}"
             )
+
+
+@pytest.mark.unit
+class TestDecimateTimestamps:
+    """Property tests for the PIPE-3189 decimation. No MS required."""
+
+    # Mirrors the min_count default of _decimate_timestamps.
+    MIN_COUNT = 50
+
+    @staticmethod
+    def _dense(duration, dt=0.016):
+        """Duration seconds sampled at the SQLD (16ms) rate."""
+        return np.arange(0.0, duration, dt)
+
+    def test_output_is_sorted_subset_of_input(self):
+        """Only real input timestamps may be returned, in ascending order."""
+        t = self._dense(100.0)
+        out = _decimate_timestamps(t)
+        assert np.all(np.diff(out) > 0)
+        assert set(out).issubset(set(t))
+
+    def test_endpoints_preserved(self):
+        """The full time range must survive decimation."""
+        t = self._dense(100.0)
+        out = _decimate_timestamps(t)
+        assert out[0] == t[0]
+        assert out[-1] == t[-1]
+
+    @pytest.mark.parametrize('duration', [2.0, 10.0, 30.0, 48.0])
+    def test_short_dense_span_keeps_min_count(self, duration):
+        """A short dense field keeps min_count points, it is not exempted."""
+        # The floor must tighten the grid rather than fall back to no
+        # decimation: a binary fallback hands a short-but-dense field all of
+        # its samples back, re-opening the SQLD pathology for short dwells.
+        t = self._dense(duration)
+        out = _decimate_timestamps(t)
+        assert len(out) >= self.MIN_COUNT, len(out)
+        assert len(out) < len(t), 'field was not decimated at all'
+
+    def test_long_span_uses_one_second_grid(self):
+        """Spans longer than min_count seconds resolve to the 1s grid."""
+        t = self._dense(100.0)
+        out = _decimate_timestamps(t)
+        gaps = np.diff(out)
+        # The grid is 1s; snapping to 16ms samples shifts a point by <= dt.
+        assert gaps.min() >= 1.0 - 0.016 - 1e-9
+        assert gaps.max() <= 1.0 + 0.016 + 1e-9
+        assert 100 <= len(out) <= 102
+
+    def test_grid_spacing_not_inflated_by_coarse_sampling(self):
+        """A 0.576s input must not round the 1s target up to 1.152s."""
+        # A minimum-gap rule cannot hit a 1s target with 0.576s sampling and
+        # has to skip every other sample, under-sampling by a third.
+        t = np.arange(0.0, 73.75 + 1e-9, 0.576)
+        out = _decimate_timestamps(t)
+        mean_gap = (out[-1] - out[0]) / (len(out) - 1)
+        assert mean_gap == pytest.approx(1.0, rel=0.05), mean_gap
+
+    def test_sparse_input_is_untouched(self):
+        """Input already sparser than the target is returned unchanged."""
+        t = np.arange(0.0, 100.0, 1.5)
+        assert np.array_equal(_decimate_timestamps(t), t)
+
+    def test_unsorted_input_is_sorted_before_selection(self):
+        """Unsorted input must not collapse during selection."""
+        t = np.array([3.0, 1.0, 2.0, 1.5, 0.5])
+        out = _decimate_timestamps(t)
+        assert np.all(np.diff(out) >= 0)
+        assert out[0] == t.min()
+        assert out[-1] == t.max()
+
+    def test_degenerate_inputs(self):
+        """Single and zero-span inputs must not raise or divide by zero."""
+        assert np.array_equal(_decimate_timestamps(np.array([5.0])), [5.0])
+        # Every timestamp identical: one evaluation covers all of them.
+        assert len(_decimate_timestamps(np.full(100, 5.0))) == 1
+
+    def test_allocation_follows_time_not_sample_count(self):
+        """Equal-duration bursts get equal points despite a 62x rate gap."""
+        # A density-driven selector fails this: it would hand the 16ms burst
+        # ~62x more points than the 1s burst.
+        a = np.arange(0.0, 30.0, 0.016)  # 1875 samples at the SQLD rate
+        b = np.arange(100.0, 130.0, 1.0)  # 30 samples at the continuum rate
+        out = _decimate_timestamps(np.concatenate([a, b]))
+        n_a = int(np.sum(out < 100.0))
+        n_b = int(np.sum(out >= 100.0))
+        assert abs(n_a - n_b) <= 1, f'equal bursts got {n_a} vs {n_b} points'
+        assert n_a == pytest.approx(30, abs=2), n_a
+
+    def test_mean_tracks_time_weighting_across_equal_bursts(self):
+        """The returned series must be unbiased across equal-length bursts."""
+        # The weblog zd_avg is a plain mean of the returned series, so any
+        # per-burst phase error shows up directly in the published average.
+        # A selector that keeps the first sample of every burst (the greedy
+        # rule) restarts phase at each gap and is biased by up to ~0.005 deg.
+        bursts = [np.arange(i * 100.0, i * 100.0 + 30.0, 0.016) for i in range(10)]
+        t = np.concatenate(bursts)
+        truth = float(np.mean([b[0] + (b[-1] - b[0]) / 2 for b in bursts]))
+        out = _decimate_timestamps(t)
+        assert out.mean() == pytest.approx(truth, rel=1e-4), f'mean {out.mean()} vs time-weighted {truth}'

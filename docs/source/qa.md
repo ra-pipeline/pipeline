@@ -253,13 +253,18 @@ The pipeline has fallback behavior:
 - Backup is `FLUX_SERVICE_URL_BACKUP` (asa.alma.cl)
 - Use local `flux.csv` override file for manual values
 
-Set via environment or PPR configuration.
+Set via environment or PPR configuration. Current availability and response status for both primary and backup
+endpoints can be verified on the [Pipeline Services Monitor](https://ra-pipeline.github.io/pipeline-services-monitor/).
 
 ### How do I handle antenna position correction failures?
 
-By default, if the `getantposalma` task fails (e.g., due to ALMA web service issues or network offline states), the pipeline raises a `PipelineException` and halts execution.
+By default, if the `getantposalma` task fails (e.g., due to ALMA web service issues or network offline states),
+the pipeline raises a `PipelineException` and halts execution. Real-time endpoint health can be checked on the
+[Pipeline Services Monitor](https://ra-pipeline.github.io/pipeline-services-monitor/).
 
-If you want the pipeline to log a warning and continue processing without applying corrections, you can enable lenient mode by setting the `ALLOW_GETANTPOSALMA_FAILURE` environment variable to `true` before running the pipeline:
+If you want the pipeline to log a warning and continue processing without applying corrections, you can enable
+lenient mode by setting the `ALLOW_GETANTPOSALMA_FAILURE` environment variable to `true` before running the
+pipeline:
 
 ```python
 import os
@@ -269,6 +274,21 @@ os.environ['ALLOW_GETANTPOSALMA_FAILURE'] = 'true'
 # Strict mode (default): Crash with PipelineException if getantposalma fails
 os.environ['ALLOW_GETANTPOSALMA_FAILURE'] = 'false'
 ```
+
+### What if the Jy/K (jyperk) service is unavailable?
+
+For ALMA Single-Dish datasets, {func}`~pipeline.hsd.cli.hsd_k2jycal` queries the online ALMA Jy/K database
+service to retrieve temperature-to-flux conversion factors.
+
+If the primary service endpoint fails:
+
+- The task automatically queries regional mirrors (JAO, EA, NA, EU) in sequence.
+- If all endpoints are unreachable, the task falls back to reading factors from a local CSV file specified
+  by the `reffile` parameter (default `jyperk.csv`). If no file is available, factors default to `1.0` with
+  a warning and a reduced QA score (`score_sd_jkperk_dbaccess`).
+
+Endpoint health across all regional mirrors is tracked on the
+[Pipeline Services Monitor](https://ra-pipeline.github.io/pipeline-services-monitor/).
 
 ### What if I need to run in a headless environment (HPC cluster)?
 
