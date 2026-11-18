@@ -4,17 +4,20 @@ SingleDish tools related to QA
 QAScoreProperiesRegistry: Holds the parameters to control the behavior
 QAScoreFormatter: Holds methods to re-format QA scores
 QAScoreAggregator: Aggregates messages in QA score
+QAScoreSorter: Sorts QAScore objects with multiple attributes
 """
 from __future__ import annotations
 
 import copy
 import functools
 import math
+from collections.abc import Iterable
 from operator import attrgetter
 from typing import TYPE_CHECKING, Callable
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.pipelineqa as pqa
+import pipeline.infrastructure.renderer.rendererutils as rutils
 
 if TYPE_CHECKING:
     from pipeline.infrastructure.api import Results
@@ -35,6 +38,7 @@ class QAScorePropertiesRegistry:
         self.keys_dict = {}
         self.to_aggregate_dict = {}
         self.excludes = []
+        self.sort_keys = []
 
     def register_longmsg_format(self, metric_name: str, template: str):
         """
@@ -74,6 +78,15 @@ class QAScorePropertiesRegistry:
             metric_names : List of QA score metric names to exclude
         """
         self.excludes = metric_names
+
+    def register_sort_keys(self, sort_keys: list[str]):
+        """
+        Register keys for sorting QAScores
+
+        Args:
+            metric_names : List of QA score metric names to exclude
+        """
+        self.sort_keys = sort_keys
 
     def get_longmsg_format(self, metric_name: str) -> str | None:
         """
@@ -119,6 +132,15 @@ class QAScorePropertiesRegistry:
             List of metric_names to exclude
         """
         return self.excludes
+
+    def get_sort_keys(self) -> list[str]:
+        """
+        Get the list of sort keys
+
+        Returns:
+            List of sort_keys
+        """
+        return self.sort_keys
 
 
 class QAScoreFormatter:
@@ -411,9 +433,76 @@ class QAScoreAggregator:
         return qascores
 
 
+class QAScoreSorter:
+    def __init__(self, sort_keys : list[str]):
+        """
+        Construct QAScoreSorter instance
+
+        Args:
+            sort_keys: Keys for sorting QAScores
+        """
+        self.sort_keys = sort_keys
+
+    def score_color(self, qascore: int) -> str:
+        """
+        Returns the 'color' associated with the score of a QAScore object
+
+        Args:
+            qascore : QAScore object
+        Returns:
+            Color associated to the score
+        """
+        if qascore.score <= rutils.SCORE_THRESHOLD_ERROR:
+            return "red"
+        elif qascore.score <= rutils.SCORE_THRESHOLD_WARNING:
+            return "yellow"
+        elif qascore.score <= rutils.SCORE_THRESHOLD_SUBOPTIMAL:
+            return "blue"
+        else:
+            return "green"
+
+    def _sort_qascores(self, qascores: list[pqa.QAScore]):
+        """
+        Sort QAScore objects with respect to the sort_keys.
+
+        Args:
+            qascores : List of QAScore obnects
+        Returns:
+            Sorted list of QAScore objects
+        """
+        for sort_key in reversed(self.sort_keys):
+            attr = attrgetter(sort_key)(qascores[0])
+            if isinstance(attr, Iterable) and type(attr) != str:
+                qascores.sort(key=lambda s: sorted(attrgetter(sort_key)(s)))
+            else:
+                qascores.sort(key=lambda s: attrgetter(sort_key)(s))
+        return qascores
+
+    def sort_qascores(self, qascores: list[pqa.QAScore], per_color: bool=False ):
+        """
+        Sort QAScore objects.
+
+        Args:
+            qascores : List of QAScore objects
+            per_color : True for per-color sorting, False to sort the entire list of QAScore
+        Returns:
+            Sorted list of QAScore objects
+        """
+        if per_color:
+            sorted_scores = []
+            for color in ["red", "yellow", "blue", "green"]:
+                picked_qascores = [s for s in qascores if self.score_color(s) == color]
+                if len(picked_qascores) > 0:
+                    sorted_scores.extend(self._sort_qascores(picked_qascores))
+        else:
+            sorted_scores = self._sort_qascores(qascores)
+
+        return sorted_scores
+
+
 def sort_qascores(method: Callable) -> Callable:
     """
-    Decorator to sort QAScores with their 'score's
+    Decorator to sort QAScores with multiple attributes
 
     Args:
         method: original method to be decorated
@@ -422,8 +511,12 @@ def sort_qascores(method: Callable) -> Callable:
     """
     @functools.wraps(method)
     def wrapper(self, context: Context, result: Results) -> str:
-        # sort QAScores with 'score's
-        result.qa.pool.sort(key=attrgetter("score"))
+        # sort QAScores
+        sort_keys = registry.get_sort_keys()
+        if sort_keys is None or len(sort_keys) == 0:
+            sort_keys = ["score"]
+        sorter = QAScoreSorter(sort_keys=sort_keys)
+        result.qa.pool = sorter.sort_qascores(result.qa.pool, per_color=True)
 
         return method(self, context, result)
 
