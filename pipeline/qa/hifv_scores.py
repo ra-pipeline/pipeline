@@ -900,6 +900,7 @@ def applycal_score_additional_flagged(ms, band_stats, cgc_fields, target_fields)
 
     scores = []
     max_frac = 0.0
+    evaluated = False
     for band, stats in band_stats.items():
         for kind, intent, fields in (('complex gain calibrator', 'PHASE', cgc_fields),
                                      ('science target', 'TARGET', target_fields)):
@@ -908,6 +909,7 @@ def applycal_score_additional_flagged(ms, band_stats, cgc_fields, target_fields)
                 before, after, total = utils.sum_flag_counts(stats, 'spw', fields=[field])
                 if not total:
                     continue
+                evaluated = True
                 frac = (after - before) / total
                 max_frac = max(max_frac, frac)
                 if frac > limit:
@@ -926,6 +928,8 @@ def applycal_score_additional_flagged(ms, band_stats, cgc_fields, target_fields)
                                       origin=pqa.QAOrigin(metric_score=max(flagged_fields.values()), **origin_kw),
                                       applies_to=applies_to))
 
+    if not evaluated:
+        return []
     if not scores:
         longmsg = (f'No complex gain calibrator or science target has more than {limit:.0%} of '
                    f'its data newly flagged by applycal in any band.')
