@@ -6,8 +6,18 @@ regressions when optimising the CASA measures-based implementation.
 Updated for PIPE-3189: timestamps are decimated onto a uniform ~1s target
 grid to avoid the unnecessarily dense SQLD sampling grid, with a floor of
 50 retained timestamps so a short field keeps its resolution.
+
+Updated for PIPE-3305: the zenith-distance check compares the level of the
+series with its shape. The geodetic tables behind measures() change weekly.
+One update moves every value by the same 2.1e-08 deg, with a spread of
+9.8e-10 deg, and moves consecutive differences by at most 5.6e-10 deg. The
+level is not stable, so a fixed relative tolerance on each value is the wrong
+guard: rel=1e-5 is 2.27e-04 deg at 22.675 deg, larger than the smallest step
+of the series (2.1176e-04 deg). It accepts a value paired with the next
+timestamp for 5 of the 58 adjacent pairs.
 """
 import datetime
+import warnings
 
 import numpy as np
 import pytest
@@ -18,6 +28,7 @@ from pipeline.infrastructure.renderer.htmlrenderer import (
     _decimate_timestamps,
     compute_zd_telmjd_for_ms,
 )
+from pipeline.infrastructure.utils.casa_data import get_measures_fingerprint
 
 MS_NAME = casa_tools.utils.resolve(
     "pl-unittest/uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small.ms"
@@ -152,6 +163,22 @@ _TELMJDS = [
 ]
 
 
+# PIPE-3305: two checks replace the old per-value relative tolerance.
+# Level: one data refresh moves every value by the same 2.1e-08 deg (spread
+# 9.8e-10 deg). Pattern: consecutive differences drift by at most 5.6e-10 deg,
+# and the smallest step in the series is 2.1176e-04 deg.
+_ZD_LEVEL_TOL = 1e-4  # deg, absorbs the constant offset a data refresh adds
+_ZD_PATTERN_TOL = 1e-7  # deg, checks the shape after the offset is removed
+_MEASURES_FP = '60ece9bd21e01000'  # fingerprint of the data these values came from
+
+
+def _level_and_pattern(actual, expected):
+    """Return the median level offset and the largest pattern residual, in degrees."""
+    diffs = np.asarray(actual, dtype=float) - np.asarray(expected, dtype=float)
+    offset = float(np.median(diffs))
+    return offset, float(np.max(np.abs(diffs - offset)))
+
+
 @pytest.fixture(scope='module')
 def ms():
     return MeasurementSetReader.get_measurement_set(MS_NAME)
@@ -162,20 +189,19 @@ class TestZdTelmjd:
     """Verify that compute_zd_telmjd_for_ms produces expected values."""
 
     def test_zd_values(self, ms):
+        """Check the level and the pattern of the zenith-distance series."""
         result = compute_zd_telmjd_for_ms(ms)
         field = result[3]
-        # Tolerance absorbs CASA measures-data refreshes: the shared measurespath
-        # geodetic tables were updated on 2026-10-05 and shifted every ZD by a
-        # constant ~2.1e-08 deg (this test also fails on unmodified main then).
-        # rel=1e-5 is ~10,000x that drift yet still 17x tighter than the ~4e-3 deg
-        # that a one-second timestamp error would produce, so it keeps catching
-        # real regressions. Timestamps themselves are asserted exactly in
-        # test_telmjd_exact, which measures data cannot perturb.
-        for i, (actual, expected) in enumerate(zip(field['zd'], _ZDS)):
-            assert actual == pytest.approx(expected, rel=1e-5), (
-                f"zd[{i}] mismatch: {actual:.16f} != {expected:.16f}, "
-                f"diff={abs(actual-expected):.2e}"
-            )
+        fingerprint = get_measures_fingerprint()
+        offset, residual = _level_and_pattern(field['zd'], _ZDS)
+        message = (
+            f'zd series mismatch: level offset {offset:.3e} deg '
+            f'(tolerance {_ZD_LEVEL_TOL:.1e} deg), worst pattern residual '
+            f'{residual:.3e} deg (tolerance {_ZD_PATTERN_TOL:.1e} deg), '
+            f'measures fingerprint {fingerprint} (recorded {_MEASURES_FP})'
+        )
+        assert abs(offset) < _ZD_LEVEL_TOL, message
+        assert residual < _ZD_PATTERN_TOL, message
 
     def test_field_count(self, ms):
         result = compute_zd_telmjd_for_ms(ms)
@@ -197,6 +223,58 @@ class TestZdTelmjd:
             assert actual == expected, (
                 f"telmjd[{i}] exact mismatch: {actual!r} != {expected!r}"
             )
+
+
+@pytest.mark.unit
+class TestMeasuresData:
+    """Checks on the geodetic data behind the recorded values. No MS required."""
+
+    def test_fingerprint_is_recorded(self):
+        """Warn when the geodetic tables differ from the recorded reference."""
+        fingerprint = get_measures_fingerprint()
+        if fingerprint != _MEASURES_FP:
+            warnings.warn(
+                f'CASA measures data changed: fingerprint {fingerprint}, '
+                f'recorded {_MEASURES_FP}. The level check absorbs a constant '
+                'shift, but the recorded _ZDS values may need re-derivation.',
+                stacklevel=2,
+            )
+
+
+@pytest.mark.unit
+class TestZdSeriesChecks:
+    """Property tests for the PIPE-3305 level and pattern checks. No MS required."""
+
+    def test_single_value_shift_breaks_the_pattern(self):
+        """One value off by 1e-6 deg fails the pattern check."""
+        expected = list(_ZDS)
+        expected[10] += 1e-6
+        offset, residual = _level_and_pattern(_ZDS, expected)
+        assert offset == pytest.approx(0.0, abs=1e-12), offset
+        assert residual > _ZD_PATTERN_TOL, residual
+
+    def test_uniform_shift_keeps_the_pattern(self):
+        """A refresh that moves every value alike passes the pattern check."""
+        actual = [v + 1e-6 for v in _ZDS]
+        offset, residual = _level_and_pattern(actual, _ZDS)
+        assert offset == pytest.approx(1e-6, abs=1e-12), offset
+        assert residual < _ZD_PATTERN_TOL, residual
+        assert abs(offset) < _ZD_LEVEL_TOL, offset
+
+    def test_adjacent_swap_breaks_the_pattern(self):
+        """Two values paired with the wrong timestamps fail the pattern check."""
+        actual = list(_ZDS)
+        actual[23], actual[24] = actual[24], actual[23]
+        _, residual = _level_and_pattern(actual, _ZDS)
+        assert residual > _ZD_PATTERN_TOL, residual
+
+    def test_pattern_tolerance_stays_below_the_pairing_signal(self):
+        """The pattern check must stay far below the smallest step of the series."""
+        smallest_step = float(np.min(np.abs(np.diff(_ZDS))))
+        assert _ZD_PATTERN_TOL < smallest_step / 1000, (
+            f'pattern tolerance {_ZD_PATTERN_TOL} deg is not below one '
+            f'thousandth of the smallest step {smallest_step:.3e} deg'
+        )
 
 
 @pytest.mark.unit
