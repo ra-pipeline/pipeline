@@ -919,8 +919,8 @@ def applycal_score_additional_flagged(ms, band_stats, cgc_fields, target_fields)
             longmsg = (f'More than {limit:.0%} of the data of {kind} {details} in '
                        f'{band} band was newly flagged by applycal.')
             shortmsg = f'>{limit:.0%} {kind} data newly flagged'
-            applies_to = pqa.TargetDataSelection(vis={ms.basename}, intent={intent},
-                                                 field={f.id for f in ms.get_fields(name=list(flagged_fields))})
+            field_ids = {f.id for f in ms.fields if utils.dequote(f.name) in flagged_fields}
+            applies_to = pqa.TargetDataSelection(vis={ms.basename}, intent={intent}, field=field_ids)
             score = rendererutils.SCORE_THRESHOLD_ERROR
             scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename,
                                       origin=pqa.QAOrigin(metric_score=max(flagged_fields.values()), **origin_kw),
@@ -1001,7 +1001,7 @@ def applycal_score_specline_spws_flagged(ms, band_stats, target_fields):
         shortmsg = 'Spectral line windows fully flagged on target'
         applies_to = pqa.TargetDataSelection(vis={ms.basename}, intent={'TARGET'},
                                              spw={spw for spws in flagged.values() for spw in spws},
-                                             field={f.id for f in ms.get_fields(name=list(flagged))})
+                                             field={f.id for f in ms.fields if utils.dequote(f.name) in flagged})
         score = rendererutils.SCORE_THRESHOLD_ERROR
         n_flagged = sum(len(spws) for spws in flagged.values())
         scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename,
