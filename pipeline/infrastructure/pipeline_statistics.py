@@ -5,6 +5,7 @@ import collections.abc
 import copy
 import datetime
 import enum
+import json
 import re
 from typing import TYPE_CHECKING
 
@@ -2018,3 +2019,16 @@ def generate_stats(context: Context) -> dict:
     LOG.info("Returning final pipeline stats dictionary...")
 
     return final_dict
+
+
+def write_stats_file(context: Context, filename: str) -> str:
+    """Generate the pipeline statistics for a run and write them to filename as JSON.
+
+    Returns:
+        The filename written.
+    """
+    stats = generate_stats(context)
+    LOG.info("Writing pipeline statistics to %s", filename)
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(stats, f, ensure_ascii=False, indent=4, sort_keys=True)
+    return filename
