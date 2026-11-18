@@ -1,3 +1,5 @@
+"""Retrieve catalogue fluxes with bounded retries and endpoint failover."""
+
 from __future__ import annotations
 
 import collections
@@ -6,7 +8,10 @@ import decimal
 import ssl
 import time
 import traceback
-import urllib
+import urllib.error
+import urllib.parse
+import urllib.request
+from http.client import IncompleteRead
 from typing import TYPE_CHECKING, Any
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
@@ -34,6 +39,62 @@ DEFAULT_HEADERS = {
     'User-Agent': 'Mozilla/5.0',
     'Accept': '*/*',
 }
+RETRYABLE_HTTP_CODES = frozenset({408, 429, 500, 502, 503, 504})
+
+
+class FluxServiceResponseError(ValueError):
+    """The service returned XML without a usable catalogue response structure."""
+
+
+class FluxServiceClient:
+    """Share the selected flux endpoint across queries in one import."""
+
+    def __init__(self, service_url: str | None = None) -> None:
+        """Initialize endpoint selection without making a probe request.
+
+        Args:
+            service_url: Selected endpoint, or the configured primary when omitted.
+        """
+        primary_url, backup_url = get_flux_urls()
+        self.service_url: str = primary_url if service_url is None else service_url
+        self._backup_url: str | None = (
+            backup_url if self.service_url == primary_url and backup_url != primary_url else None
+        )
+        self._status: str = 'BACKUPURL' if self.service_url == backup_url and backup_url != primary_url else 'FIRSTURL'
+
+    @property
+    def status(self) -> str:
+        """QA service status for the current endpoint."""
+        return self._status
+
+    def query(self, obs_time: datetime.datetime, frequency: str, sourcename: str) -> dict[str, str | None]:
+        """Query the selected service and retain a successful backup endpoint.
+
+        Args:
+            obs_time: Observation date.
+            frequency: Query frequency in Hz.
+            sourcename: Source name.
+
+        Returns:
+            The catalogue response from the working endpoint.
+
+        Raises:
+            OSError: If the available endpoints cannot be reached.
+            IncompleteRead: If the available endpoints return truncated responses.
+            ExpatError: If the available endpoints return malformed XML.
+            FluxServiceResponseError: If the available endpoints return unusable catalogue structures.
+        """
+        try:
+            return fluxservice(self.service_url, obs_time, frequency, sourcename)
+        except (OSError, IncompleteRead, ExpatError, FluxServiceResponseError):
+            if self._backup_url is None:
+                raise
+            LOG.warning('Flux query failed at %s; trying backup %s.', self.service_url, self._backup_url)
+            result = fluxservice(self._backup_url, obs_time, frequency, sourcename)
+            self.service_url = self._backup_url
+            self._backup_url = None
+            self._status = 'BACKUPURL'
+            return result
 
 
 def get_flux_urls() -> tuple[str, str]:
@@ -76,18 +137,21 @@ def check_service() -> tuple[str, str | None]:
 def get_setjy_results(
     mses: list[MeasurementSet],
     service_url: str | None = None,
+    *,
+    client: FluxServiceClient | None = None,
 ) -> tuple[list[FluxCalibrationResults], list[dict[str, Any]]]:
     """Get flux values from the database service, falling back to the Source table XML.
 
     Args:
         mses: Measurement sets for which to retrieve flux values.
         service_url: Flux service URL to query. The configured primary URL is used when this is ``None``.
+        client: Shared endpoint selection for this import; takes precedence over service_url.
 
     Returns:
         Flux calibration results and any QA status entries returned by the service.
     """
-    if service_url is None:
-        service_url, _ = get_flux_urls()
+    if client is None:
+        client = FluxServiceClient(service_url)
 
     results = []
     qastatus = []
@@ -95,7 +159,7 @@ def get_setjy_results(
         result = commonfluxresults.FluxCalibrationResults(ms.name)
         science_spw_ids = {spw.id for spw in ms.get_spectral_windows()}
 
-        fluxdb_results, qacodes = read_fluxes_db(ms, service_url=service_url)
+        fluxdb_results, qacodes = read_fluxes_db(ms, client=client)
 
         for source, measurements in fluxdb_results.items():
             m = [m for m in measurements if int(m.spw_id) in science_spw_ids]
@@ -116,26 +180,29 @@ def get_setjy_results(
 def read_fluxes_db(
     ms: MeasurementSet,
     service_url: str | None = None,
+    *,
+    client: FluxServiceClient | None = None,
 ) -> tuple[collections.defaultdict[Source, list[FluxMeasurement]], list[dict[str, Any]] | None]:
     """Read fluxes from the database server, defaulting to the Source XML table when necessary.
 
     Args:
         ms: Measurement set for which to retrieve flux values.
         service_url: Flux service URL to query. The configured primary URL is used when this is ``None``.
+        client: Shared endpoint selection; takes precedence over service_url.
 
     Returns:
         Flux measurements grouped by source and any QA status entries returned by the service.
     """
-    if service_url is None:
-        service_url, _ = get_flux_urls()
+    if client is None:
+        client = FluxServiceClient(service_url)
 
     xml_measurements = fluxes.read_fluxes_nodb(ms)
 
     if not xml_measurements:
         # Source.xml could not be read or parsed. Fall back to catalogue query
-        return flux_nosourcexml(ms, service_url=service_url), None
+        return flux_nosourcexml(ms, client=client), None
 
-    results, qacodes = add_catalogue_fluxes(xml_measurements, ms, service_url=service_url)
+    results, qacodes = add_catalogue_fluxes(xml_measurements, ms, client=client)
 
     return results, qacodes
 
@@ -143,24 +210,27 @@ def read_fluxes_db(
 def flux_nosourcexml(
     ms: MeasurementSet,
     service_url: str | None = None,
-) -> collections.defaultdict[Source, list[tuple[FluxMeasurement | str | None]]]:
+    *,
+    client: FluxServiceClient | None = None,
+) -> collections.defaultdict[Source, list[FluxMeasurement]]:
     """Query the flux service using frequencies from a measurement set without Source.xml.
 
     Args:
         ms: Measurement set for which to retrieve flux values.
         service_url: Flux service URL to query. The configured primary URL is used when this is ``None``.
+        client: Shared endpoint selection; takes precedence over service_url.
 
     Returns:
         Flux measurements grouped by source.
     """
     result = collections.defaultdict(list)
-    if service_url is None:
-        service_url, _ = get_flux_urls()
+    if client is None:
+        client = FluxServiceClient(service_url)
 
     for source in ms.sources:
         for spw in ms.get_spectral_windows(science_windows_only=True):
             url, version, status_code, data_conditions, clarification, catalogue_measurement = query_online_catalogue(
-                service_url, ms, spw, source
+                client.service_url, ms, spw, source, client=client
             )
             if catalogue_measurement:
                 result[source].append(catalogue_measurement)
@@ -183,6 +253,7 @@ def flux_nosourcexml(
 
 
 def buildurl(service_url: str, obs_time: datetime.datetime, frequency: str, sourcename: str) -> str:
+    """Construct a catalogue query URL for the source, date, and frequency."""
     # Example:
     # https://almascience.eso.org/sc/flux?DATE=10-August-2017&FREQUENCY=232101563000.0&NAME=J1924-2914&WEIGHTED=true&RESULT=1&CATALOGUE=5
     # New Example May 2019:
@@ -222,8 +293,13 @@ def fluxservice(
 
     Raises:
         OSError: If all attempts to contact or read from the service fail.
+        IncompleteRead: If all attempts to read the full response fail.
         ExpatError: If the service response cannot be parsed as XML.
+        FluxServiceResponseError: If the response has no catalogue row or an invalid status code.
+        ValueError: If retries or retry_delay is negative.
     """
+    if retries < 0 or retry_delay < 0:
+        raise ValueError('retries and retry_delay must be nonnegative')
     url = buildurl(service_url, obs_time, frequency, sourcename)
     LOG.info('Attempting query %s', url)
 
@@ -237,11 +313,17 @@ def fluxservice(
             with urllib.request.urlopen(req, context=ssl_context, timeout=60.0) as response:
                 content = response.read()
             break
-        except OSError as e:
-            if attempt >= retries:
+        except (OSError, IncompleteRead) as e:
+            retryable = not isinstance(e, urllib.error.HTTPError) or e.code in RETRYABLE_HTTP_CODES
+            reason = e.reason if isinstance(e, urllib.error.URLError) else e
+            if isinstance(reason, ssl.SSLCertVerificationError):
+                retryable = False
+            if attempt >= retries or not retryable:
                 LOG.warning('Problem contacting flux service at: <a href="%s">%s</a>', url, url)
                 raise
 
+            if isinstance(e, urllib.error.HTTPError):
+                e.close()
             delay = retry_delay * (2**attempt)
             LOG.warning('Query attempt %d failed: %s. Retrying in %.1fs...', attempt + 1, e, delay)
             time.sleep(delay)
@@ -280,54 +362,70 @@ def fluxservice(
             rowdict[output_key] = row_values.get(field_name)
         rowdict['url'] = url
 
+    try:
+        status_code = int(rowdict['statuscode'])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise FluxServiceResponseError('Flux response has no catalogue row with a valid StatusCode') from exc
+    if status_code not in range(5):
+        raise FluxServiceResponseError(f'Unsupported flux catalogue StatusCode: {status_code}')
+    if status_code != 4 and not {'FluxDensity', 'SpectralIndex'}.issubset(field_names):
+        raise FluxServiceResponseError('Flux response is missing FluxDensity or SpectralIndex columns')
+    rowdict['statuscode'] = str(status_code)
     return rowdict
 
 
 def buildparams(name: str, date: str, frequency: str) -> str:
-    """
-    Inputs are all strings with the format:
-    NAME=3c279&DATE=04-Apr-2014&FREQUENCY=231.435E9&WEIGHTED=true&RESULT=1&CATALOGUE=5
-    """
+    """Encode the flux catalogue query parameters."""
     params = dict(NAME=name, DATE=date, FREQUENCY=frequency, WEIGHTED='true', RESULT=1, VERBOSE=1, CATALOGUE=5)
     return urllib.parse.urlencode(params)
 
 
 def sanitize_string(name: str) -> str:
-    """
-    Sanitize source name if needed, taking first alias.
-    """
+    """Sanitize source name if needed, taking first alias."""
     return name.split(';')[0]
 
 
 def query_online_catalogue(
-        flux_url: str,
-        ms: MeasurementSet,
-        spw: SpectralWindow,
-        source: Source,
-        ) -> tuple[FluxMeasurement | str | None]:
-    # At this point we take:
-    #  - the source name string
-    #  - the frequency of the spw_id in Hz
-    #  - The observation date
-    #  and attempt to call the online flux catalog web service, and use the flux result
-    #  and spectral index
+    flux_url: str,
+    ms: MeasurementSet,
+    spw: SpectralWindow,
+    source: Source,
+    *,
+    client: FluxServiceClient | None = None,
+) -> tuple[str, str | None, str, str | None, str | None, FluxMeasurement | None]:
+    """Retrieve a catalogue measurement and its service metadata.
+
+    Args:
+        flux_url: Selected service URL when no client is supplied.
+        ms: Measurement set providing the observation date.
+        spw: Spectral window providing the query frequency.
+        source: Source to query.
+        client: Shared endpoint selection for this import.
+
+    Returns:
+        URL, version, status, data conditions, clarification, and optional flux measurement.
+    """
     source_name = source.name
     freq_hz = str(spw.centre_frequency.to_units(measures.FrequencyUnits.HERTZ))
     obs_time = utils.get_epoch_as_datetime(ms.start_time)
 
-    LOG.info("Input source name: %s    Input SPW: %s", str(source_name), str(spw.id))
+    LOG.info('Input source name: %s    Input SPW: %s', str(source_name), str(spw.id))
 
-    utcnow = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    utcnow = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     try:
-        fluxdict = fluxservice(flux_url, obs_time, freq_hz, source_name)
-    except Exception as e:
+        if client is None:
+            client = FluxServiceClient(flux_url)
+        fluxdict = client.query(obs_time, freq_hz, source_name)
+        flux_url = client.service_url
+    except (OSError, IncompleteRead, ExpatError, FluxServiceResponseError) as exc:
+        LOG.warning('Unable to retrieve catalogue flux for source %s spw %s: %s', source_name, spw.id, exc)
         # error contacting service
         return flux_url, '0.0', '0', None, None, None
 
     try:
         cat_fd = float(fluxdict['fluxdensity'])
         cat_spix = float(fluxdict['spectralindex'])
-    except Exception as e:
+    except (TypeError, ValueError):
         # could not convert 'null' to number. Bad catalogue value.
         return flux_url, '0.0', fluxdict['statuscode'], None, fluxdict['clarification'], None
 
@@ -339,14 +437,22 @@ def query_online_catalogue(
     final_spix = decimal.Decimal('%0.3f' % cat_spix)
     age_n_m_p = fluxdict['ageOfNearestMonitorPoint']
 
-    return fluxdict['url'], fluxdict['version'], fluxdict['statuscode'], fluxdict['dataconditions'], fluxdict['clarification'], \
-           domain.FluxMeasurement(spw.id, final_I, spix=final_spix, origin=ORIGIN_DB, queried_at=utcnow, age=age_n_m_p)
+    return (
+        fluxdict['url'],
+        fluxdict['version'],
+        fluxdict['statuscode'],
+        fluxdict['dataconditions'],
+        fluxdict['clarification'],
+        domain.FluxMeasurement(spw.id, final_I, spix=final_spix, origin=ORIGIN_DB, queried_at=utcnow, age=age_n_m_p),
+    )
 
 
 def add_catalogue_fluxes(
     measurements: collections.defaultdict[Source, list[FluxMeasurement]],
     ms: MeasurementSet,
     service_url: str | None = None,
+    *,
+    client: FluxServiceClient | None = None,
 ) -> tuple[collections.defaultdict[Source, list[FluxMeasurement]], list[dict[str, Any]]]:
     """Replace Source.xml measurements with available catalogue measurements.
 
@@ -354,6 +460,7 @@ def add_catalogue_fluxes(
         measurements: Source.xml flux measurements grouped by source.
         ms: Measurement set associated with the measurements.
         service_url: Flux service URL to query. The configured primary URL is used when this is ``None``.
+        client: Shared endpoint selection; takes precedence over service_url.
 
     Returns:
         Updated flux measurements grouped by source and any QA status entries returned by the service.
@@ -362,8 +469,8 @@ def add_catalogue_fluxes(
     qacodes = []  # Dictionaries will be added here for codes and warning messages from the sources catalog
     science_windows = ms.get_spectral_windows(science_windows_only=True)
 
-    if service_url is None:
-        service_url, _ = get_flux_urls()
+    if client is None:
+        client = FluxServiceClient(service_url)
 
     # Continue with required queries
     for source, xml_measurements in measurements.items():
@@ -375,7 +482,7 @@ def add_catalogue_fluxes(
                 continue
 
             url, version, status_code, data_conditions, clarification, catalogue_measurement = query_online_catalogue(
-                service_url, ms, spw, source
+                client.service_url, ms, spw, source, client=client
             )
 
             if catalogue_measurement:
@@ -403,32 +510,43 @@ def add_catalogue_fluxes(
             if clarification or int(status_code) > 1:
                 qacodes.append({'source': source, 'status_code': status_code, 'clarification': clarification})
 
-            log_result(source, spw, xml_measurement.I, catalogue_I, spix, age, url, version,
-                       status_code, data_conditions, clarification)
+            log_result(
+                source,
+                spw,
+                xml_measurement.I,
+                catalogue_I,
+                spix,
+                age,
+                url,
+                version,
+                status_code,
+                data_conditions,
+                clarification,
+            )
 
     return results, qacodes
 
 
 def log_result(
-        source: Source,
-        spw: SpectralWindow,
-        asdm_I: str,
-        catalogue_I: str,
-        spix: str,
-        age: str,
-        url: str,
-        version: str,
-        status_code: str,
-        data_conditions: str,
-        clarification: str,
-        ) -> None:
-
+    source: Source,
+    spw: SpectralWindow,
+    asdm_I: str,
+    catalogue_I: str,
+    spix: str,
+    age: str,
+    url: str,
+    version: str,
+    status_code: str,
+    data_conditions: str,
+    clarification: str,
+) -> None:
+    """Log the adopted flux and the catalogue response metadata."""
     codedict = {}
-    codedict[0] = "Grid cal flux estimation heuristic used"
-    codedict[1] = "Low-cadence flux estimation heuristic used"
-    codedict[2] = "Flux densities outside of the window were required to calculate an answer"
-    codedict[3] = "Fallback algorithm used, went outside the window"
-    codedict[4] = "No valid flux density could be calculated"
+    codedict[0] = 'Grid cal flux estimation heuristic used'
+    codedict[1] = 'Low-cadence flux estimation heuristic used'
+    codedict[2] = 'Flux densities outside of the window were required to calculate an answer'
+    codedict[3] = 'Fallback algorithm used, went outside the window'
+    codedict[4] = 'No valid flux density could be calculated'
 
     # DataConditions breakdown (3 digits historically, expanded to 4 digits in OFFLINE-2026AUG):
     # value[0]: number of available measurements used, where 9 means 9 or more

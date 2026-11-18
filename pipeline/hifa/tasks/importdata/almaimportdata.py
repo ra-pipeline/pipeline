@@ -1,3 +1,5 @@
+"""Import ALMA data and select local or catalogue flux measurements."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -18,10 +20,12 @@ LOG = infrastructure.logging.get_logger(__name__)
 
 
 class ALMAImportDataInputs(importdata.ImportDataInputs):
+    """Inputs for ALMA data import and flux catalogue selection."""
+
     # PIPE-2067: Added Pointing to retrieve ASDM_POINTING table for offset information
     asis = vdp.VisDependentProperty(
         default='Annotation Antenna CalAtmosphere CalPointing CalWVR ExecBlock Receiver Pointing SBSummary Source Station'
-        )
+    )
     dbservice = vdp.VisDependentProperty(default=False)
     createmms = vdp.VisDependentProperty(default='false')
     # sets threshold for polcal parallactic angle coverage. See PIPE-597
@@ -90,7 +94,7 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
 
             lazy: Use the lazy filler import.
 
-            save_flagonline:
+            save_flagonline: Save online flag commands.
 
             dbservice: Use the online flux catalog.
 
@@ -138,59 +142,76 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
 
                 Default: ``None`` (equivalent to ``False``)
         """
-        super().__init__(context, vis=vis, output_dir=output_dir, asis=asis,
-                         process_caldevice=process_caldevice, session=session,
-                         overwrite=overwrite, nocopy=nocopy, bdfflags=bdfflags, lazy=lazy,
-                         save_flagonline=save_flagonline, createmms=createmms,
-                         ocorr_mode=ocorr_mode, datacolumns=datacolumns)
+        super().__init__(
+            context,
+            vis=vis,
+            output_dir=output_dir,
+            asis=asis,
+            process_caldevice=process_caldevice,
+            session=session,
+            overwrite=overwrite,
+            nocopy=nocopy,
+            bdfflags=bdfflags,
+            lazy=lazy,
+            save_flagonline=save_flagonline,
+            createmms=createmms,
+            ocorr_mode=ocorr_mode,
+            datacolumns=datacolumns,
+        )
         self.dbservice = dbservice
         self.minparang = minparang
         self.parallel = parallel
 
 
 class ALMAImportDataResults(importdata.ImportDataResults):
+    """Imported measurement sets and their flux calibration results."""
+
     def __init__(
-            self,
-            mses: list[MeasurementSet] | None = None,
-            setjy_results: list[FluxCalibrationResults] | None = None,
-            ):
+        self,
+        mses: list[MeasurementSet] | None = None,
+        setjy_results: list[FluxCalibrationResults] | None = None,
+    ):
+        """Initialize the imported measurement sets and flux results."""
         super().__init__(mses=mses, setjy_results=setjy_results)
 
     def __repr__(self) -> str:
-        return 'ALMAImportDataResults:\n\t{0}'.format(
-            '\n\t'.join([ms.name for ms in self.mses]))
+        """Represent the result using its measurement set names."""
+        return 'ALMAImportDataResults:\n\t{0}'.format('\n\t'.join([ms.name for ms in self.mses]))
 
 
 class SerialALMAImportData(importdata.ImportData):
+    """Import ALMA data with catalogue flux retrieval and failure reporting."""
+
     Inputs = ALMAImportDataInputs
     Results = ALMAImportDataResults
 
     def prepare(self, **parameters) -> Results:
+        """Import data and defer a service outage error until weblog export."""
         results = super().prepare()
 
         # If online flux services were requested but unavailable, signal an error
         # after weblog generation to stop the pipeline before the next task.
         if getattr(self.inputs, 'dbservice', False) and results.fluxservice == 'FAIL':
             results.tb = (
-                'Online flux catalog unavailable; fell back to local Source.xml fluxes. '
-                'Stopping after weblog export.'
+                'Online flux catalog unavailable; fell back to local Source.xml fluxes. Stopping after weblog export.'
             )
 
         return results
 
     def _get_fluxes(
-            self,
-            context: Context,
-            observing_run: ObservingRun,
-            ) -> tuple[str | None, list[FluxCalibrationResults], list[dict[str, str | None]] | None]:
+        self,
+        context: Context,
+        observing_run: ObservingRun,
+    ) -> tuple[str | None, list[FluxCalibrationResults], list[dict[str, str | None]] | None]:
         # get the flux measurements from Source.xml for each MS
 
         if self.inputs.dbservice:
             fluxservice, service_url = dbfluxes.check_service()
             if fluxservice in ('FIRSTURL', 'BACKUPURL'):
-                xml_results, qastatus = dbfluxes.get_setjy_results(
-                    observing_run.measurement_sets, service_url=service_url
-                )
+                client = dbfluxes.FluxServiceClient(service_url)
+                xml_results, qastatus = dbfluxes.get_setjy_results(observing_run.measurement_sets, client=client)
+                if client.status == 'BACKUPURL':
+                    fluxservice = 'BACKUPURL'
             else:
                 xml_results = fluxes.get_setjy_results(observing_run.measurement_sets)
                 qastatus = None
