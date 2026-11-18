@@ -1381,6 +1381,7 @@ def sum_flag_counts(band_stats: dict, axis: str, ids=None, fields=None) -> tuple
         fields: field names to include; all if None.
     """
     before = after = total = 0
+    ids = None if ids is None else set(ids)
     for field in band_stats if fields is None else fields:
         for i, (b, a, t) in band_stats.get(field, {}).get(axis, {}).items():
             if ids is None or i in ids:
