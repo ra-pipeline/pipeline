@@ -16,8 +16,15 @@ import pipeline.infrastructure.utils as utils
 from pipeline import environment
 from pipeline.domain import measures
 from pipeline.domain.datatype import DataType
+from pipeline.domain.measures import FluxDensityUnits
+from pipeline.h.tasks.applycal.applycal import ApplycalResults
 from pipeline.h.tasks.common import flagging_renderer_utils as flagutils
+from pipeline.h.tasks.common.commonfluxresults import FluxCalibrationResults
+from pipeline.hif.tasks.applycal.ifapplycal import IFApplycal
 from pipeline.hifa.tasks.flagging.flagdeteralma import FlagDeterALMAResults
+from pipeline.hifa.tasks.fluxscale.gcorfluxscale import GcorFluxscale
+from pipeline.hifa.tasks.gfluxscaleflag import Gfluxscaleflag
+from pipeline.hifa.tasks.gfluxscaleflag.resultobjects import GfluxscaleflagResults
 from pipeline.infrastructure.renderer import regression
 
 LOG = infrastructure.logging.get_logger(__name__)
@@ -847,6 +854,166 @@ class FlagDeterALMAResultsExtractor(ResultsStatsExtractor):
                                    level=PipelineStatisticLevel.EB)
             stats.append((ms, ps))
         return stats
+
+
+class FluxcalflagResultsStatsExtractor(ResultsStatsExtractor):
+    """Regression test result extractor for hifa_gfluxscaleflag.
+
+    The extracted values are:
+       - the number of flagged rows before this task
+       - the number of flagged rows after this task
+       - QA score
+    """
+
+    result_cls = GfluxscaleflagResults
+    child_cls = None
+    generating_task = Gfluxscaleflag
+
+    def handle(self, result: GfluxscaleflagResults, context) -> list[tuple[str, PipelineStatistic]]:
+        before, after = self.calculate_value(result, context)
+        vis = result.inputs['vis']
+        ps = self.create_stat(before, after, vis)
+        return ps
+
+    def calculate_value(self, result: GfluxscaleflagResults, context):
+        """Extract values for testing.
+
+        Args:
+            result: GfluxscaleflagResults object
+        
+        Returns:
+            OrderedDict[str, float]
+        """
+        summaries_by_name = {s['name']: s for s in result.cafresult.summaries}
+
+        num_flags_before = summaries_by_name['before']['flagged']
+
+        if 'after' in summaries_by_name:
+            num_flags_after = summaries_by_name['after']['flagged']
+        else:
+            num_flags_after = num_flags_before
+
+        return int(num_flags_before), int(num_flags_after)
+
+    def create_stat(self, before, after, vis) -> list[tuple[str, PipelineStatistic]]:
+        longdescription = "Added for regression tests: number of flags before gfluxscaleflag."
+        ps1 = PipelineStatistic(name="gfluxscaleflag_before",
+                               value=before,
+                               longdesc=longdescription,
+                               level=PipelineStatisticLevel.EB)
+        longdescription = "Added for regression tests: number of flags after gfluxscaleflag."
+        ps2 = PipelineStatistic(name="gfluxscaleflag_after",
+                               value=after,
+                               longdesc=longdescription,
+                               level=PipelineStatisticLevel.EB)
+        return [(vis, ps1), (vis, ps2)]
+
+
+class GcorFluxscaleResultsStatsExtractor(ResultsStatsExtractor):
+    """
+    Regression test result extractor for hifa_gcorfluxscale.
+
+    The extracted values are:
+       - Stokes I for each field and spw, in Jy
+    """
+
+    result_cls = FluxCalibrationResults
+    child_cls = None
+    generating_task = GcorFluxscale
+
+    def handle(self, result:FluxCalibrationResults, context) -> list[tuple[str, PipelineStatistic]]:
+        val = self.calculate_value(result)
+        vis = result.inputs['vis']
+        ps = self.create_stat(vis, val)
+        return ps
+
+    def calculate_value(self, result:FluxCalibrationResults) -> dict:
+        """
+        Extract values for testing.
+
+        Args:
+            result: FluxCalibrationResults object
+        
+        Returns:
+            OrderedDict[str, float]
+        """
+        d = {}
+        for field_id, measurements in result.measurements.items():
+            for m in measurements:
+                key = 'field_{}.spw_{}.I'.format(field_id, m.spw_id)
+                d[key] = float(m.I.to_units(FluxDensityUnits.JANSKY))
+
+        return d
+
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
+        longdescription = "Added for regression tests: flux density results from flux calibration."
+        ps1 = PipelineStatistic(name="fluxcal_I",
+                                value=val,
+                                longdesc=longdescription,
+                                level=PipelineStatisticLevel.EB)
+        return [(vis, ps1)]
+
+
+class ApplycalResultsStatsExtractor(ResultsStatsExtractor):
+    """
+    Regression test result extractor for applycal tasks.
+
+    The extracted values are:
+       - the number of flagged and scanned rows before this task
+       - the number of flagged and scanned rows after this task
+       - QA score
+    """
+
+    result_cls = ApplycalResults
+    child_cls = None
+    generating_task = IFApplycal
+
+    def handle(self, result:FluxCalibrationResults, context) -> list[tuple[str, PipelineStatistic]]:
+        val = self.calculate_value(result)
+        vis = result.inputs['vis']
+        ps = self.create_stat(vis, val)
+        return ps
+
+    def calculate_value(self, result:ApplycalResults) -> dict:
+        """
+        Extract values for testing.
+
+        Args:
+            result: ApplycalResults object
+        
+        Returns:
+            OrderedDict[str, float]
+        """
+        d = {}
+
+        try:
+            summaries_by_name = {s['name']: s for s in result.summaries}
+            num_flags_before = summaries_by_name['before']['flagged']
+            num_flags_after = summaries_by_name['applycal']['flagged']
+            
+            d['num_rows_flagged.before'] = int(num_flags_before)
+            d['num_rows_flagged.after'] = int(num_flags_after)
+
+            flag_summary_before = summaries_by_name['before']
+            for scan_id, v in flag_summary_before['scan'].items():
+                d['scan_{}.num_rows_flagged.before'.format(scan_id)] = int(v['flagged'])
+
+            flag_summary_after = summaries_by_name['applycal']
+            for scan_id, v in flag_summary_after['scan'].items():
+                d['scan_{}.num_rows_flagged.after'.format(scan_id)] = int(v['flagged'])
+
+        except:
+            LOG.info("Some information missing from ApplycalResults. Omitting from resgression comparison.")
+            d = {}
+        return d
+
+    def create_stat(self, vis, val) -> list[tuple[str, PipelineStatistic]]:
+        longdescription = "Added for regression tests: applycal flags before and after"
+        ps1 = PipelineStatistic(name="applycal_flagging",
+                                value=val,
+                                longdesc=longdescription,
+                                level=PipelineStatisticLevel.EB)
+        return [(vis, ps1)]
 
 
 def _plain_sorted(values) -> list:
