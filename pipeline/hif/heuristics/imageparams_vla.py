@@ -176,8 +176,8 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             mean_SBL, p95_SBL = get_mean_amplitude(vis=vis, uvrange=uvrange_SBL, field=field, spw=real_spwids_str)
         except Exception as e:
             LOG.debug(e)
-            LOG.info("Data selection error   Field: {!s}, spw: {!s}.   uvrange set to >0.0klambda ".format(
-                str(field), real_spwids_str))
+            LOG.info("Cannot calculate amplitude statistics for field %s, spw %s in uvrange %s. "
+                     "uvrange set to >0.0klambda", field, real_spwids_str, uvrange_SBL)
             return '>0.0klambda', 1.0
 
         # Range for  50-55% bin
@@ -188,8 +188,8 @@ class ImageParamsHeuristicsVLA(ImageParamsHeuristics):
             mean_MBL, p95_MBL = get_mean_amplitude(vis=vis, uvrange=uvrange_MBL, field=field, spw=real_spwids_str)
         except Exception as e:
             LOG.debug(e)
-            LOG.info("Data selection error   Field: {!s}, spw: {!s}.   uvrange set to >0.0klambda ".format(
-                str(field), real_spwids_str))
+            LOG.info("Cannot calculate amplitude statistics for field %s, spw %s in uvrange %s. "
+                     "uvrange set to >0.0klambda", field, real_spwids_str, uvrange_MBL)
             return '>0.0klambda', 1.0
 
         if mean_MBL <= 0.0:
