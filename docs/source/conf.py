@@ -79,8 +79,8 @@ def setup(app):
     # to enable internal hyperlinks, while omitting it from HTML to avoid duplicating
     # the top-level API Reference section.
     def on_builder_inited(app):
-        if app.builder.name != 'latex':
-            app.config.exclude_patterns.append('users_guide/alma_tasks.rst')
+        if app.builder.name == 'latex' and 'users_guide/alma_tasks.rst' in app.config.exclude_patterns:
+            app.config.exclude_patterns.remove('users_guide/alma_tasks.rst')
 
     def on_source_read(app, docname, source):
         if docname == 'users_guide/index' and app.builder.name == 'latex':
@@ -231,9 +231,9 @@ else:
         'devel/misc/*',
     ])
 
-# Note: Builder-specific exclusions (e.g., excluding 'users_guide/alma_tasks.rst'
-# for HTML builds while keeping it for LaTeX) are dynamically appended in setup(app)
-# via the 'builder-inited' event because app.builder.name is only available at that stage.
+# PIPE-3252: Exclude 'users_guide/alma_tasks.rst' by default for HTML builds (included only for LaTeX).
+# Having it here statically prevents Sphinx from detecting a configuration change on every incremental build.
+exclude_patterns.append('users_guide/alma_tasks.rst')
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'default'  # 'sphinx', 'github-dark', ' default'

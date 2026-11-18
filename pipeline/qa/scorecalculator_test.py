@@ -4,13 +4,17 @@ Covers line range and channel heuristics, QA score calculations, the log_qa
 decorator, and behavior when DISABLE_WEBLOG or DISABLE_QA is enabled.
 """
 
+from __future__ import annotations
+
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.qa.scorecalculator as qacalc
 from pipeline.infrastructure import basetask
+from pipeline.qa import common_scores
 
 
 @pytest.mark.parametrize(
@@ -21,10 +25,11 @@ from pipeline.infrastructure import basetask
         # round-off tests
         ([(5.0, 10, True)], [(0, 10)]),
         ([(5.2, 10.1, True)], [(0, 10)]),
-        ([(5.6, 10.1, True)], [(1, 11)])
-    ]
+        ([(5.6, 10.1, True)], [(1, 11)]),
+    ],
 )
 def test_get_line_ranges(lines: list[tuple[int, int, bool]], expected: list[tuple[int, int]]):
+    """Test get_line_ranges helper function."""
     line_ranges = qacalc.get_line_ranges(lines)
     assert line_ranges == expected
 
@@ -54,9 +59,10 @@ def test_get_line_ranges(lines: list[tuple[int, int, bool]], expected: list[tupl
         ([(2, 11)], 1024, (1, 0), False),
         ([(800, 1021)], 1024, (0, 2), True),
         ([(800, 1021)], 1024, (0, 1), False),
-    ]
+    ],
 )
 def test_examine_sd_edge_lines(lines: list[tuple[int, int]], nchan: int, edge: tuple[int, int], expected: float):
+    """Test examine_sd_edge_lines helper function."""
     score = qacalc.examine_sd_edge_lines(lines, nchan, edge)
     assert score == expected
 
@@ -81,9 +87,10 @@ def test_examine_sd_edge_lines(lines: list[tuple[int, int]], nchan: int, edge: t
         ([(501, 840)], 1024, (3, 2), True),
         ([(501, 840)], 1024, (5, 0), True),
         ([(501, 840)], 1024, (0, 5), True),
-    ]
+    ],
 )
 def test_examine_sd_wide_lines(lines: list[tuple[int, int]], nchan: int, edge: tuple[int, int], expected: float):
+    """Test examine_sd_wide_lines helper function."""
     score = qacalc.examine_sd_wide_lines(lines, nchan, edge)
     assert score == expected
 
@@ -97,9 +104,12 @@ def test_examine_sd_wide_lines(lines: list[tuple[int, int]], nchan: int, edge: t
         ((1, 1), 16, 1, [(3, 5), (9, 12)], [(2, 4), (8, 11)]),
         ((1, 0), 16, -1, [(3, 5), (9, 12)], [(3, 6), (10, 12)]),
         ((1, 1), 16, -1, [(3, 5), (9, 12)], [(2, 5), (9, 11)]),
-    ]
+    ],
 )
-def test_channel_ranges_for_image(edge: tuple[int, int], nchan: int, sideband: int, ranges: list[tuple[int, int]], expected: list[tuple[int, int]]):
+def test_channel_ranges_for_image(
+    edge: tuple[int, int], nchan: int, sideband: int, ranges: list[tuple[int, int]], expected: list[tuple[int, int]]
+):
+    """Test channel_ranges_for_image helper function."""
     ranges_image = qacalc.channel_ranges_for_image(edge, nchan, sideband, ranges)
     assert ranges_image == expected
 
@@ -131,7 +141,7 @@ def test_log_qa_weblog_disabled(return_val, expected_infos, expected_warns, monk
     def dummy(self):
         return return_val
 
-    with patch.object(qacalc.LOG, 'info') as mock_info, patch.object(qacalc.LOG, 'warning') as mock_warn:
+    with patch.object(common_scores.LOG, 'info') as mock_info, patch.object(common_scores.LOG, 'warning') as mock_warn:
         assert dummy(None) == return_val
         assert [c.args[0] for c in mock_info.call_args_list] == expected_infos
         assert [c.args[0] for c in mock_warn.call_args_list] == expected_warns
@@ -145,7 +155,7 @@ def test_log_qa_weblog_enabled(monkeypatch):
     def dummy(self):
         return score
 
-    with patch.object(qacalc.LOG, 'info') as mock_info, patch.object(qacalc.LOG, 'warning') as mock_warn:
+    with patch.object(common_scores.LOG, 'info') as mock_info, patch.object(common_scores.LOG, 'warning') as mock_warn:
         assert dummy(None) is score
         mock_info.assert_not_called()
         mock_warn.assert_not_called()
@@ -178,6 +188,7 @@ def test_results_accept_respects_disable_qa(disable_qa, should_call, monkeypatch
 
     with (
         patch.object(pqa.qa_registry, 'do_qa') as mock_do_qa,
+        patch.object(basetask.LOG, 'isEnabledFor', return_value=False),
         patch.object(
             basetask.ResultsProxy, 'write', autospec=True, side_effect=lambda self, r: setattr(self, 'uuid', r.uuid)
         ),
@@ -189,3 +200,53 @@ def test_results_accept_respects_disable_qa(disable_qa, should_call, monkeypatch
             mock_do_qa.assert_called_once_with(context, results)
         else:
             mock_do_qa.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    'delays, expected_score, expected_message',
+    [
+        ([0.0], 1.0, 'Median delay <= 15 ns'),
+        ([15.0, -15.0], 1.0, 'Median delay <= 15 ns'),
+        ([16.0, -16.0], 0.33, 'Median delay > 15 ns'),
+        ([], 0.33, 'Empty delay data'),
+    ],
+)
+def test_score_testBPdcals_delay(delays, expected_score, expected_message):
+    """Preserve main's nanosecond threshold and handling of empty delay tables."""
+    from pipeline.qa import hifv_scores
+
+    with patch.object(hifv_scores.casa_tools, 'TableReader') as reader:
+        reader.return_value.__enter__.return_value.getcol.return_value = np.array(delays)
+        score = qacalc.score_testBPdcals_delay('test_small.ms', 'test_delay.cal', 'L')
+
+    assert score.score == expected_score
+    assert score.longmsg == f'{expected_message} for L band'
+
+
+def test_submodule_exports():
+    """Verify that all submodule symbols are present both in the submodule and the facade."""
+    from pipeline.qa import common_scores, hif_scores, hifa_scores, hifv_scores, hsd_scores
+
+    submodules = [common_scores, hif_scores, hifa_scores, hifv_scores, hsd_scores]
+    exported_names = []
+    for mod in submodules:
+        assert hasattr(mod, '__all__')
+        assert len(mod.__all__) > 0
+        exported_names.extend(mod.__all__)
+        for sym in mod.__all__:
+            assert hasattr(mod, sym), f'{mod.__name__} missing symbol {sym}'
+            assert getattr(qacalc, sym) is getattr(mod, sym), (
+                f'{sym} on qacalc is not identical to {mod.__name__}.{sym}'
+            )
+    assert len(exported_names) == len(set(exported_names)), 'Duplicate submodule exports'
+    assert sorted(exported_names) == qacalc.__all__
+
+
+def test_linear_score_calculation():
+    """Verify linear_score behavior from common_scores and qacalc."""
+    from pipeline.qa.common_scores import linear_score
+
+    assert linear_score(0.0, 0.0, 1.0, 0.0, 1.0) == 0.0
+    assert linear_score(0.5, 0.0, 1.0, 0.0, 1.0) == 0.5
+    assert linear_score(1.0, 0.0, 1.0, 0.0, 1.0) == 1.0
+    assert qacalc.linear_score(0.5, 0.0, 1.0, 0.0, 1.0) == 0.5
