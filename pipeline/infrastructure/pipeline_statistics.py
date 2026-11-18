@@ -127,16 +127,19 @@ class PipelineStatsCollection:
     """
     def __init__(self):
         self.stats_collection_mous = {}
-
         self.stats_collection_eb = {}
-        # {eb_name: [stat, stat, stat]}
-
         self.stats_collection_spw = {}
-
         self.stats_collection_source = {}
 
     def add_stat(self, stat: PipelineStatistic, level: PipelineStatisticLevel,
                  mous: str = None, source: str = None, eb: str = None, spw: str = None):
+
+        if level is None:
+            if stat.level is not None:
+                level = stat.level
+            else:
+                LOG.warning(f"Pipeline statistic {stat.name} does not have a level specified. It will not be added to the stats collection.")
+                return
 
         # deal with situation in which eb level is specificed but not eb
         if level == PipelineStatisticLevel.MOUS:
@@ -190,7 +193,6 @@ class PipelineStatsCollection:
         final_dict[mous_name]["TARGET"] = {}
         for source_name, source_stats in self.stats_collection_source.items():
             final_dict[mous_name]["TARGET"][source_name] = {stat.name: stat.to_dict() for stat in source_stats}
-        LOG.info(f"Final dict: {final_dict}")
 
         # # Step through the collected statistics values and construct
         # # a dictionary representation. The output format is as follows:
@@ -649,7 +651,7 @@ def get_stats_from_context(context) -> PipelineStatsCollection:
     LOG.info("Getting pipeline statistics from context")
     mous = context.get_oussid()
 
-    # List of datatypes to use (in order) for fetching EB-level information.
+    # list of datatypes to use (in order) for fetching EB-level information.
     # The following function call will fetch all the MSes for only the first
     # datatype it finds in the list. This is needed so that information is
     # not repeated for the ms and _targets.ms when both are present.
@@ -722,11 +724,11 @@ class ResultsStatsExtractor(abc.ABC):
             return False
 
     @abc.abstractmethod
-    def handle(self, result: Results, context=None) -> PipelineStatistic:
+    def handle(self, result: Results, context=None) -> list[tuple[str, PipelineStatistic]]:
         """
         [Abstract] Extract pipeline statistics values
 
-        This method should return a PipelineStatistic object
+        This method should return a list of (eb name, PipelineStatistic) tuples
 
         :param result:
         :return:
@@ -803,7 +805,7 @@ class FlagDeterALMAResultsExtractor(ResultsStatsExtractor):
     result_cls = FlagDeterALMAResults
     child_cls = None
 
-    def handle(self, result: FlagDeterALMAResults, context) -> dict:
+    def handle(self, result: FlagDeterALMAResults, context) -> list[tuple[str, PipelineStatistic]]:
         value = self.calculate_value(result, context)
         ps = self.create_stat(value)
         return ps
@@ -832,16 +834,16 @@ class FlagDeterALMAResultsExtractor(ResultsStatsExtractor):
                             output_dict[ms][reason] = percentage
         return output_dict
 
-    def create_stat(self, value_dict: dict) -> dict:
+    def create_stat(self, value_dict: dict) -> list[tuple[str, PipelineStatistic]]:
         longdescription = "dictionary giving percentage of data newly flagged by the following intents: online, shadow, qa0, qa2 before and template flagging agents"
-        stats = {}
+        stats = []
         for ms in value_dict:
             ps = PipelineStatistic(name="flagdata_percentage",
                                    value=value_dict[ms],
                                    longdesc=longdescription,
                                    units='%',
                                    level=PipelineStatisticLevel.EB)
-            stats[ms] = ps
+            stats.append((ms, ps))
         return stats
 
 
@@ -865,14 +867,14 @@ def get_stats_from_results(context: Context, stats_collection: PipelineStatsColl
     """
     Gathers all possible pipeline statistics from results.
     """
+    mous = context.get_oussid()
+
     for results_proxy in context.results:
         results = results_proxy.read()
-        handle_results = registry.handle(results, context)
-        LOG.debug("Got stats from results: %s", handle_results)
-        for elt in handle_results:
-            for eb, stat in elt.items():
-                stats_collection.add_stat(stat, eb=eb, level=PipelineStatisticLevel.EB, mous=context.get_oussid())
-        LOG.debug("stats collection results so far: %s", stats_collection)
+        extracted = registry.handle(results, context)
+        LOG.debug("Got stats from results: %s", extracted)
+        for eb, stat in extracted:
+            stats_collection.add_stat(stat, eb=eb, level=stat.level, mous=mous)
 
 
 # This is the main interface for generating statistics.
@@ -881,18 +883,20 @@ def generate_stats(context: Context) -> dict:
     Gathers statistics from the context and results and returns a
     representation of them as a dict.
     """
-    # Gather context-based stats like project and pipeline run info
-    LOG.info("Gathering pipeline stats from context")
+    # These don't need to be in any particular order
+
+    # 1. Gather context-based stats like project and pipeline run info
+    LOG.info("Gathering pipeline stats from context...")
     stats_collection = get_stats_from_context(context)
 
-    # Gather stats from results objects
-    LOG.info("Getting pipeline stats from results")
+    # 2. Gather stats from results objects
+    LOG.info("Getting pipeline stats from results...")
     get_stats_from_results(context, stats_collection)
-    LOG.info("Adding stats from results to stats collection")
 
-    # Construct dictionary representation of all pipeline stats
-    LOG.info("Converting pipeline stats collection to dictionary")
+    # 3. Construct dictionary representation of all pipeline stats
+    LOG.info("Converting pipeline stats collection to dictionary...")
     final_dict = stats_collection.to_dict()
-    LOG.info("Returning final pipeline stats dictionary")
+
+    LOG.info("Returning final pipeline stats dictionary...")
 
     return final_dict
