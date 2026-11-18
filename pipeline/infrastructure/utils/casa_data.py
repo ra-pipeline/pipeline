@@ -5,6 +5,7 @@ Utilities to work with the CASA data files
 import hashlib
 import json
 import os
+import struct
 from datetime import datetime, timedelta, timezone
 from glob import glob
 
@@ -14,11 +15,15 @@ from .conversion import get_epoch_as_datetime
 __all__ = [
     "SOLAR_SYSTEM_MODELS_PATH",
     "IERS_TABLES_PATH",
+    "GEODEDIC_TABLES",
+    "GEODEDIC_COLUMNS",
+    "EPOCH_WINDOW",
     "get_file_md5",
     "get_iso_mtime",
     "get_solar_system_model_files",
     "get_filename_info",
     "get_object_info_string",
+    "get_measures_fingerprint",
     "IERSInfo",
     "from_mjd_to_datetime"
 ]
@@ -71,6 +76,63 @@ def get_object_info_string(ss_object: str, ss_path: str = SOLAR_SYSTEM_MODELS_PA
     info_dict = {object_model_filenames[i]: get_filename_info(om) for i, om in enumerate(object_models)}
     info_string = json.dumps(info_dict)
     return f"Solar System models used for {ss_object} => " + info_string
+
+
+# PIPE-3305: the geodetic tables that measures() reads for an observatory or
+# AZELGEO calculation. Deleting any of them changes or breaks a zenith distance.
+# IERSeop2000, IERSpredict2000, IGRF and SCHED_locations have no effect there.
+GEODEDIC_TABLES = ('IERSeop97', 'IERSpredict', 'TAI_UTC', 'Observatories')
+GEODEDIC_COLUMNS = {
+    'IERSeop97': ('dUT1', 'x', 'y'),
+    'IERSpredict': ('dUT1', 'x', 'y'),
+    'TAI_UTC': ('dUTC', 'Offset'),
+    'Observatories': ('Long', 'Lat', 'Height'),
+}
+# MJD window of the recorded reference values. Values past the last measured row
+# of IERSeop97 are predictions, and predictions change with every update.
+EPOCH_WINDOW = (56000.0, 61000.0)
+
+
+def get_measures_fingerprint(
+    window: tuple[float, float] = EPOCH_WINDOW,
+    geodetic_path: str | None = None,
+) -> str:
+    """Return a 16-character digest of the geodetic values measures() reads.
+
+    The digest covers the numeric columns of the four geodetic tables that
+    measures() opens, limited to the MJD window. It does not hash table.dat,
+    which holds the VS_CREATE and VS_DATE stamps of an install, so two installs
+    of the same data give the same digest. A data update inside the window
+    changes the digest. The call reads four tables and takes about 20 ms.
+
+    Parameters:
+    ----------
+    window : tuple, optional
+        Lower and upper MJD bounds of the values to hash
+    geodetic_path : str, optional
+        Directory of the geodetic tables. Defaults to the measures() directory
+
+    Returns:
+    -------
+    str
+        The digest, or "NOT FOUND" when a table cannot be opened
+    """
+    if geodetic_path is None:
+        geodetic_path = IERS_TABLES_PATH
+    digest = hashlib.sha256()
+    try:
+        for table_name in GEODEDIC_TABLES:
+            with casa_tools.TableReader(os.path.join(geodetic_path, table_name)) as table:
+                mjd = None if table_name == 'Observatories' else table.getcol('MJD')
+                for column in GEODEDIC_COLUMNS[table_name]:
+                    values = table.getcol(column)
+                    if mjd is not None:
+                        values = [v for m, v in zip(mjd, values) if window[0] <= m <= window[1]]
+                    for value in values:
+                        digest.update(struct.pack('>d', float(value)))
+    except (IOError, RuntimeError):
+        return 'NOT FOUND'
+    return digest.hexdigest()[:16]
 
 
 def _to_utc(dt: datetime) -> datetime:

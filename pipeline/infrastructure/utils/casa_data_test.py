@@ -10,6 +10,7 @@ from .casa_data import (
     get_solar_system_model_files,
     get_filename_info,
     get_object_info_string,
+    get_measures_fingerprint,
     IERSInfo,
     from_mjd_to_datetime
 )
@@ -212,3 +213,16 @@ def test_string_representation_for_IERS_info_when_data_is_not_found():
         '"IERSeop2000": "NOT FOUND"}, "IERSeop2000_last_MJD": "NOT FOUND", '
         '"IERSeop2000_last": null, "IERSpredict_last": null}'
     )
+
+
+def test_measures_fingerprint_is_a_hex_string():
+    """The fingerprint of the tables measures() reads is 16 hex characters."""
+    fingerprint = get_measures_fingerprint()
+    assert fingerprint != 'NOT FOUND', 'the geodetic tables are not available'
+    assert len(fingerprint) == 16
+    assert all(character in '0123456789abcdef' for character in fingerprint)
+
+
+def test_measures_fingerprint_when_tables_are_missing():
+    """A geodetic directory without the four tables returns NOT FOUND."""
+    assert get_measures_fingerprint(geodetic_path=WRONG_GEODETIC_PATH) == 'NOT FOUND'
