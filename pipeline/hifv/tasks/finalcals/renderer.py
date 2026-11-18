@@ -93,13 +93,12 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
         """Return the flag counts per band, per intent, as {band: [(data selection, (before, after, total))]}."""
         selections = [('All Data', None), ('Bandpass', 'BANDPASS'), ('Flux', 'AMPLITUDE'), ('Phase', 'PHASE'),
                       ('Target', 'TARGET')]
+        scan_ids = {label: None if intent is None else {scan.id for scan in ms.get_scans(scan_intent=intent)}
+                    for label, intent in selections}
         band_flags = {}
         for band, stats in band_stats.items():
-            rows = []
-            for label, intent in selections:
-                scan_ids = None if intent is None else [scan.id for scan in ms.get_scans(scan_intent=intent)]
-                rows.append((label, utils.sum_flag_counts(stats, 'scan', ids=scan_ids)))
-            band_flags[band] = rows
+            band_flags[band] = [(label, utils.sum_flag_counts(stats, 'scan', ids=ids))
+                                for label, ids in scan_ids.items()]
         return band_flags
 
     @staticmethod
