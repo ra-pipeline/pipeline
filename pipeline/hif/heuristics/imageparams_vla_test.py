@@ -14,6 +14,7 @@ UV_STAT = {'DATA_DESC_ID=1': {'max': 3000.0, 'npts': 100.0}}
 GOOD_AMP = {'mean': 0.5, 'npts': 1000.0}
 # visstat output for a selection with no unflagged points
 EMPTY_AMP = {'mean': 0.0, 'npts': 0.0}
+NAN_AMP = {'mean': float('nan'), 'npts': 0.0}
 ZERO_MEAN_AMP = {'mean': 0.0, 'npts': 10.0}
 
 
@@ -35,7 +36,7 @@ def heuristics() -> ImageParamsHeuristicsVLA:
 
 def run_uvrange(
     heuristics: ImageParamsHeuristicsVLA, sbl_stats: dict, mbl_stats: dict, spwspec: str = '1'
-) -> tuple[str | None, float | None]:
+) -> tuple[tuple[str | None, float | None], mock.MagicMock]:
     """Run the uvrange heuristic with mocked visstat results.
 
     Args:
@@ -45,27 +46,34 @@ def run_uvrange(
         spwspec: Comma-separated spw selection.
 
     Returns:
-        The (uvrange, ratio) tuple returned by the heuristic.
+        The (uvrange, ratio) tuple returned by the heuristic and the visstat mock.
     """
     jobs = [mock.MagicMock(**{'execute.return_value': r}) for r in (UV_STAT, sbl_stats, mbl_stats)]
-    with mock.patch(VISSTAT_PATH, side_effect=jobs):
-        return heuristics.uvrange(field='F', spwspec=spwspec, specmode='cont')
+    with mock.patch(VISSTAT_PATH, side_effect=jobs) as visstat:
+        result = heuristics.uvrange(field='F', spwspec=spwspec, specmode='cont')
+    return result, visstat
 
 
 @pytest.mark.parametrize(
-    'sbl_amp, mbl_amp',
+    'sbl_amp, mbl_amp, expected_visstat_calls',
     [
-        pytest.param(GOOD_AMP, EMPTY_AMP, id='empty_mid_bin'),
-        pytest.param(GOOD_AMP, ZERO_MEAN_AMP, id='zero_mean_mid_bin'),
+        pytest.param(GOOD_AMP, EMPTY_AMP, 3, id='empty_mid_bin'),
+        pytest.param(EMPTY_AMP, GOOD_AMP, 2, id='empty_short_bin'),
+        pytest.param(GOOD_AMP, NAN_AMP, 3, id='nan_mid_bin'),
+        pytest.param(GOOD_AMP, ZERO_MEAN_AMP, 3, id='zero_mean_mid_bin'),
     ],
 )
 def test_uvrange_falls_back_without_usable_data(
-    heuristics: ImageParamsHeuristicsVLA, sbl_amp: dict, mbl_amp: dict
+    heuristics: ImageParamsHeuristicsVLA, sbl_amp: dict, mbl_amp: dict, expected_visstat_calls: int
 ) -> None:
-    """Verify an empty or zero-amplitude bin returns the full uvrange instead of raising."""
-    result = run_uvrange(heuristics, {'DATA_DESC_ID=1': sbl_amp}, {'DATA_DESC_ID=1': mbl_amp})
+    """Verify a bin without usable data returns the full uvrange instead of raising.
+
+    An empty short-baseline bin must return before mid-baseline statistics are requested.
+    """
+    result, visstat = run_uvrange(heuristics, {'DATA_DESC_ID=1': sbl_amp}, {'DATA_DESC_ID=1': mbl_amp})
 
     assert result == ('>0.0klambda', 1.0)
+    assert visstat.call_count == expected_visstat_calls
 
 
 @pytest.mark.parametrize(
@@ -84,7 +92,7 @@ def test_uvrange_ignores_empty_spw_in_multi_spw_bin(
     sbl = {'DATA_DESC_ID=1': sbl_amp, 'DATA_DESC_ID=2': sbl_amp}
     mbl = {'DATA_DESC_ID=1': GOOD_AMP, 'DATA_DESC_ID=2': EMPTY_AMP}
 
-    uvrange, ratio = run_uvrange(heuristics, sbl, mbl, spwspec='1,2')
+    (uvrange, ratio), _ = run_uvrange(heuristics, sbl, mbl, spwspec='1,2')
 
     assert uvrange == expected_uvrange
     assert ratio == pytest.approx(expected_ratio)
