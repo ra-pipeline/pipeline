@@ -363,11 +363,11 @@ except:
                 </tr>
                 %endif  
 
-                %if image_info[k].vis_amp_ratio_label is not None:
+                %if any(image_info[m].vis_amp_ratio_label is not None and image_info[m].vis_amp_ratio is not None for m in range(j, min(j+4, field_block_indices[i+1]))):
                     <tr>
                         <th>${image_info[k].vis_amp_ratio_label}</th>
                         %for k in range(j, min(j+4, field_block_indices[i+1])):
-                            <td>${'{:.4}'.format(image_info[k].vis_amp_ratio)}</td>
+                            <td>${'{:.4}'.format(image_info[k].vis_amp_ratio) if image_info[k].vis_amp_ratio is not None else 'N/A'}</td>
                         %endfor
                     </tr>
                 %endif                
