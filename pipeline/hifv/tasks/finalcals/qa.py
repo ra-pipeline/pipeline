@@ -107,8 +107,8 @@ class ApplycalsQAHandler(pqa.QAPlugin):
         band_stats = getattr(result, 'band_flag_stats', None)
         if band_stats:
             # Complex gain calibrator (CGC) and science target fields
-            cgc_fields = [f.name.strip('"') for f in ms.get_fields(intent='PHASE')]
-            target_fields = [f.name.strip('"') for f in ms.get_fields(intent='TARGET')]
+            cgc_fields = utils.deduplicate(utils.dequote(f.name) for f in ms.get_fields(intent='PHASE'))
+            target_fields = utils.deduplicate(utils.dequote(f.name) for f in ms.get_fields(intent='TARGET'))
 
             # If >30% of additional data flagged per science target or per CGC (in any band): QA score < 0.5
             scores.extend(qacalc.applycal_score_additional_flagged(ms, band_stats, cgc_fields, target_fields))

@@ -113,8 +113,9 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
         field_flags = {}
         for title, intent in groups:
             field_flags[title] = [
-                (field.name.strip('"'), {band: utils.sum_flag_counts(stats, 'spw', fields=[field.name.strip('"')])
-                                         for band, stats in band_stats.items()})
+                (utils.dequote(field.name),
+                 {band: utils.sum_flag_counts(stats, 'spw', fields=[utils.dequote(field.name)])
+                  for band, stats in band_stats.items()})
                 for field in ms.get_fields(intent=intent)
             ]
         return field_flags

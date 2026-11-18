@@ -418,7 +418,7 @@ class Applycals(applycal.SerialIFApplycal):
             # skip the 'name' and 'type' entries of the report
             if not isinstance(after_stats, dict):
                 continue
-            merged[field.strip('"')] = {
+            merged[utils.dequote(field)] = {
                 axis: {int(i): (int(before[field][axis][i]['flagged']), int(counts['flagged']), int(counts['total']))
                        for i, counts in after_stats[axis].items()}
                 for axis in ('scan', 'spw')
