@@ -33,6 +33,11 @@ on:
         required: false
         default: false
         type: boolean
+      timeout_minutes:
+        description: "Maximum job runtime in minutes"
+        required: false
+        default: 360
+        type: number
       task:
         description: "Pixi task name to run (e.g., 'test-unit')"
         required: false
@@ -56,6 +61,7 @@ jobs:
   run-in-env:
     name: Run in Pixi Env
     runs-on: ${{ inputs.os }}
+    timeout-minutes: ${{ inputs.timeout_minutes }}
 
     steps:
       - name: Free disk space (Ubuntu)
@@ -79,10 +85,16 @@ jobs:
 
       - name: Install System Dependencies (Ubuntu)
         if: runner.os == 'Linux'
+        timeout-minutes: 5
         shell: bash
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ca-certificates git xvfb
+          if ! dpkg -s ca-certificates git xvfb >/dev/null 2>&1; then
+            APT_OPTS="-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3"
+            sudo apt-get $APT_OPTS update -y
+            sudo -E apt-get $APT_OPTS install -y --no-install-recommends ca-certificates git xvfb
+          fi
 
       - name: Install Pixi
         uses: prefix-dev/setup-pixi@v0.11.3

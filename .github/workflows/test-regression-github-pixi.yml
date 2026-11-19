@@ -57,7 +57,7 @@ jobs:
           echo "$MATRIX" | python3 -m json.tool
 
   regression:
-    name: "GitHub Regression (${{ matrix.name }})"
+    name: "${{ matrix.name }}"
     needs: discover
     if: needs.discover.outputs.has_tests == 'true'
     strategy:
@@ -70,6 +70,7 @@ jobs:
       pixi_env: casa674-py312
       update_casa: ${{ github.event_name != 'workflow_dispatch' && github.ref_type != 'tag' && !startsWith(github.base_ref || github.ref_name, 'release/') }}
       free_disk_space: true
+      timeout_minutes: 180
       test_data: regression-github
       testdata_paths: ${{ matrix.testdata_paths }}
       run_command: |

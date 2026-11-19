@@ -33,6 +33,7 @@ def test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression():
 
 
 @pytest.mark.seven
+@pytest.mark.github_runner(testdata=['pl-regressiontest/uid___A002_Xef72bb_X9d29'])
 def test_uid___A002_Xef72bb_X9d29__renorm_restore_procedure_hifa_image__regression():
     """Restore renorm from Cycle 8 (with current pipeline)
 
@@ -57,6 +58,7 @@ def test_uid___A002_Xef72bb_X9d29__renorm_restore_procedure_hifa_image__regressi
 
 
 @pytest.mark.seven
+@pytest.mark.github_runner(testdata=['pl-regressiontest/uid___A002_Xc845c0_X7366'])
 def test_uid___A002_Xc845c0_X7366__cycle5_restore_procedure_hifa_image__regression():
     """
     Restore from Cycle 5 (with current pipeline)
@@ -82,6 +84,7 @@ def test_uid___A002_Xc845c0_X7366__cycle5_restore_procedure_hifa_image__regressi
 
 
 @pytest.mark.seven
+@pytest.mark.github_runner(testdata=['pl-regressiontest/uid___A002_Xc46ab2_X15ae_selfcal_restore'])
 def test_uid___A002_Xc46ab2_X15ae__selfcal_restore_procedure_hifa_image__regression():
     """Restore selfcal from Cycle 10 (with current pipeline)
 
