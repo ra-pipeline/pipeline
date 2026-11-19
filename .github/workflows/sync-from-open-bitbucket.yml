@@ -2,7 +2,7 @@ name: Sync from On-Prem Bitbucket
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '0 */2 * * *'  # fallback safety net; primary trigger is Bitbucket webhook -> workflow_dispatch
   workflow_dispatch:
     inputs:
       dry_run:
