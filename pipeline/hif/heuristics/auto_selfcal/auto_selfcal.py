@@ -436,13 +436,15 @@ class SelfcalHeuristics:
         if isinstance(selfcal_library['usermodel'], list):
             nterms = len(selfcal_library['usermodel'])
             for i, image in enumerate(selfcal_library['usermodel']):
-                if 'fits' in image:
-                    self.cts.importfits(fitsimage=image, imagename=image.replace('.fits', ''))
-                    selfcal_library['usermodel'][i] = image.replace('.fits', '')
+                if image.endswith('.fits'):
+                    out_image = os.path.basename(image).removesuffix('.fits')
+                    self.cts.importfits(fitsimage=image, imagename=out_image, overwrite=True)
+                    selfcal_library['usermodel'][i] = out_image
         elif isinstance(selfcal_library['usermodel'], str):
-            if 'fits' in selfcal_library['usermodel']:
-                self.cts.importfits(fitsimage=selfcal_library['usermodel'], imagename=selfcal_library['usermodel'].replace('.fits', ''))
-                selfcal_library['usermodel'] = selfcal_library['usermodel'].replace('.fits', '')
+            if selfcal_library['usermodel'].endswith('.fits'):
+                out_image = os.path.basename(selfcal_library['usermodel']).removesuffix('.fits')
+                self.cts.importfits(fitsimage=selfcal_library['usermodel'], imagename=out_image, overwrite=True)
+                selfcal_library['usermodel'] = out_image
             nterms = 1
 
         if mask == '':
@@ -455,8 +457,8 @@ class SelfcalHeuristics:
             usemask = 'user'
 
         if not resume:
-            for ext in ['.image*', '.mask', '.model*', '.pb*', '.psf*', '.residual*', '.sumwt*', '.gridwt*']:
-                os.system('rm -rf ' + imagename + ext)
+            image_exts = ['.image*', '.mask', '.model*', '.pb*', '.psf*', '.residual*', '.sumwt*', '.gridwt*']
+            self.remove_dirs([imagename+'_usermodel_prep'+ext for ext in image_exts])
         # regrid start model
         self.cts.tclean(vis=vlist,
                         imagename=imagename+'_usermodel_prep',
@@ -489,7 +491,7 @@ class SelfcalHeuristics:
                         reffreq=self.reffreq,
                         uvrange=selfcal_library['uvrange'],
                         threshold=threshold,
-                        parallel=False,
+                        parallel=parallel,
                         phasecenter=phasecenter,
                         datacolumn=datacolumn, spw=spw, wprojplanes=self.wprojplanes, verbose=True, startmodel=selfcal_library['usermodel'], savemodel='none')
 
@@ -1568,20 +1570,24 @@ class SelfcalHeuristics:
                         selfcal_library[target][band]['usermask'] = "../"+selfcal_library[target][band]['usermask']
 
                 if isinstance(self.usermodel, dict) and band in self.usermodel:
-                    selfcal_library[target][band]['usermodel'] = self.usermodel[band]
-                elif isinstance(self.usermodel, str) or isinstance(self.usermodel, list):
+                    model_entry = self.usermodel[band]
+                    selfcal_library[target][band]['usermodel'] = model_entry.copy() if isinstance(model_entry, list) else model_entry
+                elif isinstance(self.usermodel, str):
                     selfcal_library[target][band]['usermodel'] = self.usermodel
+                elif isinstance(self.usermodel, list):
+                    selfcal_library[target][band]['usermodel'] = self.usermodel.copy()
                 else:
                     selfcal_library[target][band]['usermodel'] = ''
 
-                if selfcal_library[target][band]['usermodel'] != '':
-                    if isinstance(selfcal_library[target][band]['usermodel'], str):
-                        if not pathlib.Path(selfcal_library[target][band]['usermodel']).is_absolute():
-                            selfcal_library[target][band]['usermodel'] = "../"+selfcal_library[target][band]['usermodel']
-                    elif isinstance(selfcal_library[target][band]['usermodel'], list):
-                        for i in range(len(selfcal_library[target][band]['usermodel'])):
-                            if not pathlib.Path(selfcal_library[target][band]['usermodel'][i]).is_absolute():
-                                selfcal_library[target][band]['usermodel'][i] = "../"+selfcal_library[target][band]['usermodel'][i]
+                if not selfcal_library[target][band]['usermodel']:
+                    selfcal_library[target][band]['usermodel'] = ''
+                elif isinstance(selfcal_library[target][band]['usermodel'], str):
+                    if not pathlib.Path(selfcal_library[target][band]['usermodel']).is_absolute():
+                        selfcal_library[target][band]['usermodel'] = "../"+selfcal_library[target][band]['usermodel']
+                elif isinstance(selfcal_library[target][band]['usermodel'], list):
+                    for i in range(len(selfcal_library[target][band]['usermodel'])):
+                        if not pathlib.Path(selfcal_library[target][band]['usermodel'][i]).is_absolute():
+                            selfcal_library[target][band]['usermodel'][i] = "../"+selfcal_library[target][band]['usermodel'][i]
 
                 # Make sure the fields get mapped properly, in case the order in which they are observed changes from EB to EB.
 
@@ -2113,13 +2119,13 @@ class SelfcalHeuristics:
         vislist = slib['vislist'].copy()
         LOG.info('Starting selfcal procedure on: '+target+' '+band)
         
-        if selfcal_library['usermodel'] != '':
+        if selfcal_library['usermodel']:
             LOG.info('Setting model column to user model')
             self.usermodel_wrapper(selfcal_library, sani_target+'_'+band,
                                    telescope=self.telescope, nsigma=0.0, scales=[0],
                                    threshold='0.0Jy',
                                    savemodel='modelcolumn', parallel=self.parallel,
-                                   field=target, spw=slib['spws_per_vis'], 
+                                   field=self.field, spw=slib['spws_per_vis'], 
                                    resume=False, cyclefactor=slib['cyclefactor'])
 
         repeat_solint = False
