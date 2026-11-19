@@ -752,12 +752,12 @@ class SelfcalHeuristics:
                 gaincal_interpolate = [slib['applycal_interp']]*len(gaincal_preapply_gaintable)
                 gaincal_gaintype = 'T' if not do_fallback_calonly or second_iter_solmode == "" else "GSPLINE" if second_iter_solmode == "GSPLINE" else "G"
                 gaincal_solmode = "" if not do_fallback_calonly or second_iter_solmode == "GSPLINE" else second_iter_solmode
-                if 'spw' in selfcal_plan['inf_EB_gaincal_combine'][vis]:
+                if 'spw' in selfcal_plan[vis]['inf_EB_gaincal_combine']:
                     applycal_spwmap = [slib[fid][vis]['spwmap'],
                                             slib[fid][vis]['spwmap'], slib[fid][vis]['spwmap']]
                     gaincal_spwmap = [slib[fid][vis]
                                             ['spwmap'], slib[fid][vis]['spwmap']]
-                elif selfcal_plan['inf_EB_fallback_mode'][vis] == 'spwmap':
+                elif selfcal_plan[vis]['inf_EB_fallback_mode'] == 'spwmap':
                     applycal_spwmap = slib[fid][vis]['inf_EB']['spwmap'] + [
                         slib[fid][vis]['spwmap'], slib[fid][vis]['spwmap']]
                     gaincal_spwmap = slib[fid][vis]['inf_EB']['spwmap'] + \
