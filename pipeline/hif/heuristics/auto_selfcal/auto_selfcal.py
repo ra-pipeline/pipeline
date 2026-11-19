@@ -2149,35 +2149,34 @@ class SelfcalHeuristics:
                     LOG.info('Starting with solint: '+solint)
                 else:
                     LOG.info('Continuing with solint: '+solint)
-                if not repeat_solint:
-                    os.system('rm -rf '+sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'*')
-                ##
-                # make images using the appropriate tclean heuristics for each telescope
-                # set threshold based on RMS of initial image and lower if value becomes lower
-                # during selfcal by resetting 'RMS_curr' after the post-applycal evaluation
-                ##
-                if slib['final_solint'] != 'None':
-                    prev_solint = slib['final_solint']
-                    prev_iteration = slib[vislist[0]][prev_solint]['iteration']
-
-                    nterms_changed = (len(glob.glob(sani_target+'_'+band+'_'+prev_solint+'_'+str(prev_iteration)+"_post.model.tt*")) <
-                                      slib['nterms'])
-
-                    if nterms_changed:
-                        resume = False
-                    else:
-                        resume = True
-                        files = glob.glob(sani_target+'_'+band+'_'+prev_solint+'_'+str(prev_iteration)+"_post.*")
-                        for f in files:
-                            if "nearfield" in f:
-                                continue
-                            os.system("cp -r "+f+" "+f.replace(prev_solint+"_" +
-                                                               str(prev_iteration)+"_post", solint+'_'+str(iteration)))
-                else:
-                    resume = False
-
                 # we don't want to re-run tclean and gaincal if we're trying to fallback to combinespw
                 if not repeat_solint:
+                    os.system('rm -rf '+sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'*')
+                    ##
+                    # make images using the appropriate tclean heuristics for each telescope
+                    # set threshold based on RMS of initial image and lower if value becomes lower
+                    # during selfcal by resetting 'RMS_curr' after the post-applycal evaluation
+                    ##
+                    if slib['final_solint'] != 'None':
+                        prev_solint = slib['final_solint']
+                        prev_iteration = slib[vislist[0]][prev_solint]['iteration']
+
+                        nterms_changed = (len(glob.glob(sani_target+'_'+band+'_'+prev_solint+'_'+str(prev_iteration)+"_post.model.tt*")) <
+                                          slib['nterms'])
+
+                        if nterms_changed:
+                            resume = False
+                        else:
+                            resume = True
+                            files = glob.glob(sani_target+'_'+band+'_'+prev_solint+'_'+str(prev_iteration)+"_post.*")
+                            for f in files:
+                                if "nearfield" in f:
+                                    continue
+                                os.system("cp -r "+f+" "+f.replace(prev_solint+"_" +
+                                                                   str(prev_iteration)+"_post", solint+'_'+str(iteration)))
+                    else:
+                        resume = False
+
                     # Record solint details.
                     for vis in vislist:
                         slib[vis][solint] = {}
