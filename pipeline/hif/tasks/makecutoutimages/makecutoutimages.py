@@ -389,7 +389,7 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
                         # low-amp pixels at the edge below pblimit (CAS-13818), we use a PB-based mask when run imstats().
                         pbname = subimagename.replace('.image.', '.pb.')
                         item_stats = imstat_items(
-                            image, items=['peak', 'madrms', 'max/madrms'], mask=f'mask("{pbname}")')
+                            image, items=['peak', 'madrms', 'peak/madrms'], mask=f'mask("{pbname}")')
                         stats[virtspw]['image'] = item_stats
                         # additional non-stats image properties are extracted here.
                         beam = image.restoringbeam(channel=0, polarization=0)
@@ -404,7 +404,7 @@ class Makecutoutimages(basetask.StandardTaskTemplate):
                     if '.tt1.' not in subimagename:
                         pbname = subimagename.replace('.residual.', '.pb.')
                         item_stats = imstat_items(
-                            image, items=['peak', 'madrms', 'max/madrms'], mask=f'mask("{pbname}")')
+                            image, items=['peak', 'madrms', 'peak/madrms'], mask=f'mask("{pbname}")')
                         stats[virtspw]['residual'] = item_stats
                 elif '.image.pbcor.' in subimagename and '.rms.' not in subimagename:
                     pass

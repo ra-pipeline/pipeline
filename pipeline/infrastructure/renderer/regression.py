@@ -1033,7 +1033,11 @@ def extract_qa_score_regression(prefix: str, result: Results) -> dict:
 
         data_select = "".join(
             f".{key}_" + "_".join(sorted(map(str, value)))
-            for key, value in [("field", qa_score.applies_to.field), ("spw", qa_score.applies_to.spw)]
+            for key, value in [
+                ("field", qa_score.applies_to.field),
+                ("spw", qa_score.applies_to.spw),
+                ("intent", qa_score.applies_to.intent),
+            ]
             if value
         )
         # Add metric score and value to dictionary with formatted keys

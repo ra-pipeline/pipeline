@@ -2,13 +2,15 @@
 
 ## PL2026
 
-**2026.2.0.27**
+2026.2.0.30 used from Nov 2026 (CASA 6.7.4-12)
+
+2026.2.0.27 used Oct 2026 (CASA 6.7.4-8)
 
 ### CASA 2026
 
 1. In {func}`~casatasks.imaging.tclean` `briggsbwtaper`, the fractional bandwidth is calculated per-chunk, so parallelizing with different breadth gives different answers ({jira}`CAS-14520` and {jira}`PIPE-2832`).
-2. **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`** will crash on source names that are integers because the CASA task {func}`~casatasks.calibration.wvrgcal` no longer supports them ({jira}`CAS-14850`).
-3. There is a possibility that imaging multi-EB datasets where the SPW ID changes between the EBs with {func}`~casatasks.imaging.tclean` in parallel will produce an odd beam-size-per-channel, as shown below ({jira}`CAS-14874`).
+2. **{func}`~pipeline.hifa.cli.hifa_wvrgcalflag`** will crash on source names that are integers because the CASA task {func}`~casatasks.calibration.wvrgcal` no longer supports them ({jira}`CAS-14850`). ***Fixed in CASA 6.7.4-12***
+3. There is a possibility that imaging multi-EB datasets where the SPW ID changes between the EBs with {func}`~casatasks.imaging.tclean` in parallel will produce an odd beam-size-per-channel, as shown below ({jira}`CAS-14874`). ***Fixed in CASA 6.7.4-12***
 
    ```{figure} cas14874_n8workers.png
    ---
@@ -31,7 +33,7 @@
 5. In **{func}`~pipeline.hifa.cli.hifa_spwphaseup`**, (i) if the refant drops out for the majority of solutions, then the Median Phase RMS assessment cannot be made; (ii) if there is low SNR in the bandpass solutions and the refant jumps in phase, then some antennas can incorrectly be identified as outliers by the Median Phase RMS assessment; (iii) for B2B datasets, if the lowest index of the target spectral windows are fully flagged no assessment will be made.
 6. **{func}`~pipeline.hifa.cli.hifa_gfluxscaleflag`** crashes on MOUS with EBs that straddle Cycle 2 and Cycle 3 ({jira}`PIPE-2691`).
 7. The aggregate bandwidth listed on continuum **{func}`~pipeline.hif.cli.hif_makeimages`** pages does not account for the deterministic flagging of edge channels on TDM spws ({jira}`PIPE-2349`) and it does not account for spw overlap ({jira}`PIPEREQ-37`).
-8. The **{func}`~pipeline.hifa.cli.hifa_tsysflagcontamination`** stage does not work for the B2B and full-polarization observing modes ({jira}`PIPE-2407`).
+8. The **{func}`~pipeline.hifa.cli.hifa_tsysflagcontamination`** stage does not work for the B2B and full-polarization observing modes ({jira}`PIPE-2407`). ***Fixed ({jira}`PIPE-3257`, {jira}`PIPE-3303`)***
 9. If ``combine='spw'`` is used in gaincal calls, pipeline will crash in **{func}`~pipeline.hifa.cli.hifa_gfluxscale`** if the lowest index spw is fully flagged ({jira}`PIPE-128`).
 10. In some B2B data, where DIFFGAIN cal == BP cal, QA will give a red warning in **{func}`~pipeline.hifa.cli.hifa_gfluxscale`** but the stage and results are correct ({jira}`PIPE-2204`).
 11. **{func}`~pipeline.hif.cli.hif_selfcal`** does not properly handle (or fails on) cases of multi-EB datasets where a spw is missing from some EBs ({jira}`PIPE-2770`).
