@@ -6,6 +6,7 @@ import copy
 import datetime
 import enum
 import json
+import os
 import re
 from typing import TYPE_CHECKING
 
@@ -1936,6 +1937,7 @@ def extract_qa_score_regression(result: Results) -> list:
         individual_score_dict['metric'] = metric_score
         individual_score_dict['score'] = score_value
         applies_to = qa_score.applies_to
+        individual_score_dict['vis'] = sorted(os.path.basename(v) for v in applies_to.vis) if applies_to else []
         individual_score_dict['fields'] = _plain_sorted(applies_to.field) if applies_to else []
         individual_score_dict['spws'] = _plain_sorted(applies_to.spw) if applies_to else []
 
