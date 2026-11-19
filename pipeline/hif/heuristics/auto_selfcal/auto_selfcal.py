@@ -222,8 +222,9 @@ class SelfcalHeuristics:
             spws_per_vis = selfcal_library['spws_per_vis']
             nterms = selfcal_library['nterms']
         else:
-            vlist = [vis for vis in selfcal_library['vislist'] if vis in selfcal_library['spw_map'][spw]]
-            spws_per_vis = self.image_heuristics.observing_run.get_real_spwsel([spw]*len(vlist), vlist)
+            spw_str = str(spw)
+            vlist = [vis for vis in selfcal_library['vislist'] if vis in selfcal_library['spw_map'][int(spw)]]
+            spws_per_vis = self.image_heuristics.observing_run.get_real_spwsel([spw_str]*len(vlist), vlist)
             nterms = 1
 
         if 'theoretical' in threshold:
@@ -232,11 +233,11 @@ class SelfcalHeuristics:
                 if spw == 'all':
                     sensitivity, _, _ = self.get_sensitivity()
                 else:
-                    sensitivity, _, _ = self.get_sensitivity(spw=spw)
+                    sensitivity, _, _ = self.get_sensitivity(spw=spw_str)
                 if spw == 'all':
                     dr_mod = get_dr_correction(self.telescope, selfcal_library['SNR_dirty']*selfcal_library['RMS_dirty'], sensitivity, vlist)
                 else:
-                    dr_mod = get_dr_correction(self.telescope, selfcal_library['per_spw_stats'][spw]['SNR_dirty']*selfcal_library['per_spw_stats'][spw]['RMS_dirty'], sensitivity, vlist)
+                    dr_mod = get_dr_correction(self.telescope, selfcal_library['per_spw_stats'][spw_str]['SNR_dirty']*selfcal_library['per_spw_stats'][spw_str]['RMS_dirty'], sensitivity, vlist)
                 LOG.info(f'DR modifier: {dr_mod} SPW: {spw}')
 
                 sensitivity_nomod = sensitivity.copy()
@@ -244,16 +245,19 @@ class SelfcalHeuristics:
                 if (band == 'Band_9' or band == 'Band_10') and spw != 'all':   # adjust for DSB noise increase
                     sensitivity = sensitivity  # *4.0  might be unnecessary with DR mods
 
-                selfcal_library['theoretical_sensitivity'] = sensitivity_nomod
-                for fid in selfcal_library['sub-fields']:
-                    selfcal_library[fid]['theoretical_sensitivity'] = sensitivity_nomod
+                if spw == 'all':
+                    selfcal_library['theoretical_sensitivity'] = sensitivity_nomod
+                    for fid in selfcal_library['sub-fields']:
+                        selfcal_library[fid]['theoretical_sensitivity'] = sensitivity_nomod
             else:
                 sensitivity = 0.0 # So that the threshold passed to tclean is properly set to 0.0Jy when the telescope is the VLA.
-                sensitivity_vla, _, self.reffreq = self.get_sensitivity()
+                sensitivity_nomod = 0.0
+                if spw == 'all':
+                    sensitivity_vla, _, self.reffreq = self.get_sensitivity()
 
-                selfcal_library['theoretical_sensitivity'] = sensitivity_vla
-                for fid in selfcal_library['sub-fields']:
-                    selfcal_library[fid]['theoretical_sensitivity'] = sensitivity_vla
+                    selfcal_library['theoretical_sensitivity'] = sensitivity_vla
+                    for fid in selfcal_library['sub-fields']:
+                        selfcal_library[fid]['theoretical_sensitivity'] = sensitivity_vla
 
             if threshold == "theoretical_with_drmod":
                 threshold = str(4.0*sensitivity)+'Jy'
@@ -1415,9 +1419,11 @@ class SelfcalHeuristics:
             for target in selfcal_library:
                 sani_target = 'sc.'+filenamer.sanitize(target)
                 for band in selfcal_library[target].keys():
-                    spwlist = self.spw_virtual.split(',')
+                    nfsnr_modifier = selfcal_library[target][band]['RMS_NF_curr'] / \
+                        selfcal_library[target][band]['RMS_curr']
                     LOG.info('Generating final per-SPW images for '+target+' in '+band)
-                    for spw in selfcal_library[target][band]['spw_map']:
+                    for spw_id in selfcal_library[target][band]['spw_map']:
+                        spw = str(spw_id)
                         # omit DR modifiers here since we should have increased DR significantly
                         if selfcal_library[target][band]['SC_success']:
                             self.tclean_wrapper(selfcal_library[target][band], sani_target + '_' + band + '_' + spw + '_final', band,
@@ -1467,9 +1473,7 @@ class SelfcalHeuristics:
             for target in selfcal_library:
                 sani_target = 'sc.'+filenamer.sanitize(target)
                 for band in selfcal_library[target].keys():
-                    vislist = selfcal_library[target][band]['vislist'].copy()
-                    spwlist = selfcal_library[target][band][vis]['spws'].split(',')
-                    for spw in spwlist:
+                    for spw in selfcal_library[target][band]['per_spw_stats']:
                         delta_beamarea = compare_beams(sani_target+'_'+band+'_'+spw+'_initial.image.tt0',
                                                        sani_target+'_'+band+'_'+spw+'_final.image.tt0')
                         delta_SNR = selfcal_library[target][band]['per_spw_stats'][spw]['SNR_final'] -\
