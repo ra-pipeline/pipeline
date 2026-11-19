@@ -332,7 +332,7 @@ class SelfcalHeuristics:
         if not savemodel_only:
             if not resume:
                 image_exts = ['.image*', '.mask', '.model*', '.pb*', '.psf*', '.residual*',
-                              '.sumwt*', '.gridwt*', '.weight'
+                              '.sumwt*', '.gridwt*', '.weight',
                               '.alpha', '.alpha.error', '.beta']
                 self.remove_dirs([imagename+ext for ext in image_exts])
             tc_ret = self.cts.tclean(**tclean_args)
@@ -1351,6 +1351,7 @@ class SelfcalHeuristics:
         for target in selfcal_library:
             sani_target = 'sc.'+filenamer.sanitize(target)
             for band in selfcal_library[target].keys():
+                is_mosaic = selfcal_library[target][band]['obstype'] == 'mosaic'
                 nfsnr_modifier = selfcal_library[target][band]['RMS_NF_curr'] / \
                     selfcal_library[target][band]['RMS_curr']
                 
@@ -1404,7 +1405,7 @@ class SelfcalHeuristics:
                         'orig', 'orig')
 
                 for fid in selfcal_library[target][band]['sub-fields']:
-                    if selfcal_library[target][band]['obstype'] == 'mosaic':
+                    if is_mosaic:
                         imagename = sani_target + '_field_' + str(fid) + '_' + band
                     else:
                         imagename = sani_target + '_' + band
@@ -1775,7 +1776,7 @@ class SelfcalHeuristics:
                     selfcal_library[target][band][fid]['LAS'] = band_properties[vislist[0]][band]['LAS']
 
         for target in all_targets:
-            for band in selfcal_library[target].keys():
+            for band in list(selfcal_library[target].keys()):
                 if selfcal_library[target][band]['Total_TOS'] == 0.0:
                     selfcal_library[target].pop(band)
 
@@ -2360,11 +2361,13 @@ class SelfcalHeuristics:
                     loose_field_by_field_success += [((post_mosaic_SNR[fid]-mosaic_SNR[fid])/mosaic_SNR[fid] > -0.02) and
                                                         ((post_mosaic_SNR_NF[fid] - mosaic_SNR_NF[fid])/mosaic_SNR_NF[fid] > -0.02)]
                     beam_field_by_field_success += [delta_beamarea < delta_beam_thresh]
-                    rms_field_by_field_success = ((post_mosaic_RMS[fid] - mosaic_RMS[fid])/mosaic_RMS[fid] < 1.05 and
-                                                    (post_mosaic_RMS_NF[fid] - mosaic_RMS_NF[fid])/mosaic_RMS_NF[fid] < 1.05) or \
-                        (((post_mosaic_RMS[fid] - mosaic_RMS[fid])/mosaic_RMS[fid] > 1.05 or
-                            (post_mosaic_RMS_NF[fid] - mosaic_RMS_NF[fid])/mosaic_RMS_NF[fid] > 1.05) and
-                            selfcal_plan[fid]['solint_snr_per_field'][solint] > 5)
+                    rms_field_by_field_success += [
+                        (post_mosaic_RMS[fid] / mosaic_RMS[fid] < 1.05
+                         and post_mosaic_RMS_NF[fid] / mosaic_RMS_NF[fid] < 1.05)
+                        or ((post_mosaic_RMS[fid] / mosaic_RMS[fid] > 1.05
+                             or post_mosaic_RMS_NF[fid] / mosaic_RMS_NF[fid] > 1.05)
+                            and selfcal_plan[fid]['solint_snr_per_field'][solint] > 5)
+                    ]
 
                 if solint == 'inf_EB':
                     # If any of the fields succeed in the "strict" sense, then allow for minor reductions in the evaluation quantity in other
@@ -2514,7 +2517,10 @@ class SelfcalHeuristics:
                             selfcal_plan[vis]['inf_EB_gaincal_combine'] = inf_EB_gaincal_combine  # 'scan'
                             if slib['obstype'] == 'mosaic':
                                 selfcal_plan[vis]['inf_EB_gaincal_combine'] += ',field'
-                            selfcal_plan[vis]['inf_EB_gaintype'] = inf_EB_gaintype  # G
+                            if slib[vis]['pol_type'] == 'single-pol':
+                                selfcal_plan[vis]['inf_EB_gaintype'] = 'T'
+                            else:
+                                selfcal_plan[vis]['inf_EB_gaintype'] = inf_EB_gaintype  # G
                             selfcal_plan[vis]['inf_EB_fallback_mode'] = ''  # 'scan'
 
                     repeat_solint = True
