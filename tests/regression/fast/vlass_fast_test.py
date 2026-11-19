@@ -1,9 +1,12 @@
 import shutil
 
+import pytest
+
 from pipeline.infrastructure import casa_tools
 from tests.testing_utils import PipelineTester, ensure_working_dir
 
 
+@pytest.mark.github_runner(testdata=['pl-regressiontest/vlass_quicklook'])
 def test_TSKY0001__vlass_quicklook_regression():
     """Run VLASS quicklook regression
 

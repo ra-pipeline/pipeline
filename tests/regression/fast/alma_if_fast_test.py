@@ -8,6 +8,12 @@ from tests.testing_utils import PipelineTester
 
 # 7m tests
 @pytest.mark.seven
+@pytest.mark.github_runner(
+    testdata=[
+        'pl-unittest/uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small.ms',
+        'pl-regressiontest/uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small',
+    ]
+)
 def test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression():
     """Run ALMA cal+image regression on a small test dataset with a PPR file.
 
@@ -163,6 +169,7 @@ def test_E2E6_1_00010_S__uid___A002_Xd0a588_X2239__procedure_hifa_image__regress
 
 
 @pytest.mark.twelve
+@pytest.mark.github_runner(testdata=['pl-regressiontest/CSV-3899-EB2-small'])
 def test_csv_3899_eb2_small__procedure_hifa_calimage__regression():
     """PIPE-2245: Run small ALMA cal+image regression to cover various heuristics
 
@@ -182,6 +189,7 @@ def test_csv_3899_eb2_small__procedure_hifa_calimage__regression():
 
 
 @pytest.mark.twelve
+@pytest.mark.github_runner(testdata=['pl-regressiontest/uid___A002_Xee1eb6_Xc58d_calsurvey'])
 def test_uid___A002_Xee1eb6_Xc58d__procedure_hifa_calsurvey__regression():
     """Run ALMA cal+survey regression on a calibration survey test dataset.
 

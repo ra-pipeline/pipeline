@@ -209,6 +209,7 @@ markers = [
     "makeimages: makeimages task(s)",
     "mpi: test recommended for an MPI-enabled CASA session; use -m mpi or -m 'not mpi' to control execution",
     "unit: unit test",
+    "github_runner: regression test suitable for free GitHub-hosted runners",
 ]
 addopts = [
     "-ra", # show extra test summary info for (a)ll except passed
