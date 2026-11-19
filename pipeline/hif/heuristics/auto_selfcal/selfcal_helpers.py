@@ -958,55 +958,55 @@ def rank_refants(vis, caltable=None, refantignore=None):
 
 
 def get_SNR_self(
-    selfcal_library,
-    selfcal_plan,
-    n_ant,
-    inf_EB_gaincal_combine,
-    inf_EB_gaintype,
-):
+    selfcal_library: dict[str, Any],
+    selfcal_plan: dict[str, Any],
+    n_ant: int,
+    inf_EB_gaincal_combine: str,
+    inf_EB_gaintype: str,
+) -> None:
+    """Estimate and populate per-solint SNR in selfcal_plan."""
     for target in selfcal_library:
         for band in selfcal_library[target].keys():
-            selfcal_plan[target][band]['solint_snr'], selfcal_plan[target][band]['solint_snr_per_spw'] = get_SNR_self_individual(
-                selfcal_library[target][band]['vislist'],
-                selfcal_library[target][band],
-                n_ant,
-                selfcal_plan[target][band]['solints'],
-                selfcal_plan[target][band]['integration_time'],
-                inf_EB_gaincal_combine,
-                inf_EB_gaintype,
+            selfcal_plan[target][band]['solint_snr'], selfcal_plan[target][band]['solint_snr_per_spw'] = (
+                get_SNR_self_individual(
+                    selfcal_library[target][band]['vislist'],
+                    selfcal_library[target][band],
+                    n_ant,
+                    selfcal_plan[target][band]['solints'],
+                    selfcal_plan[target][band]['integration_time'],
+                    inf_EB_gaincal_combine,
+                    inf_EB_gaintype,
+                )
             )
 
             LOG.info('Estimated SNR per solint:')
-            LOG.info(f'{target} {band}')
+            LOG.info('%s %s', target, band)
             for solint in selfcal_plan[target][band]['solints']:
-                if solint == 'inf_EB':
-                    LOG.info('{}: {:0.2f}'.format(solint, selfcal_plan[target][band]['solint_snr'][solint]))
-                else:
-                    LOG.info('{}: {:0.2f}'.format(solint, selfcal_plan[target][band]['solint_snr'][solint]))
+                LOG.info('%s: %0.2f', solint, selfcal_plan[target][band]['solint_snr'][solint])
 
             for fid in selfcal_library[target][band]['sub-fields']:
                 selfcal_plan[target][band][fid] = {}
-                selfcal_plan[target][band][fid]['solint_snr_per_field'], selfcal_plan[target][band][fid]['solint_snr_per_field_per_spw'] = (
-                    get_SNR_self_individual(
-                        selfcal_library[target][band]['vislist'],
-                        selfcal_library[target][band][fid],
-                        n_ant,
-                        selfcal_plan[target][band]['solints'],
-                        selfcal_plan[target][band]['integration_time'],
-                        inf_EB_gaincal_combine,
-                        inf_EB_gaintype,
-                    )
+                (
+                    selfcal_plan[target][band][fid]['solint_snr_per_field'],
+                    selfcal_plan[target][band][fid]['solint_snr_per_field_per_spw'],
+                ) = get_SNR_self_individual(
+                    selfcal_library[target][band]['vislist'],
+                    selfcal_library[target][band][fid],
+                    n_ant,
+                    selfcal_plan[target][band]['solints'],
+                    selfcal_plan[target][band]['integration_time'],
+                    inf_EB_gaincal_combine,
+                    inf_EB_gaintype,
                 )
 
                 LOG.info('Estimated SNR per solint:')
                 LOG.info('%s %s field %s', target, band, str(fid))
                 for solint in selfcal_plan[target][band]['solints']:
-                    if solint == 'inf_EB':
-                        LOG.info('{}: {:0.2f}'.format(solint, selfcal_plan[target][band][fid]['solint_snr_per_field'][solint]))
-                    else:
-                        LOG.info('{}: {:0.2f}'.format(solint, selfcal_plan[target][band][fid]['solint_snr_per_field'][solint]))
-
-    #return solint_snr, solint_snr_per_spw, solint_snr_per_field, solint_snr_per_field_per_spw
+                    LOG.info(
+                        '%s: %0.2f',
+                        solint,
+                        selfcal_plan[target][band][fid]['solint_snr_per_field'][solint],
+                    )
 
 
 def get_SNR_self_individual(
@@ -1140,24 +1140,35 @@ def get_SNR_self_individual(
     return solint_snr, solint_snr_per_spw
 
 
-def get_SNR_self_update(selfcal_library, n_ant, solint_curr, solint_next, integration_time, solint_snr):
-    SNR = max(selfcal_library[selfcal_library['vislist'][0]][solint_curr]['SNR_post'],
-                selfcal_library[selfcal_library['vislist'][0]][solint_curr]['intflux_post'] /
-                selfcal_library[selfcal_library['vislist'][0]][solint_curr]['e_intflux_post'])
+def get_SNR_self_update(
+    slib: dict[str, Any],
+    n_ant: int,
+    solint_curr: str,
+    solint_next: str,
+    integration_time: float,
+    solint_snr: dict[str, float],
+) -> None:
+    """Update the estimated SNR for the next solint using post-selfcal stats."""
+    SNR = max(
+        slib[slib['vislist'][0]][solint_curr]['SNR_post'],
+        slib[slib['vislist'][0]][solint_curr]['intflux_post']
+        / slib[slib['vislist'][0]][solint_curr]['e_intflux_post'],
+    )
 
-    if solint_next == 'inf' or solint_next == 'inf_ap':
-        selfcal_library['per_scan_SNR'] = SNR/((n_ant-3)**0.5*(selfcal_library['Total_TOS']/(
-            selfcal_library['Median_scan_time']/selfcal_library['Median_fields_per_scan']))**0.5)
-        solint_snr[solint_next] = selfcal_library['per_scan_SNR']
+    if solint_next in ('inf', 'inf_ap'):
+        slib['per_scan_SNR'] = SNR / (
+            (n_ant - 3) ** 0.5
+            * (slib['Total_TOS'] / (slib['Median_scan_time'] / slib['Median_fields_per_scan'])) ** 0.5
+        )
+        solint_snr[solint_next] = slib['per_scan_SNR']
     elif solint_next == 'scan_inf':
-        selfcal_library['per_scan_SNR'] = SNR / \
-            ((n_ant-3)**0.5*(selfcal_library['Total_TOS']/selfcal_library['Median_scan_time'])**0.5)
-        solint_snr[solint_next] = selfcal_library['per_scan_SNR']
+        slib['per_scan_SNR'] = SNR / ((n_ant - 3) ** 0.5 * (slib['Total_TOS'] / slib['Median_scan_time']) ** 0.5)
+        solint_snr[solint_next] = slib['per_scan_SNR']
     elif solint_next == 'int':
-        solint_snr[solint_next] = SNR/((n_ant-3)**0.5*(selfcal_library['Total_TOS']/integration_time)**0.5)
+        solint_snr[solint_next] = SNR / ((n_ant - 3) ** 0.5 * (slib['Total_TOS'] / integration_time) ** 0.5)
     else:
         solint_float = float(solint_next.replace('s', '').replace('_ap', ''))
-        solint_snr[solint_next] = SNR/((n_ant-3)**0.5*(selfcal_library['Total_TOS']/solint_float)**0.5)
+        solint_snr[solint_next] = SNR / ((n_ant - 3) ** 0.5 * (slib['Total_TOS'] / solint_float) ** 0.5)
 
 
 def get_sensitivity(vislist, selfcal_library, field='', specmode='mfs', virtual_spw='all',
