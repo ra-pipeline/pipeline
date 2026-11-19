@@ -61,7 +61,7 @@ Documentation source files live alongside the code in `pipeline/docs/`, and we g
    BUILD_INTERNAL_DOCS=1 pixi run -e docs build-docs-fast
    ```
 
-3. **Push & wait for sync**: Push your branch to [Open Bitbucket @ NRAO](https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline). Branches are mirrored to GitHub every 15 minutes and built automatically in Read the Docs (see [Read the Docs Hosting & CI Pipeline](#read-the-docs-hosting--ci-pipeline) for details). Check build status in the [Read the Docs dashboard](https://app.readthedocs.org/projects/pipe-docs/builds/).
+3. **Push & preview**: Push your branch to [Open Bitbucket @ NRAO](https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline). A Bitbucket webhook triggers the GitHub mirror and Read the Docs build automatically (see [Read the Docs Hosting & CI Pipeline](#read-the-docs-hosting--ci-pipeline) for details). Check build status in the [Read the Docs dashboard](https://app.readthedocs.org/projects/pipe-docs/builds/).
 4. **Open PR**: Add the RTD preview link to the Bitbucket PR description for reviewers.
 
 (viewing-branch-builds-on-read-the-docs)=
@@ -113,11 +113,12 @@ Source code is hosted on [Open Bitbucket @ NRAO](https://open-bitbucket.nrao.edu
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#f4f6fb', 'primaryBorderColor': '#c5d0e6', 'primaryTextColor': '#1f2328', 'lineColor': '#57606a', 'edgeLabelBackground': '#ffffff' }}}%%
 flowchart LR
-    BB("<b>Open Bitbucket @ NRAO</b><br/>open-bitbucket.nrao.edu") -->|"mirror every 15 min<br/>(MIRROR_PAT)"| GH("<b>GitHub Mirror</b><br/>--atomic --prune")
+    BB("<b>Open Bitbucket @ NRAO</b><br/>open-bitbucket.nrao.edu") -->|"push webhook<br/>(HMAC)"| CF("<b>Cloudflare Worker</b><br/>workflow_dispatch")
+    CF -->|"sync workflow<br/>(MIRROR_PAT)"| GH("<b>GitHub Mirror</b><br/>--atomic --prune")
     GH -->|"push / delete<br/>webhooks"| RTD("<b>Read the Docs</b><br/>auto-activate, build, prune")
 ```
 
-1. **Bitbucket to GitHub mirror**: `.github/workflows/sync-from-open-bitbucket.yml` fetches all branches and tags (`refs/heads/*`, `refs/tags/*`) from Bitbucket every 15 minutes (or on manual `workflow_dispatch`) and pushes them to GitHub using `MIRROR_PAT` with `--atomic --prune`. Using a PAT ensures GitHub emits `push` and `delete` webhook events.
+1. **Bitbucket to GitHub mirror**: Bitbucket `repo:refs_changed` webhooks hit a Cloudflare Worker relay, which triggers `.github/workflows/sync-from-open-bitbucket.yml` via `workflow_dispatch`. The workflow fetches all branches and tags (`refs/heads/*`, `refs/tags/*`) from Bitbucket and pushes them to GitHub with `--atomic --prune`, causing GitHub to emit `push` and `delete` webhook events. A 2-hour `cron` schedule serves as a fallback if a webhook is missed.
 2. **Read the Docs automation**: Three RTD Automation Rules manage branch versions, and active branches rebuild automatically on each mirrored push:
    - **Activate version** (`Branch`, `Any`): activates every newly pushed branch.
    - **Hide version** (`Branch`, `^(?!main$|docs/20).*$`): hides branches other than `main` and `docs/20*` from the flyout menu while keeping them accessible via direct URL.
