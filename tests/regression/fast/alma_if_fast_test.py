@@ -12,7 +12,8 @@ from tests.testing_utils import PipelineTester
     testdata=[
         'pl-unittest/uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small.ms',
         'pl-regressiontest/uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small',
-    ]
+    ],
+    macos=True,
 )
 def test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression():
     """Run ALMA cal+image regression on a small test dataset with a PPR file.

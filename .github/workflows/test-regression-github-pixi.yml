@@ -57,7 +57,7 @@ jobs:
           echo "$MATRIX" | python3 -m json.tool
 
   regression:
-    name: "${{ matrix.name }}"
+    name: "${{ matrix.name }} (${{ matrix.os }})"
     needs: discover
     if: needs.discover.outputs.has_tests == 'true'
     strategy:
@@ -66,7 +66,7 @@ jobs:
 
     uses: ./.github/workflows/env-setup-run-template-pixi.yml
     with:
-      os: ubuntu-24.04
+      os: ${{ matrix.os }}
       pixi_env: casa674-py312
       update_casa: ${{ github.event_name != 'workflow_dispatch' && github.ref_type != 'tag' && !startsWith(github.base_ref || github.ref_name, 'release/') }}
       free_disk_space: true
@@ -79,7 +79,7 @@ jobs:
         rc=$?
         df -h
         exit $rc
-      artifact_name: github-regression-${{ matrix.name }}
+      artifact_name: github-regression-${{ matrix.name }}-${{ matrix.os }}
       artifact_path: |
         regression-results.xml
         casa-*.log

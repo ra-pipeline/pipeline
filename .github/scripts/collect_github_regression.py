@@ -16,15 +16,19 @@ def _is_github_runner_mark(node: ast.expr) -> ast.Call | ast.Attribute | None:
     return None
 
 
-def _extract_testdata(mark: ast.Call | ast.Attribute, node_id: str) -> list[str]:
+def _extract_marker_args(mark: ast.Call | ast.Attribute, node_id: str) -> tuple[list[str], list[str]]:
+    testdata: list[str] = []
+    os_list = ['ubuntu-24.04']
     if isinstance(mark, ast.Call):
         for kw in mark.keywords:
             if kw.arg == 'testdata':
                 val = ast.literal_eval(kw.value)
-                paths = [str(item) for item in val] if isinstance(val, (list, tuple)) else [str(val)]
-                if paths:
-                    return paths
-    raise ValueError(f'{node_id}: @pytest.mark.github_runner requires a non-empty testdata=[...] argument')
+                testdata = [str(item) for item in val] if isinstance(val, (list, tuple)) else [str(val)]
+            elif kw.arg == 'macos' and ast.literal_eval(kw.value):
+                os_list.append('macos-15')
+    if not testdata:
+        raise ValueError(f'{node_id}: @pytest.mark.github_runner requires a non-empty testdata=[...] argument')
+    return testdata, os_list
 
 
 def collect_tests(root: Path) -> list[dict[str, str]]:
@@ -49,12 +53,14 @@ def collect_tests(root: Path) -> list[dict[str, str]]:
                     continue
                 node_id = f'{rel_path}::{node.name}'
                 short_name = re.sub(r'^test_?|_?regression$', '', node.name).strip('_')
-                testdata = _extract_testdata(mark, node_id)
-                entries.append({
-                    'name': short_name,
-                    'node_id': node_id,
-                    'testdata_paths': '\n'.join(testdata),
-                })
+                testdata, os_list = _extract_marker_args(mark, node_id)
+                for os_name in os_list:
+                    entries.append({
+                        'name': short_name,
+                        'os': os_name,
+                        'node_id': node_id,
+                        'testdata_paths': '\n'.join(testdata),
+                    })
                 break
 
     return entries
