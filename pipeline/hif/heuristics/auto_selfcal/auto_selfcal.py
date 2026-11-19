@@ -2151,6 +2151,7 @@ class SelfcalHeuristics:
                     LOG.info('Continuing with solint: '+solint)
                 # we don't want to re-run tclean and gaincal if we're trying to fallback to combinespw
                 if not repeat_solint:
+                    do_fallback_calonly = selfcal_plan['applycal_mode'][iteration] == 'calonly'
                     os.system('rm -rf '+sani_target+'_'+band+'_'+solint+'_'+str(iteration)+'*')
                     ##
                     # make images using the appropriate tclean heuristics for each telescope
@@ -2218,7 +2219,7 @@ class SelfcalHeuristics:
 
                 if not do_fallback_combinespw:
                     # We need to redo saving the model now that we have potentially unflagged some data.
-                    if not do_fallback_calonly:
+                    if not repeat_solint:
                         self.tclean_wrapper(selfcal_library, sani_target+'_'+band+'_'+solint+'_'+str(iteration),
                                             band, telescope=telescope, nsigma=slib['nsigma'][iteration], scales=[
                                                 0],
