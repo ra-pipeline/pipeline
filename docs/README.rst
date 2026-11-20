@@ -2,7 +2,7 @@ Pipeline
 ========
 *The operational data processing pipelines for ALMA, VLA, and the NRO 45m telescope.*
 
-|Docs Pages| |Docs RTD| |Test Unit| |Codecov Unit|
+|Docs Pages| |Docs RTD| |Test Unit| |Codecov Unit| |Test Regression| |Codecov Regression|
 
 Pipeline development is a collaborative effort led by `NRAO`_, `ESO`_, and `NAOJ`_, with additional contributions from `MPIfR`_, `NOVA`_ (from 2026), and `UKATC`_ (until 2025) under contract to `ESO`_.
 
@@ -93,7 +93,15 @@ Documentation Components
   :target: https://github.com/ra-pipeline/pipeline/actions/workflows/test-unit-pixi.yml
   :alt: Test: GH-Test-Unit-Status
 
-.. |Codecov Unit| image:: https://img.shields.io/codecov/c/github/ra-pipeline/pipeline?style=plastic&label=codecov-unit
-  :target: https://app.codecov.io/github/ra-pipeline/pipeline
+.. |Codecov Unit| image:: https://img.shields.io/codecov/c/github/ra-pipeline/pipeline?style=plastic&flag=unittests&label=codecov-unit
+  :target: https://app.codecov.io/github/ra-pipeline/pipeline?flags[0]=unittests
   :alt: Test: Codecov-Unit-Status
+
+.. |Test Regression| image:: https://img.shields.io/github/actions/workflow/status/ra-pipeline/pipeline/test-regression-github-pixi.yml?style=plastic&logo=githubactions&label=test-regression
+  :target: https://github.com/ra-pipeline/pipeline/actions/workflows/test-regression-github-pixi.yml
+  :alt: Test: GH-Test-Regression-Status
+
+.. |Codecov Regression| image:: https://img.shields.io/codecov/c/github/ra-pipeline/pipeline?style=plastic&flag=regression&label=codecov-regression
+  :target: https://app.codecov.io/github/ra-pipeline/pipeline?flags[0]=regression
+  :alt: Test: Codecov-Regression-Status
 

@@ -98,12 +98,58 @@ jobs:
       testdata_paths: ${{ matrix.testdata_paths }}
       run_command: |
         export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONNOUSERSITE=1
-        python -m pytest "${{ matrix.node_id }}" --junitxml=regression-results.xml
+        COV_ARGS=""
+        if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
+          export COVERAGE_FILE=coverage.dat
+          COV_ARGS="--cov=pipeline --cov-branch --cov-report="
+        fi
+        python -m pytest "${{ matrix.node_id }}" --junitxml=regression-results.xml $COV_ARGS
         rc=$?
         df -h
         exit $rc
       artifact_name: github-regression-${{ matrix.name }}-${{ matrix.os }}
       artifact_path: |
         regression-results.xml
+        coverage.dat*
         casa-*.log
         **/html/
+
+  upload_codecov:
+    name: Upload Regression Coverage to Codecov
+    needs: regression
+    if: ${{ !cancelled() && needs.regression.result != 'skipped' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Full History for Codecov
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download Regression Artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: github-regression-*-ubuntu-24.04
+
+      - name: Combine Coverage Data
+        shell: bash
+        run: |
+          if compgen -G "github-regression-*-ubuntu-24.04/coverage.dat.*" >/dev/null; then
+            python3 -m venv .cov-venv
+            .cov-venv/bin/pip install --quiet coverage
+            .cov-venv/bin/coverage combine github-regression-*-ubuntu-24.04/coverage.dat.*
+            .cov-venv/bin/coverage xml
+          else
+            echo "::warning::No coverage.dat.* files found in downloaded artifacts."
+          fi
+
+      - name: Upload Regression Coverage to Codecov
+        if: hashFiles('coverage.xml') != ''
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: regression
+          name: codecov-regression-ubuntu
+          fail_ci_if_error: true
+          verbose: true
+          disable_telem: true
