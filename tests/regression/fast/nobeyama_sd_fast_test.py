@@ -24,7 +24,12 @@ def test_mg2_20170525142607_180419__procedure_hsdn_calimage__regression():
     pt.run()
 
 
-@pytest.mark.github_runner(testdata=['pl-regressiontest/mg2-20170525142607-180419_PPR'])
+@pytest.mark.github_runner(
+    testdata=[
+        'pl-regressiontest/mg2-20170525142607-180419',
+        'pl-regressiontest/mg2-20170525142607-180419_PPR',
+    ]
+)
 def test_mg2_20170525142607_180419__PPR__regression():
     """Run ALMA single-dish cal+image regression for restore nobeyama recipe.
 
