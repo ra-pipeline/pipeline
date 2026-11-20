@@ -118,9 +118,14 @@ jobs:
         run: |
           # GH macOS runners use Homebrew for package management          
           brew install git
-          # Note: xvfb is X11 specific. macOS usually doesn't need it for headless browsers,
-          # or requires XQuartz (brew install --cask xquartz) if you specifically need X11.          
+          # casaplotms on macOS is native Qt (Cocoa), not X11, but task_plotms.py
+          # still requires DISPLAY to be set and pytest-xvfb does not start Xvfb
+          # on macOS; start XQuartz Xvfb so DISPLAY points to a valid server.
           brew install --cask xquartz
+          if [ -x /opt/X11/bin/Xvfb ]; then
+            /opt/X11/bin/Xvfb :99 -screen 0 1280x1024x24 >/dev/null 2>&1 &
+            echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          fi
 
       - name: Configure CASA
         shell: bash
