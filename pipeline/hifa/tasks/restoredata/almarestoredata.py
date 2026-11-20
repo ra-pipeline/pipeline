@@ -1,3 +1,5 @@
+from packaging.version import InvalidVersion, parse
+
 import pipeline.h.tasks.restoredata.restoredata as restoredata
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure as infrastructure
@@ -7,6 +9,10 @@ from pipeline.infrastructure import task_registry
 from ..importdata import almaimportdata
 
 LOG = infrastructure.get_logger(__name__)
+
+# Pipeline versions prior to this cutoff imported SQLD rows into MAIN, so
+# restoredata must also import full ASDMs to match archived flagversions.
+_EXCLUDE_SQLD_CUTOFF = parse('2026.3.0.49')
 
 
 class ALMARestoreDataInputs(restoredata.RestoreDataInputs):
@@ -98,9 +104,39 @@ class ALMARestoreData(restoredata.RestoreData):
     def _do_importasdm(self, sessionlist, vislist):
         inputs = self.inputs
 
-        container = vdp.InputsContainer(almaimportdata.ALMAImportData, inputs.context, vis=vislist, session=sessionlist,
-                                        save_flagonline=False, lazy=inputs.lazy, bdfflags=inputs.bdfflags,
-                                        dbservice=False, asis=inputs.asis, ocorr_mode=inputs.ocorr_mode)
+        pipemanifest = self._do_get_manifest('*pipeline_manifest.xml', '*cal*pipeline_manifest.xml')
+        _, pipeline_version, _ = self._extract_casa_pipeline_version(pipemanifest)
+        exclude_spw = ''
+        if pipeline_version is None:
+            LOG.info('No pipeline_version found in manifest; importing full ASDM for flagversion compatibility')
+        else:
+            try:
+                if parse(pipeline_version) >= _EXCLUDE_SQLD_CUTOFF:
+                    exclude_spw = '*#SQLD'
+                else:
+                    LOG.info(
+                        'Original pipeline version %r predates SQLD exclusion; importing full ASDM for flagversion compatibility',
+                        pipeline_version,
+                    )
+            except InvalidVersion:
+                LOG.warning(
+                    'Unable to parse pipeline_version %r from manifest; importing full ASDM for flagversion compatibility',
+                    pipeline_version,
+                )
+
+        container = vdp.InputsContainer(
+            almaimportdata.ALMAImportData,
+            inputs.context,
+            vis=vislist,
+            session=sessionlist,
+            save_flagonline=False,
+            lazy=inputs.lazy,
+            bdfflags=inputs.bdfflags,
+            dbservice=False,
+            asis=inputs.asis,
+            ocorr_mode=inputs.ocorr_mode,
+            exclude_spw=exclude_spw,
+        )
         importdata_task = almaimportdata.ALMAImportData(container)
         return self._executor.execute(importdata_task, merge=True)
 
