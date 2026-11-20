@@ -256,6 +256,9 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         grid_ra_corr = grid_size * dec_corr
         grid_dec = grid_size
 
+        # rewrap RA
+        ras = utils.rewrap_angle(ras)
+
         min_ra = ras.min()
         max_ra = ras.max()
         min_dec = decs.min()
