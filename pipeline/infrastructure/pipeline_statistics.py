@@ -1325,7 +1325,7 @@ class PriorcalsResultsStatsExtractor(ResultsStatsExtractor):
         try:
             opacity_dict = {}
             for idx, opacity in enumerate(result.oc_result.opacities):
-                spw = result.oc_result.spw[idx]
+                spw = result.oc_result.spw.split(',')[idx]
                 opacity_dict[f'spw_{spw}'] = opacity
             if opacity_dict:
                 d['opacity'] = opacity_dict
