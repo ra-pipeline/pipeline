@@ -19,12 +19,14 @@ from pipeline.hsd.heuristics.baselineparamconfig import (
 
 
 @pytest.fixture
-def heuristic_poly():
+def heuristic_poly() -> BaselineFitParamConfig:
+    """Provide a polynomial configuration without switching."""
     return BaselineFitParamConfig(fitfunc='poly', switchpoly=False)
 
 
 @pytest.fixture
-def heuristic_cspline():
+def heuristic_cspline() -> BaselineFitParamConfig:
+    """Provide a cubic spline configuration with switching enabled."""
     return BaselineFitParamConfig(fitfunc='cspline', switchpoly=True)
 
 
@@ -33,7 +35,8 @@ def heuristic_cspline():
     ([[5, 5]], "5~5"),
     ([], ""),
 ])
-def test_as_maskstring(masklist, expected):
+def test_as_maskstring(masklist: list[list[int]], expected: str) -> None:
+    """Verify mask ranges are formatted as a semicolon-separated string."""
     assert as_maskstring(masklist) == expected
 
 @pytest.mark.parametrize("func, npiece, nwave, expected", [
@@ -41,7 +44,8 @@ def test_as_maskstring(masklist, expected):
     ("cspline", 3, "", ["1", "0", "0~10", "cspline", "1", "3", ""]),
     ("sinusoid","", [2,4,6], ["1", "0", "0~10", "sinusoid", "1", "", "[2,4,6]"]),
 ])
-def test_write_blparam(func, npiece, nwave, expected):
+def test_write_blparam(func: str, npiece: int | str, nwave: list[int] | str, expected: list[str]) -> None:
+    """Verify baseline parameters are serialized for each fitting function."""
     fileobj = io.StringIO()
     param = {
         BLP.ROW: 1,
@@ -72,7 +76,8 @@ def test_write_blparam(func, npiece, nwave, expected):
 
 
 
-def test_no_switching():
+def test_no_switching() -> None:
+    """Verify disabling switching selects a spline without calling the engine."""
     engine = MagicMock()
     result = no_switching(engine, 100, (0, 0), 1, [])
     assert result == (fitorder.FittingFunction.CSPLINE.blfunc, 0)
@@ -80,7 +85,8 @@ def test_no_switching():
 
 
 class TestBaselineFitParamConfig:
-    def test_init(self, heuristic_poly, heuristic_cspline):
+    def test_init(self, heuristic_poly: BaselineFitParamConfig, heuristic_cspline: BaselineFitParamConfig) -> None:
+        """Verify initialization selects the fitting function and switching heuristic."""
         assert heuristic_poly.fitfunc == fitorder.FittingFunction.POLY
         assert heuristic_poly.switching_heuristic == no_switching
 
@@ -95,12 +101,15 @@ class TestBaselineFitParamConfig:
         (np.array([0, 1, 1, 0, 0, 1, 1, 1, 0, 1], dtype=int), 1, [[1, 2], [5, 7], [9, 9]]),
         (np.array([1, 0, 1], dtype=int), 0, [[0, 1], [2, 3]]),
     ])
-    def test_convert_mask_to_masklist(self, heuristic_poly, mask, end_offset, expected):
+    def test_convert_mask_to_masklist(self, heuristic_poly: BaselineFitParamConfig, mask: np.ndarray,
+                                      end_offset: int, expected: list[list[int]]) -> None:
+        """Verify contiguous mask ranges and their end offsets are converted correctly."""
         # Accessing private method for testing
         result = heuristic_poly._BaselineFitParamConfig__convert_mask_to_masklist(mask, end_offset)
         assert result == expected
 
-    def test_convert_flags_to_masklist(self, heuristic_poly):
+    def test_convert_flags_to_masklist(self, heuristic_poly: BaselineFitParamConfig) -> None:
+        """Verify flagged channels become inclusive ranges for each polarization."""
         flags = np.array([
             [0, 1, 1, 0],
             [1, 0, 0, 1]
@@ -112,14 +121,16 @@ class TestBaselineFitParamConfig:
         result = heuristic_poly._BaselineFitParamConfig__convert_flags_to_masklist(flags)
         assert result == [[[1, 2]], [[0, 0], [3, 3]]]
 
-    def test_get_fit_param_poly(self, heuristic_poly):
+    def test_get_fit_param_poly(self, heuristic_poly: BaselineFitParamConfig) -> None:
+        """Verify polynomial fitting parameters include the requested order."""
         edge = fitorder.EdgeChannels(0, 0)
         result = heuristic_poly._get_fit_param(polyorder=2, nchan=100, edge=edge, nchan_without_edge=100,
                                                nchan_masked=0, masklist=[])
         assert result[BLP.FUNC] == 'poly'
         assert result[BLP.ORDER] == 2
 
-    def test_get_fit_param_cspline(self, heuristic_cspline):
+    def test_get_fit_param_cspline(self, heuristic_cspline: BaselineFitParamConfig) -> None:
+        """Verify cubic spline fitting parameters include the expected piece count and order."""
         edge = fitorder.EdgeChannels(0, 0)
         result = heuristic_cspline._get_fit_param(polyorder=2, nchan=10, edge=edge, nchan_without_edge=5,
                                                   nchan_masked=0, masklist=[[0,1], [0,2], [5,6], [7,8], [3,4]])
@@ -127,7 +138,8 @@ class TestBaselineFitParamConfig:
         assert result[BLP.NPIECE] == 1
         assert result[BLP.ORDER] == 0
 
-    def test_get_fit_param_sinusoid(self):
+    def test_get_fit_param_sinusoid(self) -> None:
+        """Verify sinusoidal fitting parameters retain the configured wave numbers."""
         config = BaselineFitParamConfig(fitfunc='sinusoid')
         config.wave_number = [1, 2, 3]
         edge = fitorder.EdgeChannels(0, 0)
@@ -136,7 +148,8 @@ class TestBaselineFitParamConfig:
         assert result[BLP.FUNC] == 'sinusoid'
         assert result[BLP.NWAVE] == [1, 2, 3]
 
-    def test_configure_baseline_param(self, heuristic_poly):
+    def test_configure_baseline_param(self, heuristic_poly: BaselineFitParamConfig) -> None:
+        """Verify row, polarization, function, and fit ranges are configured."""
         edge = fitorder.EdgeChannels(5, 5)
         mask = np.ones(100, dtype=int)
         mask_list = [[20, 30]]
@@ -152,7 +165,9 @@ class TestBaselineFitParamConfig:
 
     @patch('pipeline.hsd.heuristics.baselineparamconfig.casa_tools.TableReader')
     @patch('pipeline.hsd.heuristics.baselineparamconfig.fitorder.FitOrderHeuristics')
-    def test_calculate(self, mock_fitorder_heuristics, mock_table_reader, heuristic_poly):
+    def test_calculate(self, mock_fitorder_heuristics: MagicMock, mock_table_reader: MagicMock,
+                       heuristic_poly: BaselineFitParamConfig) -> None:
+        """Verify calculation writes the expected baseline parameter file for mocked data."""
         import hashlib
 
         # Mocks for MeasurementSet and its components
