@@ -36,7 +36,7 @@ def heuristic_cspline() -> BaselineFitParamConfig:
     ([], ""),
 ])
 def test_as_maskstring(masklist: list[list[int]], expected: str) -> None:
-    """Verify mask ranges are formatted as a semicolon-separated string."""
+    """Verify mask ranges"""
     assert as_maskstring(masklist) == expected
 
 @pytest.mark.parametrize("func, npiece, nwave, expected", [
@@ -115,7 +115,7 @@ class TestBaselineFitParamConfig:
             [1, 0, 0, 1]
         ], dtype=int)
         # '1' means flagged (invalid), '0' means valid.
-        # Result should be list of ranges where value is 1.
+        # Result should be a list of ranges where the value is 1.
         # row 0: [1, 3]
         # row 1: [0, 1], [3, 4]
         result = heuristic_poly._BaselineFitParamConfig__convert_flags_to_masklist(flags)
