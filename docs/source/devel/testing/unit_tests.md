@@ -185,6 +185,10 @@ def test_using_fixture(sample_data):
     assert sample_data['number'] == 42
 ```
 
+### Coordinate-dependent test tolerances
+
+Unit tests evaluating astronomical coordinate transformations (e.g., via `casa_tools.measures`) depend on external geodetic and ephemeris tables (IERS, UT1–UTC). Different measures table distribution sources could potentially differ at the ~1e-8 to 1e-7 relative level in horizontal coordinates. Test tolerances for these operations should be chosen accordingly to absorb operational table drift while preserving regression sensitivity (see {jira}`PIPE-3273`).
+
 ## Best practices
 
 - Place test files in the same directory as the code they test.
