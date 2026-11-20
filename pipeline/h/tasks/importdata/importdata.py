@@ -37,7 +37,7 @@ class ImportDataInputs(vdp.StandardInputs):
     bdfflags = vdp.VisDependentProperty(default=True)
     createmms = vdp.VisDependentProperty(default='automatic')
     datacolumns = vdp.VisDependentProperty(default={})
-    exclude_spw = vdp.VisDependentProperty(default='')
+    exclude_spw = vdp.VisDependentProperty(default='', null_input=[None])
     lazy = vdp.VisDependentProperty(default=False)
     nocopy = vdp.VisDependentProperty(default=False)
     ocorr_mode = vdp.VisDependentProperty(default='ca')

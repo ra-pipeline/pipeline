@@ -34,7 +34,7 @@ class ALMAImportDataInputs(importdata.ImportDataInputs):
         )
     dbservice = vdp.VisDependentProperty(default=False)
     createmms = vdp.VisDependentProperty(default='false')
-    exclude_spw = vdp.VisDependentProperty(default='*#SQLD')
+    exclude_spw = vdp.VisDependentProperty(default='*#SQLD', null_input=[None])
     # sets threshold for polcal parallactic angle coverage. See PIPE-597
     minparang = vdp.VisDependentProperty(default=0.0)
     parallel = sessionutils.parallel_inputs_impl(default=False)
