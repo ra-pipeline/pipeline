@@ -27,6 +27,26 @@ on:
       - "pyproject.toml"
       - "pixi.lock"
   workflow_dispatch:
+    inputs:
+      test_filter:
+        description: "Optional substring filter on test name (empty = all)"
+        required: false
+        default: ""
+        type: string
+      os:
+        description: "Target OS filter"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - ubuntu-24.04
+          - macos-15
+      pixi_env:
+        description: "Pixi environment name"
+        required: false
+        default: "casa674-py312"
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
@@ -49,8 +69,11 @@ jobs:
       - name: Collect @pytest.mark.github_runner tests
         id: collect
         shell: bash
+        env:
+          TEST_FILTER: ${{ github.event.inputs.test_filter || '' }}
+          OS_FILTER: ${{ github.event.inputs.os || 'all' }}
         run: |
-          MATRIX=$(python3 .github/scripts/collect_github_regression.py)
+          MATRIX=$(python3 .github/scripts/collect_github_regression.py --filter "$TEST_FILTER" --os "$OS_FILTER")
           HAS_TESTS=$(python3 -c "import json, sys; print('true' if json.loads(sys.argv[1])['include'] else 'false')" "$MATRIX")
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "has_tests=$HAS_TESTS" >> "$GITHUB_OUTPUT"
@@ -67,7 +90,7 @@ jobs:
     uses: ./.github/workflows/env-setup-run-template-pixi.yml
     with:
       os: ${{ matrix.os }}
-      pixi_env: casa674-py312
+      pixi_env: ${{ github.event.inputs.pixi_env || 'casa674-py312' }}
       update_casa: ${{ github.event_name != 'workflow_dispatch' && github.ref_type != 'tag' && !startsWith(github.base_ref || github.ref_name, 'release/') }}
       free_disk_space: true
       timeout_minutes: 180

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import ast
 import json
 import re
@@ -31,7 +32,12 @@ def _extract_marker_args(mark: ast.Call | ast.Attribute, node_id: str) -> tuple[
     return testdata, os_list
 
 
-def collect_tests(root: Path) -> list[dict[str, str]]:
+def collect_tests(
+    root: Path,
+    *,
+    name_filter: str = '',
+    os_filter: str = 'all',
+) -> list[dict[str, str]]:
     """Scan tests/regression for @pytest.mark.github_runner(testdata=[...]) functions.
 
     Each testdata entry must be a directory path (e.g. a .ms or dataset directory)
@@ -39,6 +45,7 @@ def collect_tests(root: Path) -> list[dict[str, str]]:
     """
     regression_dir = root / 'tests' / 'regression'
     entries: list[dict[str, str]] = []
+    needle = name_filter.strip().lower()
 
     for py_file in sorted(regression_dir.rglob('*_test.py')):
         tree = ast.parse(py_file.read_text(encoding='utf-8'), filename=str(py_file))
@@ -53,8 +60,12 @@ def collect_tests(root: Path) -> list[dict[str, str]]:
                     continue
                 node_id = f'{rel_path}::{node.name}'
                 short_name = re.sub(r'^test_?|_?regression$', '', node.name).strip('_')
+                if needle and needle not in short_name.lower() and needle not in node_id.lower():
+                    break
                 testdata, os_list = _extract_marker_args(mark, node_id)
                 for os_name in os_list:
+                    if os_filter != 'all' and os_name != os_filter:
+                        continue
                     entries.append({
                         'name': short_name,
                         'os': os_name,
@@ -68,8 +79,13 @@ def collect_tests(root: Path) -> list[dict[str, str]]:
 
 def main() -> None:
     """Print the collected GitHub Actions matrix JSON to stdout."""
+    parser = argparse.ArgumentParser(description='Collect @pytest.mark.github_runner tests.')
+    parser.add_argument('--filter', default='', help='Optional case-insensitive substring filter on test name')
+    parser.add_argument('--os', default='all', help='Target OS filter (all, ubuntu-24.04, macos-15)')
+    args = parser.parse_args()
+
     root = Path(__file__).resolve().parents[2]
-    entries = collect_tests(root)
+    entries = collect_tests(root, name_filter=args.filter, os_filter=args.os)
     print(json.dumps({'include': entries}))
 
 
