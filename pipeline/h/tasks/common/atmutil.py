@@ -164,9 +164,11 @@ def get_dry_opacity(at: atmosphere) -> NDArray:
         An array of the zenith integrated opacity of dry species for each
         channel of the first spectral window.
     """
-    dry_opacity_result = at.getDryOpacitySpec(0)
-    dry_opacity = np.asarray(dry_opacity_result[1])
-    return dry_opacity
+    dry_opacity = []
+    for i in range(at.getNumSpectralWindows()):
+        dry_opacity_result = at.getDryOpacitySpec(i)
+        dry_opacity.append(np.asarray(dry_opacity_result[1]))
+    return np.array(dry_opacity)
 
 
 def get_wet_opacity(at: atmosphere) -> NDArray:
@@ -181,9 +183,11 @@ def get_wet_opacity(at: atmosphere) -> NDArray:
         An array of the zenith integrated opacity of wet species for each
         channel of the first spectral window.
     """
-    wet_opacity_result = at.getWetOpacitySpec(0)
-    wet_opacity = np.asarray(wet_opacity_result[1]['value'])
-    return wet_opacity
+    wet_opacity = []
+    for i in range(at.getNumSpectralWindows()):
+        wet_opacity_result = at.getWetOpacitySpec(i)
+        wet_opacity.append(np.asarray(wet_opacity_result[1]['value']))
+    return np.array(wet_opacity)
 
 
 def _test(pwv: float = 1.0, elevation: float = 45.0) -> NDArray:
@@ -212,8 +216,8 @@ def _test(pwv: float = 1.0, elevation: float = 45.0) -> NDArray:
 
     airmass = calc_airmass(elevation)
 
-    dry_opacity = get_dry_opacity(myat)
-    wet_opacity = get_wet_opacity(myat)
+    dry_opacity = get_dry_opacity(myat)[0]
+    wet_opacity = get_wet_opacity(myat)[0]
     transmission = calc_transmission(airmass, dry_opacity, wet_opacity)
 
     plot(frequency, dry_opacity, wet_opacity, transmission)
@@ -237,14 +241,23 @@ def plot(frequency: NDArray, dry_opacity: NDArray,
     """
     plt.clf()
     a1 = plt.gcf().gca()
-    plt.plot(frequency, dry_opacity, label='dry')
-    plt.plot(frequency, wet_opacity, label='wet')
+    if frequency.ndim == 1:
+        plt.plot(frequency, dry_opacity, label='dry')
+        plt.plot(frequency, wet_opacity, label='wet')
+    else:
+        for i in range(frequency.shape[0]):
+            plt.plot(frequency[i], dry_opacity[i], label=f'dry spw {i}')
+            plt.plot(frequency[i], wet_opacity[i], label=f'wet spw {i}')
     plt.legend(loc='upper left', bbox_to_anchor=(0., 0.5))
     a2 = a1.twinx()
     a2.yaxis.set_major_formatter(plt.NullFormatter())
     a2.yaxis.set_major_locator(plt.NullLocator())
     plt.gcf().sca(a2)
-    plt.plot(frequency, transmission, 'm-')
+    if frequency.ndim == 1:
+        plt.plot(frequency, transmission, 'm-')
+    else:
+        for i in range(frequency.shape[0]):
+            plt.plot(frequency[i], transmission[i], 'm-')
     M = transmission.min()
     Y = 0.8
     ymin = (M - Y) / (1.0 - Y)
@@ -443,7 +456,7 @@ def get_transmission(vis: str, antenna_id: int = 0, spw_id: int = 0,
     return get_transmission_for_range(vis, center_freq, nchan, resolution, antenna_id, doplot)
 
 
-def get_transmission_for_range(vis: str, center_freq: float, nchan: int, resolution: float, antenna_id: int = 0, doplot: bool = False) -> tuple[NDArray, NDArray]:
+def get_transmission_for_range(vis: str, center_freq: float | list[float], nchan: int | list[int], resolution: float | list[float], antenna_id: int = 0, doplot: bool = False) -> tuple[NDArray, NDArray]:
     """
     Calculate atmospheric transmission covering a range of frequency.
 
@@ -488,15 +501,30 @@ def get_transmission_for_range(vis: str, center_freq: float, nchan: int, resolut
 
     myat = casa_tools.atmosphere
     myqa = casa_tools.quanta
-    init_at(myat, fcenter=center_freq, nchan=nchan, resolution=resolution,
-            altitude=altitude)
+    myat.done()
+    init_atm(myat, altitude=altitude)
+    if isinstance(center_freq, list) and isinstance(nchan, list) and isinstance(resolution, list):
+        assert len(center_freq) == len(nchan) == len(resolution), "center_freq, nchan, and resolution must have the same length."
+        nbands = len(center_freq)
+        fc = myqa.quantity(center_freq, "GHz")
+        fw = myqa.quantity([abs(n * r) for n, r in zip(nchan, resolution)], "GHz")
+        fr = myqa.quantity(resolution, "GHz")
+    else:
+        nbands = 1
+        fc = myqa.quantity(center_freq, "GHz")
+        fw = myqa.quantity(nchan * resolution, "GHz")
+        fr = myqa.quantity(resolution, "GHz")
+    myat.initSpectralWindow(nbands=nbands, fCenter=fc, fWidth=fw, fRes=fr)
     myat.setUserWH2O(myqa.quantity(pwv, 'mm'))
 
     airmass = calc_airmass(elevation)
     dry_opacity = get_dry_opacity(myat)
     wet_opacity = get_wet_opacity(myat)
     transmission = calc_transmission(airmass, dry_opacity, wet_opacity)
-    frequency = myqa.convert(myat.getSpectralWindow(0), "GHz")['value']
+    frequency = [
+        myqa.convert(myat.getSpectralWindow(i), "GHz")['value']
+        for i in range(myat.getNumSpectralWindows())
+    ]
 
     if doplot:
         plot(frequency, dry_opacity, wet_opacity, transmission)

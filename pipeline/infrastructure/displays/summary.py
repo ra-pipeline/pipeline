@@ -1094,7 +1094,7 @@ class UVChart:
         self.customflagged = customflagged
         self.figfile = self._get_figfile(output_dir=output_dir)
         self.custom_plot_flags = None
-        
+
         # Get spw_id, field, field_name, and intent to plot.
         self.spw_id, self.field, self.field_name, self.intent = self._get_spwid_and_field()
 
@@ -1115,7 +1115,7 @@ class UVChart:
             # PIPE-1780
             if custom_plot_flags is not None:
                 self.custom_plot_flags = custom_plot_flags
-                
+
     def plot(self):
         if DISABLE_PLOTMS:
             LOG.debug('Disabling UV coverage plot due to problems with plotms')
@@ -1150,7 +1150,7 @@ class UVChart:
         # number of channels(performance optimisation).
         if self.custom_plot_flags is not None:
             task_args.update(self.custom_plot_flags)
-        
+
         task = casa_tasks.plotms(**task_args)
 
         if not os.path.exists(self.figfile):
@@ -1423,22 +1423,24 @@ class SpwIdVsFreqChart:
         # plot spws
         if self.context.project_summary.telescope in ('VLA', 'EVLA'):  # For VLA
             spw_list_generator = self._extract_spwdata_vla()
-            scan_spws = request_spws
+            scan_spws = {spw.id: spw for spw in request_spws}
             max_spws_to_annotate = max_spws_to_annotate_VLA
         else:  # for ALMA or NRO
             spw_list_generator = self._extract_spwdata_alma_nro()
-            scan_spws = {spw for scan in targeted_scans for spw in scan.spws if spw in request_spws}
+            scan_spws = {spw.id: spw for spw in set(spw for scan in targeted_scans for spw in scan.spws if spw in request_spws)}
             max_spws_to_annotate = max_spws_to_annotate_ALMA_NRO
         xmin, xmax = np.inf, -np.inf
         totalnum_spws = len(scan_spws)
         idx = 0
         rmin = np.inf
-        for spwid_list in spw_list_generator:
+
+        spw_groups = list(spw_list_generator)
+        for spwid_list in spw_groups:
             color = next(colorcycle)['color']
             for spwid in spwid_list:
 
                 # 1. draw bars
-                spwdata = [spw for spw in scan_spws if spw.id == spwid][0]
+                spwdata = scan_spws.get(spwid)
                 bw = float(spwdata.bandwidth.to_units(measures.FrequencyUnits.GIGAHERTZ))
                 fmin = float(spwdata.min_frequency.to_units(measures.FrequencyUnits.GIGAHERTZ))
                 xmin, xmax = min(xmin, fmin), max(xmax, fmin+bw)
@@ -1451,24 +1453,50 @@ class SpwIdVsFreqChart:
                 rmin = min(rmin, abs(atmutil.get_spw_spec(vis=ms.name, spw_id=spwid)[2]))
 
         # 3. Frequency vs. ATM transmission
-        center_freq = (xmin + xmax) / 2.0
-        # Determining the resolution value so that generates fine ATM transmission curve: it is set
-        # to smaller than 500 kHz but is set to larger than that corresponding to 48001 data points.
-        default_resolution = 5e-4  # To have 5 data points within the ozone feature of 2 MHz FWHM:
-                                   # 2 MHz/(5-1) = 500 kHz.
-        max_nchan = 48001  # 24 GHz/500 kHz, where 24 GHz covers both sidebands of a 4-12 GHz IF
-                           # for a single LO tuning.
-        fspan = xmax - xmin
-        resolution = min(default_resolution, rmin)
-        nchan = min(max_nchan, round(fspan / resolution) + 1)
-        resolution = fspan / (nchan - 1)
-        LOG.info("'Spectral Window ID vs. Frequency' plots the atmospheric transmission with %d data points at %.3f kHz intervals." % (nchan, resolution*1e6))
+        # PIPE-3294: limit number of data points to 4000
+        max_nchan = 4000
+        frequency_ranges = []
+        if self.context.project_summary.telescope == "ALMA":
+            # PIPE-3294: cover IF coverage only
+            lo_frequencies = set()
+            for spwid_list in spw_groups:
+                spwdata = [scan_spws.get(spwid) for spwid in spwid_list]
+                lo_freqs = {spw.freq_lo[0].convert_to(measures.FrequencyUnits.GIGAHERTZ).value for spw in spwdata}
+                assert len(lo_freqs) == 1
+                lo_frequencies = lo_frequencies.union(lo_freqs)
+            for lo_freq_decimal in sorted(lo_frequencies):
+                # ALMA Technical Handbook, Appendix B.2:
+                # The front end mixer uses LO1 to down convert
+                # the observing frequency into an IF range
+                # covering up to 4–12 GHz.
+                lo_freq = float(lo_freq_decimal)
+                if_freqs = [4.0, 12.0]
+                # LSB
+                frequency_ranges.append([lo_freq - if_freqs[1], lo_freq - if_freqs[0]])
+                # USB
+                frequency_ranges.append([lo_freq + if_freqs[0], lo_freq + if_freqs[1]])
+        else:
+            frequency_ranges.append([xmin, xmax])
+        xmin_plot = xmin - (xmax - xmin) / 15.0
+        xmax_plot = xmax + (xmax - xmin) / 15.0
+        center_freq = []
+        nchan = []
+        resolution = []
+        for fmin, fmax in frequency_ranges:
+            fmin_plot = max(fmin, xmin_plot)
+            fmax_plot = min(fmax, xmax_plot)
+            fspan = fmax_plot - fmin_plot
+            nchan.append(max_nchan // len(frequency_ranges))
+            center_freq.append((fmin_plot + fmax_plot) / 2.0)
+            resolution.append(fspan / (nchan[-1] - 1))
+            LOG.info("'Spectral Window ID vs. Frequency' plots the atmospheric transmission with %d data points at %.3f kHz intervals." % (nchan[-1], resolution[-1]*1e6))
         atm_freq, atm_transmission = atmutil.get_transmission_for_range(vis=ms.name, center_freq=center_freq, nchan=nchan, resolution=resolution, antenna_id=antid, doplot=False)
 
-        ax_atm.plot(atm_freq, atm_transmission, color=atm_color, alpha=0.6, linestyle='-', linewidth=2.0)
+        for _freq, _trans in zip(atm_freq, atm_transmission):
+            ax_atm.plot(_freq, _trans, color=atm_color, alpha=0.6, linestyle='-', linewidth=2.0)
 
         # set axes limits, title, label, grid, tick, and save the plot to file
-        ax_spw.set_xlim(xmin-(xmax-xmin)/15.0, xmax+(xmax-xmin)/15.0)
+        ax_spw.set_xlim(xmin_plot, xmax_plot)
         ax_spw.invert_yaxis()
         ax_spw.set_ylim(totalnum_spws + totalnum_spws/20.0, -1.0 - totalnum_spws/20.0)  # The spw indices are from 0 to totalnum_spws. y-axis is inverted. totalnum_spws/20.0 is a mergin. -1.0 is upper edge.
         ax_spw.set_title('Spectral Window ID vs. Frequency', loc='center')
