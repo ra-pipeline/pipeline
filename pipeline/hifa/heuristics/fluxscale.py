@@ -132,7 +132,7 @@ def antenna(ms, refsource, refant, peak_frac=0.7):
     # the antennas to be used in the gaincals, suffixed with
     # & to tell CASA tasks to only use baseline between antennas
     # in the list
-    antenna = ','.join(ant for ant in antenna)
+    antenna = ','.join(sorted(antenna))
     antenna += '&'
     uvrange = '<%0.3fm' % limit_baseline
     LOG.info('Antenna selection: %s' % antenna)

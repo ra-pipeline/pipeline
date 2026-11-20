@@ -295,3 +295,52 @@ def test_verify_spw_heuristic_allows_tdm(monkeypatch):
     task.verify_spw(spw)
 
 
+def test_get_aca_edgespw_cmds_falls_back_to_spectralspec_when_sqld_intents_empty():
+    from pipeline.domain import measures
+
+    sqld_spw = SimpleNamespace(
+        id=0,
+        baseband='BB_1',
+        type='SQLD',
+        intents=set(),
+        spectralspec='X0000000000',
+        min_frequency=measures.Frequency(100.0, measures.FrequencyUnits.GIGAHERTZ),
+        max_frequency=measures.Frequency(102.0, measures.FrequencyUnits.GIGAHERTZ),
+    )
+    sci_spw = SimpleNamespace(
+        id=16,
+        baseband='BB_1',
+        type='FDM',
+        intents={'TARGET'},
+        spectralspec='X0000000000',
+        channels=[
+            SimpleNamespace(
+                frequency_range=measures.FrequencyRange(
+                    measures.Frequency(100.01, measures.FrequencyUnits.GIGAHERTZ),
+                    measures.Frequency(100.02, measures.FrequencyUnits.GIGAHERTZ),
+                )
+            ),
+            SimpleNamespace(
+                frequency_range=measures.FrequencyRange(
+                    measures.Frequency(100.50, measures.FrequencyUnits.GIGAHERTZ),
+                    measures.Frequency(100.51, measures.FrequencyUnits.GIGAHERTZ),
+                )
+            ),
+        ],
+    )
+
+    task = SerialFlagDeterALMA.__new__(SerialFlagDeterALMA)
+    task.missing_baseband_spws = []
+    task.inputs = SimpleNamespace(
+        ms=SimpleNamespace(
+            basename='fake.ms',
+            get_spectral_windows=lambda science_windows_only=False: [sqld_spw, sci_spw],
+        )
+    )
+
+    threshold = measures.Frequency(0.05, measures.FrequencyUnits.GIGAHERTZ)
+    assert task._get_aca_edgespw_cmds(sci_spw, threshold) == ['16:0']
+    assert task.missing_baseband_spws == []
+
+
+

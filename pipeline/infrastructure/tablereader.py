@@ -1470,6 +1470,8 @@ class FieldTable:
             return None
 
         times_by_spw = msmd.timesforspws(non_sqld_spws)
+        if not times_by_spw:
+            return None
         return np.unique(np.concatenate(list(times_by_spw.values())))
 
     @staticmethod
