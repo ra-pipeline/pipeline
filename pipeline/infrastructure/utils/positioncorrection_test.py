@@ -41,8 +41,8 @@ test_params_func = [({'unit': 'deg', 'value': 239.9617912649343},
 @pytest.mark.parametrize('fitsname, obs_long, obs_lat, expected', test_params_fits)
 def test_do_wide_field_corr(fitsname: str, obs_long: dict[str, str | float],
                             obs_lat: dict[str, str | float],
-                            expected: tuple[dict, dict], epsilon: float = 1.0e-9):
-    """Test do_wide_field_corr()
+                            expected: tuple[dict, dict], epsilon: float = 1.0e-7):
+    """Test do_wide_field_corr.
 
     This utility function downloads a FITS image and applies wide field position
     correction to the image reference coordinates (CRVAL1 and CRVAL2). The tested
@@ -51,7 +51,10 @@ def test_do_wide_field_corr(fitsname: str, obs_long: dict[str, str | float],
     If url is not provided, or not available, then assume file already exists in
     current folder.
 
-    The default tolerance (epsilon) value is equivalent to about 0.01 milliarcs.
+    The default relative tolerance (epsilon = 1.0e-7) corresponds to ~12–86 mas
+    on these coordinates (e.g., ~86 mas on 240 deg RA). This relative tolerance
+    serves as an interim threshold to absorb CASA measures table variations
+    (PIPE-3273) pending recasting with absolute tolerances.
     """
     # Check if FITS file exists
     try:
@@ -85,11 +88,15 @@ def test_do_wide_field_corr(fitsname: str, obs_long: dict[str, str | float],
 
 @pytest.mark.parametrize('ra, dec, obs_long, obs_lat, date_time, expected', test_params_func)
 def test_calc_zd_pa(ra: dict, dec: dict, obs_long: dict, obs_lat: dict, date_time: dict,
-                    expected: tuple[float, float], epsilon: float = 1.0e-9):
-    """Test calc_zd_pa()
+                    expected: tuple[float, float], epsilon: float = 1.0e-7):
+    """Test calc_zd_pa.
 
     This utility function tests the mathematical correctness of the zenith distance and parallactic
     angle calculation function.
+
+    The default relative tolerance (epsilon = 1.0e-7) corresponds to ~5.5–43 mas
+    on these test arguments, providing a ~10x margin over the observed worst-case
+    drift (~7.3e-9) between ASTRON and NRAO CASA measures tables (PIPE-3273).
     """
     # Compute correction
     zd, pa = calc_zd_pa(ra=ra, dec=dec, obs_long=obs_long, obs_lat=obs_lat, date_time=date_time)
