@@ -19,10 +19,25 @@ on:
         default: false
         type: boolean
       test_data:
-        description: "Type of test data to checkout (e.g., 'unit')"
+        description: "Type of test data to checkout (e.g., 'unit', 'regression-smoke', or 'none')"
         required: false
         default: "none"
         type: string
+      testdata_paths:
+        description: "Newline-separated sparse-checkout paths for pipeline-testdata (defaults to .github/testdata-paths.txt)"
+        required: false
+        default: ""
+        type: string
+      free_disk_space:
+        description: "Reclaim disk space on Linux runners before setup"
+        required: false
+        default: false
+        type: boolean
+      timeout_minutes:
+        description: "Maximum job runtime in minutes"
+        required: false
+        default: 360
+        type: number
       task:
         description: "Pixi task name to run (e.g., 'test-unit')"
         required: false
@@ -46,8 +61,23 @@ jobs:
   run-in-env:
     name: Run in Pixi Env
     runs-on: ${{ inputs.os }}
+    timeout-minutes: ${{ inputs.timeout_minutes }}
 
     steps:
+      - name: Free disk space (Ubuntu)
+        if: inputs.free_disk_space && runner.os == 'Linux'
+        shell: bash
+        run: |
+          df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /usr/local/share/boost \
+            /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -55,10 +85,16 @@ jobs:
 
       - name: Install System Dependencies (Ubuntu)
         if: runner.os == 'Linux'
+        timeout-minutes: 5
         shell: bash
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ca-certificates git xvfb
+          if ! dpkg -s ca-certificates git xvfb >/dev/null 2>&1; then
+            APT_OPTS="-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3"
+            sudo apt-get $APT_OPTS update -y
+            sudo -E apt-get $APT_OPTS install -y --no-install-recommends ca-certificates git xvfb
+          fi
 
       - name: Install Pixi
         uses: prefix-dev/setup-pixi@v0.11.3
@@ -82,9 +118,14 @@ jobs:
         run: |
           # GH macOS runners use Homebrew for package management          
           brew install git
-          # Note: xvfb is X11 specific. macOS usually doesn't need it for headless browsers,
-          # or requires XQuartz (brew install --cask xquartz) if you specifically need X11.          
+          # casaplotms on macOS is native Qt (Cocoa), not X11, but task_plotms.py
+          # still requires DISPLAY to be set and pytest-xvfb does not start Xvfb
+          # on macOS; start XQuartz Xvfb so DISPLAY points to a valid server.
           brew install --cask xquartz
+          if [ -x /opt/X11/bin/Xvfb ]; then
+            /opt/X11/bin/Xvfb :99 -screen 0 1280x1024x24 >/dev/null 2>&1 &
+            echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          fi
 
       - name: Configure CASA
         shell: bash
@@ -123,9 +164,26 @@ jobs:
             exit 1
           }
 
+      - name: Prepare testdata sparse-checkout paths
+        id: testdata-paths
+        if: inputs.test_data != 'none'
+        shell: bash
+        env:
+          TESTDATA_PATHS_INPUT: ${{ inputs.testdata_paths }}
+        run: |
+          PATHS_FILE="$RUNNER_TEMP/testdata-paths.txt"
+          if [ -n "$TESTDATA_PATHS_INPUT" ]; then
+            printf '%s\n' "$TESTDATA_PATHS_INPUT" | sed '/^[[:space:]]*$/d' > "$PATHS_FILE"
+          else
+            cp "$GITHUB_WORKSPACE/.github/testdata-paths.txt" "$PATHS_FILE"
+          fi
+          HASH=$(sha256sum "$PATHS_FILE" | awk '{ print $1 }')
+          echo "file=$PATHS_FILE" >> "$GITHUB_OUTPUT"
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+
       - name: Get latest testdata commit hash
         id: testdata-commit
-        if: inputs.test_data == 'unit'
+        if: inputs.test_data != 'none'
         shell: bash
         run: |
           source .github/scripts/git-resilient.sh
@@ -137,19 +195,20 @@ jobs:
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
       - name: Cache pipeline-testdata
-        if: inputs.test_data == 'unit'
+        if: inputs.test_data != 'none'
         uses: actions/cache@v6
         id: cache-testdata
         with:
           path: pipeline-testdata
-          key: pipeline-testdata-unit-${{ hashFiles('.github/testdata-paths.txt') }}-${{ steps.testdata-commit.outputs.sha }}
+          key: pipeline-testdata-${{ inputs.test_data }}-${{ steps.testdata-paths.outputs.hash }}-${{ steps.testdata-commit.outputs.sha }}
           restore-keys: |
-            pipeline-testdata-unit-${{ hashFiles('.github/testdata-paths.txt') }}-
-            pipeline-testdata-unit-
+            pipeline-testdata-${{ inputs.test_data }}-${{ steps.testdata-paths.outputs.hash }}-
 
       - name: Checkout and LFS pull test data
-        if: inputs.test_data == 'unit' && steps.cache-testdata.outputs.cache-hit != 'true'
+        if: inputs.test_data != 'none' && steps.cache-testdata.outputs.cache-hit != 'true'
         shell: bash
+        env:
+          TESTDATA_PATHS_FILE: ${{ steps.testdata-paths.outputs.file }}
         run: |
           source .github/scripts/git-resilient.sh
 
@@ -159,11 +218,11 @@ jobs:
             echo "No existing cache found. Performing sparse clone..."
             retry_cmd git clone --filter=blob:none --sparse "$TESTDATA_URL" pipeline-testdata
             cd pipeline-testdata
-            git sparse-checkout set --stdin < "$GITHUB_WORKSPACE/.github/testdata-paths.txt"
+            git sparse-checkout set --stdin < "$TESTDATA_PATHS_FILE"
           else
             echo "Existing cache restored. Updating incrementally..."
             cd pipeline-testdata
-            git sparse-checkout set --stdin < "$GITHUB_WORKSPACE/.github/testdata-paths.txt"
+            git sparse-checkout set --stdin < "$TESTDATA_PATHS_FILE"
             retry_cmd git remote set-url origin "$TESTDATA_URL" || true
             if ! retry_cmd git fetch origin; then
               echo "::warning::Incremental fetch from Bitbucket failed; using restored cache data."
@@ -174,7 +233,7 @@ jobs:
 
           echo "Pulling LFS test files..."
           LFS_INCLUDE=$(
-            sed 's|$|/**|' "$GITHUB_WORKSPACE/.github/testdata-paths.txt" |
+            sed 's|$|/**|' "$TESTDATA_PATHS_FILE" |
               paste -sd, -
           )
           retry_cmd git lfs pull --include="$LFS_INCLUDE" --exclude="" || {
@@ -197,7 +256,7 @@ jobs:
           pixi run -e ${{ inputs.pixi_env }} bash -c "$RUN_COMMAND"
 
       - name: Upload Artifacts
-        if: inputs.artifact_name != ''
+        if: ${{ !cancelled() && inputs.artifact_name != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.artifact_name }}

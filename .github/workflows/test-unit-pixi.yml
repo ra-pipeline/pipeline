@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-latest]
+        os: [ubuntu-24.04, macos-15]
         pixi_env:
           - casa674-py312
           - casa676-py312
@@ -61,7 +61,7 @@ jobs:
       #
       # Standard GitHub Runner specs:
       #   ubuntu-24.04: 4 vCPUs / 16 GB RAM (public), 2 vCPUs / 8 GB RAM (private)
-      #   macos-latest: 3 vCPUs / 7 GB RAM (M1 Apple Silicon)
+      #   macos-15: 3 vCPUs / 7 GB RAM (M1 Apple Silicon)
       # (pytest uses '-n logical' in pixi task to auto-scale across runner cores).
       artifact_name: ${{ (matrix.os == 'ubuntu-24.04' && matrix.pixi_env == 'casa674-py312') && 'pytest-results-ubuntu-latest' || '' }}
       artifact_path: |

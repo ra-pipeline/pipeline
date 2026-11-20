@@ -6,6 +6,7 @@ from pipeline.infrastructure import casa_tools
 from tests.testing_utils import PipelineTester
 
 
+@pytest.mark.github_runner(testdata=['pl-regressiontest/13A-537'])
 def test_13A_537__procedure_hifv__regression():
     """Run VLA calibration regression for standard procedure_hifv.xml recipe.
 
@@ -25,6 +26,7 @@ def test_13A_537__procedure_hifv__regression():
     pt.run(telescope='vla', omp_num_threads=1)
 
 
+@pytest.mark.github_runner(testdata=['pl-regressiontest/13A-537'])
 def test_13A_537__calibration__PPR__regression():
     """Run VLA calibration regression with a PPR file.
 
@@ -44,6 +46,7 @@ def test_13A_537__calibration__PPR__regression():
     pt.run(telescope='vla', omp_num_threads=1)
 
 
+@pytest.mark.github_runner(testdata=['pl-regressiontest/13A-537'])
 def test_13A_537__restore__PPR__regression():
     """Run VLA calibration restoredata regression with a PPR file
     NOTE: results file frozen to CASA/Pipeline version below since products were created
