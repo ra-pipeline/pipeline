@@ -133,13 +133,13 @@ jobs:
       - name: Combine Coverage Data
         shell: bash
         run: |
-          if compgen -G "github-regression-*-ubuntu-24.04/coverage.dat.*" >/dev/null; then
+          if compgen -G "github-regression-*-ubuntu-24.04/coverage.dat*" >/dev/null; then
             python3 -m venv .cov-venv
-            .cov-venv/bin/pip install --quiet coverage
-            .cov-venv/bin/coverage combine github-regression-*-ubuntu-24.04/coverage.dat.*
+            .cov-venv/bin/pip install --quiet "coverage>=7,<8"
+            .cov-venv/bin/coverage combine github-regression-*-ubuntu-24.04/coverage.dat*
             .cov-venv/bin/coverage xml
           else
-            echo "::warning::No coverage.dat.* files found in downloaded artifacts."
+            echo "::warning::No coverage.dat* files found in downloaded artifacts."
           fi
 
       - name: Upload Regression Coverage to Codecov
