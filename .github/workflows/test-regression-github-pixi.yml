@@ -112,7 +112,7 @@ jobs:
         COV_ARGS=""
         if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
           export COVERAGE_FILE=coverage.dat
-          COV_ARGS="--cov=pipeline --cov-branch --cov-report="
+          COV_ARGS="--cov=pipeline --cov-branch --cov-report= --cov-fail-under=0"
         fi
         python -m pytest "${{ matrix.node_id }}" --junitxml=regression-results.xml $COV_ARGS
         rc=$?

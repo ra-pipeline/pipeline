@@ -133,7 +133,7 @@ jobs:
           artifact_path: ${{ inputs.artifact_path }}
 
   run-in-container:
-    name: Run in Pixi Env (${{ inputs.container }})
+    name: Run in Pixi Container
     if: inputs.container != '' && !startsWith(inputs.os, 'macos')
     runs-on: ${{ inputs.os }}
     container: ${{ inputs.container }}
@@ -157,6 +157,7 @@ jobs:
               ca-certificates curl findutils fontconfig git git-lfs gzip libgl1 procps tar xvfb
             rm -rf /var/lib/apt/lists/*
           fi
+          git config --system --add safe.directory '*'
 
       - uses: actions/checkout@v7
         with:
