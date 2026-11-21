@@ -1,0 +1,191 @@
+name: "Setup and Run in Pixi Environment"
+description: "Set up Pixi/CASA/testdata, run tests or custom commands, and upload artifacts."
+
+inputs:
+  pixi_env:
+    description: "Pixi environment name (from pyproject.toml)"
+    required: false
+    default: "default"
+  update_casa:
+    description: "Update CASA packages within manifest constraints before testing ('true' or 'false')"
+    required: false
+    default: "false"
+  test_data:
+    description: "Type of test data to checkout (e.g., 'unit', 'regression-smoke', or 'none')"
+    required: false
+    default: "none"
+  testdata_paths:
+    description: "Newline-separated sparse-checkout paths for pipeline-testdata (defaults to .github/testdata-paths.txt)"
+    required: false
+    default: ""
+  task:
+    description: "Pixi task name to run (e.g., 'test-unit')"
+    required: false
+    default: ""
+  run_command:
+    description: "Bash commands to run inside the pixi env (used if task is empty)"
+    required: false
+    default: ""
+  artifact_name:
+    description: "Name of the artifact to upload"
+    required: false
+    default: ""
+  artifact_path:
+    description: "Path of files to upload"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Pixi
+      uses: prefix-dev/setup-pixi@v0.11.3
+      with:
+        pixi-version: v0.83.0
+        environments: ${{ inputs.pixi_env }}
+        # Use the reviewed lockfile; refresh dev snapshots with pixi update.
+        cache: false
+        # To enable caching in future, set `cache: true` and define an appropriate cache key,
+        # for example: v1-${{ runner.os }}-${{ inputs.pixi_env }}.
+        locked: true
+        activate-environment: ${{ inputs.pixi_env }}
+
+    - name: Enable post-link scripts
+      shell: bash
+      run: pixi config set --local run-post-link-scripts insecure
+
+    - name: Configure CASA
+      shell: bash
+      run: |
+        mkdir -p ~/.casa
+        mkdir -p casarundata
+        cat > ~/.casa/config.py << PYEOF
+        measurespath = "$GITHUB_WORKSPACE/casarundata"
+        datapath = [ "$GITHUB_WORKSPACE/casarundata", "$GITHUB_WORKSPACE/pipeline-testdata" ]
+        measures_auto_update = True
+        data_auto_update = True
+        PYEOF
+
+    - name: Update CASA snapshots
+      if: inputs.update_casa == 'true'
+      shell: bash
+      env:
+        CASA_PIXI_ENV: ${{ inputs.pixi_env }}
+      run: |
+        pixi update --environment "$CASA_PIXI_ENV" \
+          casatools casatasks casashell casaplotms casampi
+
+    - name: Cache casarundata
+      uses: actions/cache@v6
+      with:
+        path: casarundata
+        key: casarundata
+
+    - name: Fetch casarundata
+      # Trigger casatools import to fetch or update casarundata under $GITHUB_WORKSPACE/casarundata.
+      # This may download or update measurement sets and related runtime data; fail explicitly if it does not succeed.
+      shell: bash
+      run: |
+        pixi run -e ${{ inputs.pixi_env }} python -c "import casatools" || {
+          echo 'casatools import failed; casarundata may be incomplete.' >&2
+          exit 1
+        }
+
+    - name: Prepare testdata sparse-checkout paths
+      id: testdata-paths
+      if: inputs.test_data != 'none'
+      shell: bash
+      env:
+        TESTDATA_PATHS_INPUT: ${{ inputs.testdata_paths }}
+      run: |
+        PATHS_FILE="$RUNNER_TEMP/testdata-paths.txt"
+        if [ -n "$TESTDATA_PATHS_INPUT" ]; then
+          printf '%s\n' "$TESTDATA_PATHS_INPUT" | sed '/^[[:space:]]*$/d' > "$PATHS_FILE"
+        else
+          cp "$GITHUB_WORKSPACE/.github/testdata-paths.txt" "$PATHS_FILE"
+        fi
+        HASH=$(sha256sum "$PATHS_FILE" | awk '{ print $1 }')
+        echo "file=$PATHS_FILE" >> "$GITHUB_OUTPUT"
+        echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+
+    - name: Get latest testdata commit hash
+      id: testdata-commit
+      if: inputs.test_data != 'none'
+      shell: bash
+      run: |
+        source .github/scripts/git-resilient.sh
+        SHA=$(retry_cmd git ls-remote https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git HEAD 2>/dev/null | awk '{ print $1 }' || true)
+        if [ -z "$SHA" ]; then
+          echo "::warning::Could not resolve testdata commit hash from Bitbucket. Using fallback cache key."
+          SHA="fallback"
+        fi
+        echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+    - name: Cache pipeline-testdata
+      if: inputs.test_data != 'none'
+      uses: actions/cache@v6
+      id: cache-testdata
+      with:
+        path: pipeline-testdata
+        key: pipeline-testdata-${{ inputs.test_data }}-${{ steps.testdata-paths.outputs.hash }}-${{ steps.testdata-commit.outputs.sha }}
+        restore-keys: |
+          pipeline-testdata-${{ inputs.test_data }}-${{ steps.testdata-paths.outputs.hash }}-
+
+    - name: Checkout and LFS pull test data
+      if: inputs.test_data != 'none' && steps.cache-testdata.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        TESTDATA_PATHS_FILE: ${{ steps.testdata-paths.outputs.file }}
+      run: |
+        source .github/scripts/git-resilient.sh
+
+        TESTDATA_URL="https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git"
+
+        if [ ! -d "pipeline-testdata/.git" ]; then
+          echo "No existing cache found. Performing sparse clone..."
+          retry_cmd git clone --filter=blob:none --sparse "$TESTDATA_URL" pipeline-testdata
+          cd pipeline-testdata
+          git sparse-checkout set --stdin < "$TESTDATA_PATHS_FILE"
+        else
+          echo "Existing cache restored. Updating incrementally..."
+          cd pipeline-testdata
+          git sparse-checkout set --stdin < "$TESTDATA_PATHS_FILE"
+          retry_cmd git remote set-url origin "$TESTDATA_URL" || true
+          if ! retry_cmd git fetch origin; then
+            echo "::warning::Incremental fetch from Bitbucket failed; using restored cache data."
+          else
+            git checkout -f FETCH_HEAD || git checkout -f master || true
+          fi
+        fi
+
+        echo "Pulling LFS test files..."
+        LFS_INCLUDE=$(
+          sed 's|$|/**|' "$TESTDATA_PATHS_FILE" |
+            paste -sd, -
+        )
+        retry_cmd git lfs pull --include="$LFS_INCLUDE" --exclude="" || {
+          echo "::error::Failed to download required LFS test data."
+          git lfs logs last || true
+          exit 1
+        }
+
+    - name: Run Pixi Task
+      if: inputs.task != ''
+      shell: bash
+      run: pixi run -e ${{ inputs.pixi_env }} ${{ inputs.task }}
+
+    - name: Run Custom Commands
+      if: inputs.task == '' && inputs.run_command != ''
+      shell: bash
+      env:
+        RUN_COMMAND: ${{ inputs.run_command }}
+      run: |
+        pixi run -e ${{ inputs.pixi_env }} bash -c "$RUN_COMMAND"
+
+    - name: Upload Artifacts
+      if: ${{ !cancelled() && inputs.artifact_name != '' }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ${{ inputs.artifact_path }}
+        if-no-files-found: warn

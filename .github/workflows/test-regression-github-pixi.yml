@@ -10,6 +10,7 @@ on:
       - "tests/**"
       - "scripts/**"
       - ".github/scripts/collect_github_regression.py"
+      - ".github/actions/**"
       - ".github/workflows/env-setup-run-template-pixi.yml"
       - ".github/workflows/test-regression-github-pixi.yml"
       - "pyproject.toml"
@@ -22,6 +23,7 @@ on:
       - "tests/**"
       - "scripts/**"
       - ".github/scripts/collect_github_regression.py"
+      - ".github/actions/**"
       - ".github/workflows/env-setup-run-template-pixi.yml"
       - ".github/workflows/test-regression-github-pixi.yml"
       - "pyproject.toml"
@@ -42,6 +44,14 @@ on:
           - all
           - ubuntu-24.04
           - macos-15
+      linux_env:
+        description: "Linux runtime environment"
+        required: false
+        default: "almalinux:8"
+        type: choice
+        options:
+          - almalinux:8
+          - ubuntu-24.04
       pixi_env:
         description: "Pixi environment name"
         required: false
@@ -80,7 +90,7 @@ jobs:
           echo "$MATRIX" | python3 -m json.tool
 
   regression:
-    name: "${{ matrix.name }} (${{ matrix.os }})"
+    name: "${{ matrix.name }} (${{ matrix.os == 'ubuntu-24.04' && (github.event.inputs.linux_env || 'almalinux:8') || matrix.os }})"
     needs: discover
     if: needs.discover.outputs.has_tests == 'true'
     strategy:
@@ -90,9 +100,10 @@ jobs:
     uses: ./.github/workflows/env-setup-run-template-pixi.yml
     with:
       os: ${{ matrix.os }}
+      container: ${{ matrix.os == 'ubuntu-24.04' && (github.event.inputs.linux_env || 'almalinux:8') == 'almalinux:8' && 'almalinux:8' || '' }}
       pixi_env: ${{ github.event.inputs.pixi_env || 'casa674-py312' }}
       update_casa: ${{ github.event_name != 'workflow_dispatch' && github.ref_type != 'tag' && !startsWith(github.base_ref || github.ref_name, 'release/') }}
-      free_disk_space: true
+      free_disk_space: ${{ (github.event.inputs.linux_env || 'almalinux:8') != 'almalinux:8' }}
       timeout_minutes: 180
       test_data: regression-github
       testdata_paths: ${{ matrix.testdata_paths }}

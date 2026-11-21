@@ -12,6 +12,7 @@ on:
       - "pipeline/**"
       - "tests/**"
       - "scripts/**"
+      - ".github/actions/**"
       - ".github/workflows/**"
       - ".github/testdata-paths.txt"
       - "pyproject.toml"

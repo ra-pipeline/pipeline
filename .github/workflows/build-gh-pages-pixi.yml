@@ -8,6 +8,7 @@ on:
       - "docs/**"
       - "pipeline/**"
       - "scripts/**"
+      - ".github/actions/**"
       - ".github/workflows/**"
       - "pyproject.toml"
       - "pixi.lock"
