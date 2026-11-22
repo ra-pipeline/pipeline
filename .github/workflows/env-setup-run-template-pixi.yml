@@ -137,6 +137,11 @@ jobs:
     if: inputs.container != '' && !startsWith(inputs.os, 'macos')
     runs-on: ${{ inputs.os }}
     container: ${{ inputs.container }}
+    # Note: To run AppImages via FUSE instead of APPIMAGE_EXTRACT_AND_RUN=1, replace `container:` above with:
+    # container:
+    #   image: ${{ inputs.container }}
+    #   options: --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor=unconfined
+    # and install `fuse` / `fuse-libs` (EL8) or `libfuse2t64` (Ubuntu 24.04) below.
     timeout-minutes: ${{ inputs.timeout_minutes }}
     env:
       APPIMAGE_EXTRACT_AND_RUN: "1"
@@ -151,12 +156,14 @@ jobs:
           if command -v dnf >/dev/null 2>&1; then
             dnf install -y --setopt=install_weak_deps=False --setopt=timeout=30 --setopt=retries=3 \
               ca-certificates dbus-libs findutils fontconfig git git-lfs gzip mesa-libGL perl procps-ng tar which xorg-x11-server-Xvfb
+            # dnf install -y --setopt=install_weak_deps=False fuse fuse-libs
             dnf clean all
           elif command -v apt-get >/dev/null 2>&1; then
             APT_OPTS="-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3"
             apt-get $APT_OPTS update -y
             apt-get $APT_OPTS install -y --no-install-recommends \
               ca-certificates curl findutils fontconfig git git-lfs gzip libgl1 perl procps tar xvfb
+            # apt-get $APT_OPTS install -y --no-install-recommends libfuse2t64
             rm -rf /var/lib/apt/lists/*
           fi
           git config --system --add safe.directory '*'
