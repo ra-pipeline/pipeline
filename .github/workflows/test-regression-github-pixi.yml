@@ -109,6 +109,7 @@ jobs:
       testdata_paths: ${{ matrix.testdata_paths }}
       run_command: |
         export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONNOUSERSITE=1
+        ulimit -Sn 8192 2>/dev/null || true
         COV_ARGS=""
         if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
           export COVERAGE_FILE=coverage.dat

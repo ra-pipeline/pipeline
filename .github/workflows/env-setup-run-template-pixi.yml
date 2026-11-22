@@ -138,6 +138,8 @@ jobs:
     runs-on: ${{ inputs.os }}
     container: ${{ inputs.container }}
     timeout-minutes: ${{ inputs.timeout_minutes }}
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: "1"
 
     steps:
       - name: Install System Dependencies (Container)
@@ -148,13 +150,13 @@ jobs:
         run: |
           if command -v dnf >/dev/null 2>&1; then
             dnf install -y --setopt=install_weak_deps=False --setopt=timeout=30 --setopt=retries=3 \
-              ca-certificates dbus-libs findutils fontconfig git git-lfs gzip mesa-libGL procps-ng tar which xorg-x11-server-Xvfb
+              ca-certificates dbus-libs findutils fontconfig git git-lfs gzip mesa-libGL perl procps-ng tar which xorg-x11-server-Xvfb
             dnf clean all
           elif command -v apt-get >/dev/null 2>&1; then
             APT_OPTS="-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3"
             apt-get $APT_OPTS update -y
             apt-get $APT_OPTS install -y --no-install-recommends \
-              ca-certificates curl findutils fontconfig git git-lfs gzip libgl1 procps tar xvfb
+              ca-certificates curl findutils fontconfig git git-lfs gzip libgl1 perl procps tar xvfb
             rm -rf /var/lib/apt/lists/*
           fi
           git config --system --add safe.directory '*'
