@@ -9,7 +9,13 @@ import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.callibrary as callibrary
 import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure.vdp as vdp
-from pipeline.hifv.heuristics import do_bandpass, getCalFlaggedSoln
+from pipeline.hifv.heuristics import (
+    build_gaintable_spwmap,
+    do_bandpass,
+    getCalFlaggedSoln,
+    get_vla_baseband_spwmap,
+    run_ktype_delaycal,
+)
 from pipeline.hifv.heuristics import standard as standard
 from pipeline.hifv.heuristics import uvrange, weakbp
 from pipeline.hifv.heuristics.lib_EVLApipeutils import vla_minbaselineforcal
@@ -365,19 +371,19 @@ class Finalcals(basetask.StandardTaskTemplate):
             except Exception as ex:
                 LOG.warning(str(ex))
 
-        tablesToAdd = [(ktypecaltable, '', ''), (bpcaltable, 'linear,linearflag', ''),
-                       (avgpgain, '', ''), (finalampgaincaltable, '', ''),
-                       (finalphasegaincaltable, '', '')]
-        # tablesToAdd = [(table, interp, gainfield) for table, interp, gainfield in tablesToAdd]
+        k_spwmap = get_vla_baseband_spwmap(m)
+        tablesToAdd = [(ktypecaltable, '', '', k_spwmap), (bpcaltable, 'linear,linearflag', '', []),
+                       (avgpgain, '', '', []), (finalampgaincaltable, '', '', []),
+                       (finalphasegaincaltable, '', '', [])]
 
         callist = []
-        for addcaltable, interp, gainfield in tablesToAdd:
+        for addcaltable, interp, gainfield, spwmap in tablesToAdd:
             if not os.path.exists(addcaltable):
                 continue
             LOG.info("Finalcals stage:  Adding " + addcaltable + " to callibrary.")
             calto = callibrary.CalTo(self.inputs.vis)
             calfrom = callibrary.CalFrom(gaintable=addcaltable, interp=interp, calwt=False,
-                                         caltype='finalcal', gainfield=gainfield)
+                                         caltype='finalcal', gainfield=gainfield, spwmap=spwmap)
             calapp = callibrary.CalApplication(calto, calfrom)
             callist.append(calapp)
             self.pool.append(calapp)
@@ -506,7 +512,6 @@ class Finalcals(basetask.StandardTaskTemplate):
         m = self.inputs.context.observing_run.get_ms(self.inputs.vis)
         delay_field_select_string = self.inputs.context.evla['msinfo'][m.name].delay_field_select_string
         delay_scan_select_string = self.inputs.context.evla['msinfo'][m.name].delay_scan_select_string
-        minBL_for_cal = vla_minbaselineforcal()
 
         GainTables = sorted(self.inputs.context.callibrary.active.get_caltable())
         GainTables.append(addcaltable)
@@ -518,45 +523,20 @@ class Finalcals(basetask.StandardTaskTemplate):
             else:
                 LOG.warning(f"{gt} not found, removing it from list of gain tables")
         GainTables = GainTables_present
-        delaycal_task_args = {'vis': self.inputs.vis,
-                              'caltable': caltable,
-                              'field': '',
-                              'spw': spw,
-                              'intent': '',
-                              'selectdata': True,
-                              'uvrange': '',
-                              'scan': delay_scan_select_string,
-                              'solint': 'inf',
-                              'combine': 'scan',
-                              'preavg': -1.0,
-                              'refant': refAnt.lower(),
-                              'minblperant': minBL_for_cal,
-                              'minsnr': 3.0,
-                              'solnorm': False,
-                              'gaintype': 'K',
-                              'smodel': [],
-                              'calmode': 'p',
-                              'append': append,
-                              'docallib': False,
-                              'gaintable': GainTables,
-                              'gainfield': [''],
-                              'interp': [''],
-                              'spwmap': [],
-                              'parang': self.parang}
-
-        for fieldidstring in delay_field_select_string.split(','):
-            fieldid = int(fieldidstring)
-            uvrangestring = uvrange(self.setjy_results, fieldid)
-            delaycal_task_args['field'] = fieldidstring
-            delaycal_task_args['uvrange'] = uvrangestring
-            if os.path.exists(caltable):
-                delaycal_task_args['append'] = True
-
-            job = casa_tasks.gaincal(**delaycal_task_args)
-
-            self._executor.execute(job)
-
-        return True
+        return run_ktype_delaycal(
+            vis=self.inputs.vis,
+            caltable=caltable,
+            ms=m,
+            delay_field_select_string=delay_field_select_string,
+            delay_scan_select_string=delay_scan_select_string,
+            refant=refAnt.lower(),
+            gaintables=GainTables,
+            setjy_results=self.setjy_results,
+            executor=self._executor,
+            spw=spw,
+            parang=self.parang,
+            append=append,
+        )
 
     def _do_gtype_bpdgains(
         self,
@@ -601,6 +581,7 @@ class Finalcals(basetask.StandardTaskTemplate):
             else:
                 LOG.warning(f"{gt} not found, removing it from list of gain tables")
         GainTables = GainTables_present
+        spwmap = build_gaintable_spwmap(m, GainTables, addcaltable, spw=','.join(spwlist))
         bpdgains_task_args = {'vis': self.inputs.vis,
                               'caltable': caltable,
                               'field': '',
@@ -624,7 +605,7 @@ class Finalcals(basetask.StandardTaskTemplate):
                               'gaintable': GainTables,
                               'gainfield': [''],
                               'interp': [''],
-                              'spwmap': [],
+                              'spwmap': spwmap,
                               'parang': self.parang}
 
         bpscanslist = list(map(int, bandpass_scan_select_string.split(',')))
@@ -685,6 +666,7 @@ class Finalcals(basetask.StandardTaskTemplate):
             else:
                 LOG.warning(f"{gt} not found, removing it from list of gain tables")
         AllCalTables = GainTables_present
+        spwmap = build_gaintable_spwmap(m, AllCalTables, ktypecaltable, spw=spw)
 
         avgphasegaincal_task_args = {'vis': self.inputs.vis,
                                      'caltable': caltable,
@@ -708,7 +690,7 @@ class Finalcals(basetask.StandardTaskTemplate):
                                      'gaintable': AllCalTables,
                                      'gainfield': [''],
                                      'interp': [''],
-                                     'spwmap': [],
+                                     'spwmap': spwmap,
                                      'parang': self.parang,
                                      'refantmode': refantmode}
 
@@ -791,6 +773,7 @@ class Finalcals(basetask.StandardTaskTemplate):
                 LOG.warning(f"{gt} not found, removing it from list of gain tables")
         AllCalTables = GainTables_present
         ntables = len(AllCalTables)
+        spwmap = build_gaintable_spwmap(m, AllCalTables, ktypecaltable, spw=spw)
 
         applycal_task_args = {'vis': self.inputs.vis,
                               'field': '',
@@ -802,7 +785,7 @@ class Finalcals(basetask.StandardTaskTemplate):
                               'gaintable': AllCalTables,
                               'gainfield': [''],
                               'interp': [interp],
-                              'spwmap': [],
+                              'spwmap': spwmap,
                               'calwt': [False] * ntables,
                               'parang': self.parang,
                               'applymode': 'calflagstrict',

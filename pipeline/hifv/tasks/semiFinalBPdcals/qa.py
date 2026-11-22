@@ -5,6 +5,7 @@ import pipeline.infrastructure.logging as logging
 import pipeline.infrastructure.pipelineqa as pqa
 import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
+from pipeline.hifv.heuristics import get_vla_baseband_spw_groups
 from . import semiFinalBPdcals
 from . import semiFinalBPdcalsResults
 
@@ -65,10 +66,14 @@ class semiFinalBPdcalsQAHandler(pqa.QAPlugin):
         result.qa.pool.extend(scores)
 
     def _check_spw_flagged(self, table: dict, bandname: str, ms: object, table_type: str):
+        # Per-baseband K-tables store solutions only under each baseband's lowest SPW ID.
+        expected_spws = {bb[0] for bb in get_vla_baseband_spw_groups(ms)} if table_type == 'Delay' else None
         for spw in ms.get_spectral_windows():
             if not spw.specline_window:
                 continue
             spw_id = spw.id
+            if expected_spws and spw_id not in expected_spws:
+                continue
             flaginfo = table.get('spw', {}).get(spw_id)
 
             if flaginfo is None:

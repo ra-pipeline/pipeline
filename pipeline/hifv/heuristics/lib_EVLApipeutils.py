@@ -37,10 +37,13 @@
 # 11/19/12 STM add getCalStatistics function
 # 12/17/12 STM add phases to getCalStatistics
 ######################################################################
+import os
+
 import numpy
 
 import pipeline.infrastructure as infrastructure
-from pipeline.infrastructure import casa_tools
+from pipeline.infrastructure import casa_tasks, casa_tools
+from .uvrange import uvrange
 
 LOG = infrastructure.get_logger(__name__)
 
@@ -890,7 +893,7 @@ def set_add_model_column_parameters(context):
 
 
 def vla_minbaselineforcal():
-    """Min baseline for cal
+    """Min baseline for cal.
 
     Args:
         None
@@ -899,7 +902,158 @@ def vla_minbaselineforcal():
         Constant value
 
     """
-
     # Old determination before it was changed to a constant value of 4
     # return max(4, int(len(self.antennas) / 2.0))
     return 4
+
+
+def get_vla_baseband_spw_groups(ms: object, spw: str = '') -> list[list[int]]:
+    """Return sorted science SPW ID lists grouped by VLA baseband.
+
+    Args:
+        ms: MeasurementSet domain object.
+        spw: Optional comma-separated SPW selection string to filter by.
+
+    Returns:
+        Sorted SPW ID lists, one per baseband.
+    """
+    selected_spws = {int(s) for s in spw.split(',') if s.strip()} if spw else set()
+    baseband_groups = ms.get_vla_baseband_spws(science_windows_only=True, return_select_list=True)
+
+    filtered_groups: list[list[int]] = []
+    for bb_spws in baseband_groups:
+        spw_ids = sorted(spwid for spwid in bb_spws if not selected_spws or spwid in selected_spws)
+        if spw_ids:
+            filtered_groups.append(spw_ids)
+
+    if not filtered_groups and selected_spws:
+        filtered_groups.append(sorted(selected_spws))
+
+    return filtered_groups
+
+
+def get_vla_baseband_spwmap(ms: object, spw: str = '') -> list[int]:
+    """Build a CASA spwmap mapping each science SPW to its baseband's lowest SPW ID.
+
+    Args:
+        ms: MeasurementSet domain object.
+        spw: Optional comma-separated SPW selection string used for fallback grouping.
+
+    Returns:
+        List of target SPW IDs indexed by MS SPW ID.
+    """
+    all_spws = ms.get_spectral_windows(science_windows_only=False)
+    if not all_spws:
+        return []
+
+    max_spw_id = max(spw_obj.id for spw_obj in all_spws)
+    spwmap = list(range(max_spw_id + 1))
+
+    for bb_spws in get_vla_baseband_spw_groups(ms, spw=spw):
+        ref_spw = bb_spws[0]
+        for spwid in bb_spws:
+            spwmap[spwid] = ref_spw
+
+    return spwmap
+
+
+def build_gaintable_spwmap(
+    ms: object,
+    gaintables: list[str],
+    ktypecaltable: str | None,
+    spw: str = '',
+) -> list[list[int]]:
+    """Build per-table spwmap list for CASA tasks applying a per-baseband K-table.
+
+    Args:
+        ms: MeasurementSet domain object.
+        gaintables: Ordered list of calibration tables passed to CASA.
+        ktypecaltable: Path to the per-baseband K-type delay table.
+        spw: Optional comma-separated SPW selection string used for fallback grouping.
+
+    Returns:
+        Per-table spwmap list, or empty list if no K-table mapping is needed.
+    """
+    if not ktypecaltable or ktypecaltable not in gaintables:
+        return []
+
+    k_spwmap = get_vla_baseband_spwmap(ms, spw=spw)
+    if not k_spwmap:
+        return []
+
+    return [k_spwmap if gt == ktypecaltable else [] for gt in gaintables]
+
+
+def run_ktype_delaycal(
+    vis: str,
+    caltable: str,
+    ms: object,
+    delay_field_select_string: str,
+    delay_scan_select_string: str,
+    refant: str,
+    gaintables: list[str],
+    setjy_results: object,
+    executor: object,
+    spw: str = '',
+    parang: bool = True,
+    append: bool = False,
+) -> bool:
+    """Run per-baseband K-type delay calibration with CASA gaincal.
+
+    Args:
+        vis: MeasurementSet path.
+        caltable: Output delay calibration table path.
+        ms: MeasurementSet domain object.
+        delay_field_select_string: Comma-separated delay calibrator field IDs.
+        delay_scan_select_string: Comma-separated delay calibrator scan IDs.
+        refant: Reference antenna string passed to CASA gaincal.
+        gaintables: Pre-apply calibration tables.
+        setjy_results: Flux calibration results for uvrange calculation.
+        executor: Pipeline task executor.
+        spw: Comma-separated SPW selection string for the target band.
+        parang: Whether to apply parallactic angle correction.
+        append: Initial append flag for gaincal.
+
+    Returns:
+        True upon completion.
+    """
+    baseband_spw_groups = get_vla_baseband_spw_groups(ms, spw=spw)
+    delaycal_task_args = {
+        'vis': vis,
+        'caltable': caltable,
+        'field': '',
+        'spw': spw,
+        'intent': '',
+        'selectdata': True,
+        'uvrange': '',
+        'scan': delay_scan_select_string,
+        'solint': 'inf',
+        'combine': 'scan,spw',
+        'preavg': -1.0,
+        'refant': refant,
+        'minblperant': vla_minbaselineforcal(),
+        'minsnr': 3.0,
+        'solnorm': False,
+        'gaintype': 'K',
+        'smodel': [],
+        'calmode': 'p',
+        'append': append,
+        'docallib': False,
+        'gaintable': gaintables,
+        'gainfield': [''],
+        'interp': [''],
+        'spwmap': [],
+        'parang': parang,
+    }
+
+    for bb_spws in baseband_spw_groups:
+        delaycal_task_args['spw'] = ','.join(map(str, bb_spws))
+        for fieldidstring in delay_field_select_string.split(','):
+            fieldid = int(fieldidstring)
+            delaycal_task_args['field'] = fieldidstring
+            delaycal_task_args['uvrange'] = uvrange(setjy_results, fieldid)
+            if os.path.exists(caltable):
+                delaycal_task_args['append'] = True
+            executor.execute(casa_tasks.gaincal(**delaycal_task_args))
+
+    return True

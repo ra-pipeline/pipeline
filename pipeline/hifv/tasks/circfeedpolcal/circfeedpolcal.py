@@ -11,7 +11,7 @@ import pipeline.infrastructure.vdp as vdp
 from pipeline.hif.tasks.polarization import polarization
 from pipeline.hifv.tasks.setmodel.vlasetjy import standard_sources
 from pipeline.hifv.heuristics import uvrange
-from pipeline.hifv.heuristics.lib_EVLApipeutils import vla_minbaselineforcal
+from pipeline.hifv.heuristics.lib_EVLApipeutils import get_vla_baseband_spwmap, vla_minbaselineforcal
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import task_registry
 from pipeline.infrastructure import utils
@@ -576,16 +576,7 @@ class Circfeedpolcal(polarization.Polarization):
         Returns: spwmap for use with gaintable in callibrary (polcal and applycal)
         """
         m = self.inputs.context.observing_run.get_ms(self.inputs.vis)
-        baseband_spws_list = m.get_vla_baseband_spws(science_windows_only=False, return_select_list=True)
-        baseband_spwstr = [','.join(map(str, spws_list)) for spws_list in baseband_spws_list]
-
-        spwmap = []
-        for spwstr in baseband_spwstr:
-            spwlist = [int(spw) for spw in spwstr.split(',')]
-            basebandmap = [spwlist[0]] * len(spwlist)
-            spwmap.extend(basebandmap)
-
-        return spwmap
+        return get_vla_baseband_spwmap(m)
 
     def _do_clipflag(self, dcaltable):
 

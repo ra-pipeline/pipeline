@@ -6,7 +6,14 @@ import pipeline.hif.heuristics.findrefant as findrefant
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
-from pipeline.hifv.heuristics import do_bandpass, getCalFlaggedSoln, uvrange, weakbp
+from pipeline.hifv.heuristics import (
+    build_gaintable_spwmap,
+    do_bandpass,
+    getCalFlaggedSoln,
+    run_ktype_delaycal,
+    uvrange,
+    weakbp,
+)
 from pipeline.hifv.heuristics.lib_EVLApipeutils import vla_minbaselineforcal
 from pipeline.infrastructure import casa_tasks, task_registry, utils
 
@@ -368,7 +375,6 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         m = self.inputs.context.observing_run.get_ms(self.inputs.vis)
         delay_field_select_string = self.inputs.context.evla['msinfo'][m.name].delay_field_select_string
         delay_scan_select_string = self.inputs.context.evla['msinfo'][m.name].delay_scan_select_string
-        minBL_for_cal = vla_minbaselineforcal()
 
         # need to add scan?
         # ref antenna string needs to be lower case for gaincal
@@ -377,45 +383,19 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         if os.path.exists(addcaltable):
             GainTables.append(addcaltable)
 
-        delaycal_task_args = {'vis': self.inputs.vis,
-                              'caltable': caltable,
-                              'field': '',
-                              'spw': spw,
-                              'intent': '',
-                              'selectdata': True,
-                              'uvrange': '',
-                              'scan': delay_scan_select_string,
-                              'solint': 'inf',
-                              'combine': 'scan',
-                              'preavg': -1.0,
-                              'refant': ','.join(RefAntOutput),
-                              'minblperant': minBL_for_cal,
-                              'minsnr': 3.0,
-                              'solnorm': False,
-                              'gaintype': 'K',
-                              'smodel': [],
-                              'calmode': 'p',
-                              'append': False,
-                              'docallib': False,
-                              'gaintable': GainTables,
-                              'gainfield': [''],
-                              'interp': [''],
-                              'spwmap': [],
-                              'parang': self.parang}
-
-        for fieldidstring in delay_field_select_string.split(','):
-            fieldid = int(fieldidstring)
-            uvrangestring = uvrange(self.setjy_results, fieldid)
-            delaycal_task_args['field'] = fieldidstring
-            delaycal_task_args['uvrange'] = uvrangestring
-            if os.path.exists(caltable):
-                delaycal_task_args['append'] = True
-
-            job = casa_tasks.gaincal(**delaycal_task_args)
-
-            self._executor.execute(job)
-
-        return True
+        return run_ktype_delaycal(
+            vis=self.inputs.vis,
+            caltable=caltable,
+            ms=m,
+            delay_field_select_string=delay_field_select_string,
+            delay_scan_select_string=delay_scan_select_string,
+            refant=','.join(RefAntOutput),
+            gaintables=GainTables,
+            setjy_results=self.setjy_results,
+            executor=self._executor,
+            spw=spw,
+            parang=self.parang,
+        )
 
     def _check_flagSolns(self, flaggedSolnResult: dict, RefAntOutput: list[str] = None) -> tuple[float, list[str]]:
         """Change reference antenna list based on a critical fraction of flagged solutions (defined in the domain ms object).
@@ -475,8 +455,9 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         # ref antenna string needs to be lower case for gaincal
 
         GainTables = sorted(self.inputs.context.callibrary.active.get_caltable())
-        if os.path.exists(addcaltable):
+        if addcaltable and os.path.exists(addcaltable):
             GainTables.append(addcaltable)
+        spwmap = build_gaintable_spwmap(m, GainTables, addcaltable, spw=','.join(spwlist))
 
         bpdgains_task_args = {'vis': self.inputs.vis,
                               'caltable': caltable,
@@ -501,7 +482,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
                               'gaintable': GainTables,
                               'gainfield': [''],
                               'interp': [''],
-                              'spwmap': [],
+                              'spwmap': spwmap,
                               'parang': self.parang}
 
         bpscanslist = list(map(int, bandpass_scan_select_string.split(',')))
@@ -549,13 +530,14 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
         LOG.info("Applying semi-final delay and BP calibrations to all calibrators")
 
         AllCalTables = sorted(self.inputs.context.callibrary.active.get_caltable())
-        if os.path.exists(ktypecaltable):
+        if ktypecaltable and os.path.exists(ktypecaltable):
             AllCalTables.append(ktypecaltable)
         # AllCalTables.append(bpdgain_touse)
         if os.path.exists(bpcaltable):
             AllCalTables.append(bpcaltable)
 
-        ntables=len(AllCalTables)
+        ntables = len(AllCalTables)
+        spwmap = build_gaintable_spwmap(m, AllCalTables, ktypecaltable, spw=spw)
 
         applycal_task_args = {'vis': self.inputs.vis,
                               'field': '',
@@ -567,7 +549,7 @@ class semiFinalBPdcals(basetask.StandardTaskTemplate):
                               'gaintable': AllCalTables,
                               'gainfield': [''],
                               'interp': interp,
-                              'spwmap': [],
+                              'spwmap': spwmap,
                               'calwt': [False]*ntables,
                               'parang': self.parang,
                               'applymode': 'calflagstrict',

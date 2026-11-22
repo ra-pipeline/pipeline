@@ -8,7 +8,7 @@ import pipeline.infrastructure.utils as utils
 import pipeline.infrastructure as infrastructure
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
-from pipeline.hifv.heuristics.lib_EVLApipeutils import vla_minbaselineforcal
+from pipeline.hifv.heuristics.lib_EVLApipeutils import build_gaintable_spwmap, vla_minbaselineforcal
 from . import uvrange
 
 LOG = infrastructure.get_logger(__name__)
@@ -168,9 +168,10 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
         setjy_results = context.results[0].read().setjy_results
 
     BPGainTables = sorted(context.callibrary.active.get_caltable())
-    if os.path.exists(ktypecaltable):
+    if ktypecaltable and os.path.exists(ktypecaltable):
         BPGainTables.append(ktypecaltable)
     BPGainTables.append(bpdgain_touse)
+    spwmap = build_gaintable_spwmap(m, BPGainTables, ktypecaltable, spw=spw or '')
 
     bandpass_task_args = {'vis': vis,
                           'caltable': caltable,
@@ -194,7 +195,7 @@ def do_bandpass(vis, caltable, context=None, RefAntOutput=None, spw=None, ktypec
                           'gaintable': BPGainTables,
                           'gainfield': [''],
                           'interp': [''],
-                          'spwmap': [],
+                          'spwmap': spwmap,
                           'parang': True}
 
     bpscanslist = list(map(int, bandpass_scan_select_string.split(',')))
@@ -317,9 +318,10 @@ def do_bandpassweakbp(vis, caltable, context=None, RefAntOutput=None, spw=None, 
     minBL_for_cal = vla_minbaselineforcal()
 
     BPGainTables = sorted(context.callibrary.active.get_caltable())
-    if os.path.exists(ktypecaltable):
+    if ktypecaltable and os.path.exists(ktypecaltable):
         BPGainTables.append(ktypecaltable)
     BPGainTables.append(bpdgain_touse)
+    spwmap = build_gaintable_spwmap(m, BPGainTables, ktypecaltable, spw=spw or '')
 
     bandpass_task_args = {'vis': vis,
                           'caltable': caltable,
@@ -343,7 +345,7 @@ def do_bandpassweakbp(vis, caltable, context=None, RefAntOutput=None, spw=None, 
                           'gaintable': BPGainTables,
                           'gainfield': [''],
                           'interp': [''],
-                          'spwmap': [],
+                          'spwmap': spwmap,
                           'parang': True}
 
     job = casa_tasks.bandpass(**bandpass_task_args)
