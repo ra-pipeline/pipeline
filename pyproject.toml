@@ -168,7 +168,7 @@ quote-style = "single"
 skip-magic-trailing-comma = false
 
 [tool.coverage.run]
-omit = ['pipeline/run*pipeline.py', 'tests/*']
+omit = ['pipeline/run*pipeline.py', 'pipeline/_version.py', 'tests/*']
 branch = true                                  # Same as --cov-branch
 source = ['pipeline']                          # Same as --cov=pipeline
 parallel = true                                # Enable parallel coverage collection for xdist
