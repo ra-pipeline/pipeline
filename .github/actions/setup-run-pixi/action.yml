@@ -81,6 +81,14 @@ runs:
         path: casarundata
         key: casarundata
 
+    - name: Ensure casarundata ownership in container
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        if [ "$(id -u)" -eq 0 ] && [ -d casarundata ]; then
+          chown -R 0:0 casarundata
+        fi
+
     - name: Fetch casarundata
       # Trigger casatools import to fetch or update casarundata under $GITHUB_WORKSPACE/casarundata.
       # This may download or update measurement sets and related runtime data; fail explicitly if it does not succeed.
