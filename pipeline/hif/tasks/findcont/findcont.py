@@ -589,6 +589,8 @@ class FindCont(basetask.StandardTaskTemplate):
                         'status': ImagingStatus.DIRTY_CUBE.value,
                     })
 
+                    tclean_kwargs = image_heuristics.tclean_fractional_bw_kwargs(weighting, start, width, nchan)
+
                     job = casa_tasks.tclean(vis=vislist, imagename=findcont_basename, datacolumn=datacolumn,
                                             antenna=antenna, spw=real_spwsel,
                                             intent=utils.to_CASA_intent(inputs.ms[0], target['intent']),
@@ -602,7 +604,7 @@ class FindCont(basetask.StandardTaskTemplate):
                                             uvtaper=uvtaper,
                                             npixels=0, restoration=False, restoringbeam=[], pbcor=False,
                                             usepointing=usepointing, savemodel='none', parallel=parallel,
-                                            fullsummary=False)
+                                            fullsummary=False, **tclean_kwargs)
                     self._executor.execute(job)
 
                     # Try detecting continuum frequency ranges

@@ -628,6 +628,12 @@ class CleanBase(basetask.StandardTaskTemplate):
         if 'cube' in tclean_job_parameters['specmode']:
             tclean_job_parameters['fullsummary'] = False
 
+        tclean_job_parameters.update(
+            inputs.heuristics.tclean_fractional_bw_kwargs(
+                inputs.weighting, inputs.start, inputs.width, inputs.nchan
+            )
+        )
+
         job = casa_tasks.tclean(**tclean_job_parameters)
         tclean_result = self._executor.execute(job)
 

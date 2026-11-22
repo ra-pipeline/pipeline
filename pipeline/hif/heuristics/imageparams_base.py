@@ -3,6 +3,7 @@ from __future__ import annotations
 import collections
 import copy
 import fnmatch
+import inspect
 import math
 import operator
 import os.path
@@ -13,6 +14,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 import astropy.units as u
+import casatasks
 import numpy as np
 import pipeline.domain.measures as measures
 import pipeline.infrastructure as infrastructure
@@ -31,6 +33,7 @@ from pipeline.infrastructure.utils.conversion import phasecenter_to_skycoord, re
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import Any
 
     from pipeline.hif.tasks.makeimlist.cleantarget import CleanTarget
     from pipeline.infrastructure.vdp import StandardInputs
@@ -2869,6 +2872,63 @@ class ImageParamsHeuristics:
     def psfcutoff(self) -> None:
         """Tclean psfcutoff parameter heuristics."""
         return None
+
+    def fractional_bw(
+        self,
+        start: str | dict[str, Any] | None,
+        width: str | dict[str, Any] | None,
+        nchan: int | None,
+    ) -> float | None:
+        """Calculate the fractional bandwidth of a spectral cube.
+
+        Args:
+            start: Frequency of the first channel center.
+            width: Channel width.
+            nchan: Number of channels.
+
+        Returns:
+            Dimensionless fractional bandwidth, or None if inputs do not define a frequency grid.
+        """
+        if nchan is None or nchan <= 0 or start in (None, '') or width in (None, ''):
+            return None
+
+        qa_tool = casa_tools.quanta
+        start_q = qa_tool.quantity(start)
+        width_q = qa_tool.quantity(width)
+        if not (qa_tool.checkfreq(start_q) and qa_tool.checkfreq(width_q)):
+            return None
+
+        f_start = float(qa_tool.getvalue(qa_tool.convert(start_q, 'Hz'))[0])
+        chan_width = float(qa_tool.getvalue(qa_tool.convert(width_q, 'Hz'))[0])
+        f_mid = f_start + 0.5 * (nchan - 1) * chan_width
+        if f_mid <= 0.0 or chan_width == 0.0:
+            return None
+
+        return float(abs(nchan * chan_width) / f_mid)
+
+    def tclean_fractional_bw_kwargs(
+        self,
+        weighting: str,
+        start: str | dict[str, Any] | None,
+        width: str | dict[str, Any] | None,
+        nchan: int | None,
+    ) -> dict[str, float]:
+        """Return tclean keyword arguments for fractional_bw when applicable.
+
+        Args:
+            weighting: Weighting scheme passed to tclean.
+            start: Frequency of the first channel center.
+            width: Channel width.
+            nchan: Number of channels.
+
+        Returns:
+            Dictionary with ``fractional_bw`` when using ``briggsbwtaper`` and
+            supported by ``casatasks.tclean``, otherwise an empty dictionary.
+        """
+        if weighting != 'briggsbwtaper' or 'fractional_bw' not in inspect.signature(casatasks.tclean).parameters:
+            return {}
+        frac_bw = self.fractional_bw(start, width, nchan)
+        return {'fractional_bw': frac_bw} if frac_bw is not None else {}
 
     def get_nfrms_multiplier(self, iteration, intent, specmode, imagename) -> None:
         """PIPE-1878: Determine the nfrms-based threshold multiplier for TARGET imaging.
