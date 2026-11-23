@@ -226,6 +226,7 @@ else:
         'internal_notes/*',
         'inheritance.rst',
         'timeline*',
+        'users_guide/whats-new-2027.md',
         'devel/process/*',
         'devel/reference/*',
         'devel/misc/*',
