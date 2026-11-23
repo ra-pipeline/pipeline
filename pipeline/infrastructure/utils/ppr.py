@@ -9,11 +9,20 @@ from __future__ import annotations
 import datetime
 import json
 import os
+from typing import TYPE_CHECKING
 from xml.dom import minidom
 
-from .. import exceptions, logging, task_registry
+from .. import logging, task_registry, workflow
 
-__all__ = ['check_ppr', 'write_errorexit_file', 'write_pipeline_early_exit_file']
+if TYPE_CHECKING:
+    from ..launcher import Context
+
+__all__ = [
+    'check_ppr',
+    'write_errorexit_file',
+    'write_pipeline_early_exit_file',
+    'write_pipeline_early_exit_file_if_requested',
+]
 
 LOG = logging.get_logger(__name__)
 
@@ -88,7 +97,7 @@ def write_errorexit_file(path: str, root: str, extension: str, content: str | No
 
 def write_pipeline_early_exit_file(
     path: str,
-    early_exit: exceptions.PipelineEarlyExit,
+    early_exit: workflow.PipelineEarlyExitRequest,
     *,
     task_name: str | None = None,
     stage_number: int | None = None,
@@ -114,3 +123,33 @@ def write_pipeline_early_exit_file(
         sort_keys=True,
     )
     return write_errorexit_file(path, 'errorexit', 'txt', content)
+
+
+def write_pipeline_early_exit_file_if_requested(
+    path: str,
+    context: Context,
+    *,
+    task_name: str | None = None,
+    stage_number: int | None = None,
+) -> str:
+    """Write the requested workflow stop sentinel, if enabled.
+
+    Args:
+        path: Directory where the sentinel is created.
+        context: Context containing the workflow stop request.
+        task_name: Task that requested the stop, when known.
+        stage_number: Pipeline stage that requested the stop, when known.
+
+    Returns:
+        Path to the created sentinel, or an empty string when none is requested.
+    """
+    early_exit = context.pipeline_early_exit
+    if not context.pipeline_early_exit_active or early_exit is None or not early_exit.create_errorfile:
+        return ''
+
+    return write_pipeline_early_exit_file(
+        path,
+        early_exit,
+        task_name=task_name,
+        stage_number=stage_number,
+    )

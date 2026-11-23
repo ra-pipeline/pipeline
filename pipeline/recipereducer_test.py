@@ -9,17 +9,20 @@ from types import SimpleNamespace
 import pytest
 
 from pipeline import recipereducer
-from pipeline.infrastructure import exceptions
+from pipeline.infrastructure import basetask, workflow
 
 
-def test_execute_task_propagates_early_exit() -> None:
-    """The recipe task adapter preserves an early exit."""
+def test_execute_task_returns_result_with_early_exit_request() -> None:
+    """The recipe task adapter returns a result containing a stop request."""
+    result = basetask.Results()
+    result.request_pipeline_early_exit('review required')
 
-    def request_early_exit() -> None:
-        raise exceptions.PipelineEarlyExit('review required')
+    def request_early_exit() -> basetask.Results:
+        return result
 
-    with pytest.raises(exceptions.PipelineEarlyExit, match='review required'):
-        recipereducer._execute_task(request_early_exit, {})
+    returned = recipereducer._execute_task(request_early_exit, {})
+
+    assert returned is result
 
 
 @pytest.mark.parametrize('create_errorfile', [False, True])
@@ -29,13 +32,23 @@ def test_reduce_stops_recipe_and_saves_context(
     create_errorfile: bool,
 ) -> None:
     """A recipe early exit skips later tasks and follows its sentinel policy."""
-    context = SimpleNamespace(output_dir=str(tmp_path), task_counter=0)
+    context = SimpleNamespace(
+        output_dir=str(tmp_path),
+        task_counter=1,
+        pipeline_early_exit=None,
+        pipeline_early_exit_active=False,
+    )
     executed = []
     saved = []
 
-    def request_early_exit() -> None:
+    def request_early_exit() -> SimpleNamespace:
         executed.append('stop')
-        raise exceptions.PipelineEarlyExit('review required', create_errorfile=create_errorfile)
+        context.pipeline_early_exit = workflow.PipelineEarlyExitRequest(
+            'review required',
+            create_errorfile=create_errorfile,
+        )
+        context.pipeline_early_exit_active = True
+        return SimpleNamespace(stage_number=1)
 
     def should_not_run() -> None:
         executed.append('later task')
@@ -58,27 +71,28 @@ def test_reduce_stops_recipe_and_saves_context(
 
 def test_run_named_tasks_stops_and_saves_context(monkeypatch: pytest.MonkeyPatch) -> None:
     """An explicit task list exits early and saves the context."""
-    context = SimpleNamespace()
+    context = SimpleNamespace(
+        output_dir='',
+        task_counter=1,
+        pipeline_early_exit=None,
+        pipeline_early_exit_active=False,
+    )
     resolved = []
     saved = []
 
-    def get_task(task_name: str) -> Callable[[], None]:
+    def get_task(task_name: str) -> Callable[[], SimpleNamespace]:
         resolved.append(task_name)
 
-        def request_early_exit() -> None:
-            raise exceptions.PipelineEarlyExit('review required')
+        def request_early_exit() -> SimpleNamespace:
+            context.pipeline_early_exit = workflow.PipelineEarlyExitRequest('review required')
+            context.pipeline_early_exit_active = True
+            return SimpleNamespace()
 
         return request_early_exit
 
-    monkeypatch.setattr(recipereducer.cli, 'h_init', lambda: None)
+    monkeypatch.setattr(recipereducer.cli, 'h_init', lambda: context)
     monkeypatch.setattr(recipereducer.cli, 'h_save', lambda: saved.append(True))
     monkeypatch.setattr(recipereducer.cli, 'get_pipeline_task_with_name', get_task)
-    monkeypatch.setattr(
-        recipereducer.launcher,
-        'Pipeline',
-        lambda **kwargs: SimpleNamespace(context=context),
-    )
-
     result = recipereducer.run_named_tasks([('stop', {}), ('later_task', {})])
 
     assert result is context

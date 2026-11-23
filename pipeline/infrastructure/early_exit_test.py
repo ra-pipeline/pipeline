@@ -10,7 +10,7 @@ import pytest
 
 from pipeline.h.cli import utils as cli_utils
 
-from . import basetask, exceptions, launcher
+from . import basetask, exceptions, launcher, workflow
 from .eventbus import ResultAcceptedEvent
 
 
@@ -53,7 +53,7 @@ def test_context_can_override_early_exit() -> None:
     context = object.__new__(launcher.Context)
     context.pipeline_early_exit = None
     context.pipeline_early_exit_overridden = False
-    context.request_pipeline_early_exit(exceptions.PipelineEarlyExit('review required'))
+    context.request_pipeline_early_exit(workflow.PipelineEarlyExitRequest('review required'))
 
     assert context.pipeline_early_exit_active
 
@@ -65,7 +65,7 @@ def test_context_can_override_early_exit() -> None:
 
 def test_early_exit_preserves_errorfile_request_when_pickled() -> None:
     """A saved stop request retains its error-sentinel policy."""
-    early_exit = exceptions.PipelineEarlyExit('processing failed', create_errorfile=True)
+    early_exit = workflow.PipelineEarlyExitRequest('processing failed', create_errorfile=True)
 
     restored = pickle.loads(pickle.dumps(early_exit))
 
@@ -73,8 +73,8 @@ def test_early_exit_preserves_errorfile_request_when_pickled() -> None:
     assert restored.create_errorfile
 
 
-def test_cli_raises_early_exit_after_result_merge(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The CLI exposes a stop request only after accepting its result."""
+def test_cli_returns_result_after_merging_early_exit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The CLI returns normally after merging a workflow stop request."""
     result = basetask.Results()
     result.request_pipeline_early_exit('review required')
     context = SimpleNamespace(pipeline_early_exit_active=False)
@@ -89,7 +89,28 @@ def test_cli_raises_early_exit_after_result_merge(monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr(cli_utils, '_merge_results', merge_results)
 
-    with pytest.raises(exceptions.PipelineEarlyExit, match='review required'):
-        cli_utils.execute_task(context, 'h_test', {})
+    returned = cli_utils.execute_task(context, 'h_test', {})
 
     assert calls == ['merge']
+    assert returned is result
+
+
+def test_cli_blocks_task_while_early_exit_is_active(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A later interactive task requires an explicit early-exit override."""
+    context = SimpleNamespace(
+        pipeline_early_exit=workflow.PipelineEarlyExitRequest('review required'),
+        pipeline_early_exit_active=True,
+    )
+    calls = []
+
+    def task() -> None:
+        calls.append('task')
+
+    monkeypatch.setattr(cli_utils.task_registry, 'get_pipeline_class_for_task', lambda _: object())
+    monkeypatch.setattr(cli_utils, 'get_context', lambda: context)
+    wrapped = cli_utils.cli_wrapper(task)
+
+    with pytest.raises(exceptions.PipelineException, match='override_pipeline_early_exit'):
+        wrapped()
+
+    assert calls == []

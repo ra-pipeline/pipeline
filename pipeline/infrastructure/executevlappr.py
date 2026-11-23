@@ -195,26 +195,26 @@ def executeppr(pprXmlFile: str, importonly: bool = True, loglevel: str = 'info',
             results = pipeline_task(**task_args)
             casa_tools.post_to_log('Results ' + str(results), echo_to_screen=echo_to_screen)
 
+            if context.pipeline_early_exit_active:
+                casa_tools.post_to_log(
+                    'Pipeline task {} requested an early exit: {}'.format(
+                        pipeline_task_name,
+                        context.pipeline_early_exit,
+                    ),
+                    echo_to_screen=echo_to_screen,
+                )
+                utils.write_pipeline_early_exit_file_if_requested(
+                    workingDir,
+                    context,
+                    task_name=pipeline_task_name,
+                    stage_number=context.task_counter,
+                )
+                break
+
             if importonly and pipeline_task_name in import_tasks:
                 casa_tools.post_to_log("Terminating execution after running " + pipeline_task_name,
                                         echo_to_screen=echo_to_screen)
                 break
-
-        except exceptions.PipelineEarlyExit as exc:
-            if hasattr(context, 'request_pipeline_early_exit'):
-                context.request_pipeline_early_exit(exc)
-            casa_tools.post_to_log(
-                'Pipeline task {} requested an early exit: {}'.format(pipeline_task_name, exc),
-                echo_to_screen=echo_to_screen,
-            )
-            if exc.create_errorfile:
-                utils.write_pipeline_early_exit_file(
-                    workingDir,
-                    exc,
-                    task_name=pipeline_task_name,
-                    stage_number=getattr(context, 'task_counter', None),
-                )
-            break
 
         except Exception:
             # Log message if an exception occurred that was not handled by

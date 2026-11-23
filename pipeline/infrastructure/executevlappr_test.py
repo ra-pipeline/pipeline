@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from . import exceptions, executevlappr
+from . import executevlappr, workflow
 
 
 @pytest.mark.parametrize('create_errorfile', [False, True])
@@ -16,7 +16,11 @@ def test_executeppr_early_exit(
     create_errorfile: bool,
 ) -> None:
     """An early exit follows its requested VLA PPR completion policy."""
-    context = SimpleNamespace()
+    context = SimpleNamespace(
+        pipeline_early_exit=None,
+        pipeline_early_exit_active=False,
+        task_counter=1,
+    )
     saved: list[bool] = []
     resolved_tasks: list[str] = []
     early_exit_files = []
@@ -27,11 +31,16 @@ def test_executeppr_early_exit(
     ]
     commands = [('request_review', {}), ('must_not_run', {})]
 
-    def get_task(task_name: str) -> Callable[[], None]:
+    def get_task(task_name: str) -> Callable[[], object]:
         resolved_tasks.append(task_name)
 
-        def request_early_exit() -> None:
-            raise exceptions.PipelineEarlyExit('review required', create_errorfile=create_errorfile)
+        def request_early_exit() -> object:
+            context.pipeline_early_exit = workflow.PipelineEarlyExitRequest(
+                'review required',
+                create_errorfile=create_errorfile,
+            )
+            context.pipeline_early_exit_active = True
+            return object()
 
         return request_early_exit
 

@@ -21,7 +21,6 @@ from . import (
     api,
     casa_tools,
     eventbus,
-    exceptions,
     filenamer,
     jobrequest,
     pipelineqa,
@@ -29,6 +28,7 @@ from . import (
     task_registry,
     utils,
     vdp,
+    workflow,
 )
 from . import logging as pipeline_logging
 from .casa_tasks import CasaTasks
@@ -224,7 +224,7 @@ class Results(api.Results):
 
         # Optional request to stop workflow execution after this result has
         # been accepted and rendered.
-        self.pipeline_early_exit: exceptions.PipelineEarlyExit | None = None
+        self.pipeline_early_exit: workflow.PipelineEarlyExitRequest | None = None
 
     def request_pipeline_early_exit(self, message: str, *, create_errorfile: bool = False) -> None:
         """Request that workflow execution stop after this result is rendered.
@@ -236,7 +236,7 @@ class Results(api.Results):
             create_errorfile: Whether the workflow entry point should create
                 an ``errorexit`` sentinel.
         """
-        self.pipeline_early_exit = exceptions.PipelineEarlyExit(
+        self.pipeline_early_exit = workflow.PipelineEarlyExitRequest(
             message,
             create_errorfile=create_errorfile,
         )
@@ -562,7 +562,7 @@ class ResultsList(Results, Generic[T]):
             return None
 
 
-def get_pipeline_early_exit(result: object) -> exceptions.PipelineEarlyExit | None:
+def get_pipeline_early_exit(result: object) -> workflow.PipelineEarlyExitRequest | None:
     """Return the first workflow stop request contained in a result.
 
     Args:

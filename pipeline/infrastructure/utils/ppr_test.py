@@ -5,14 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pipeline.infrastructure import exceptions
+from pipeline.infrastructure import workflow
 
 from . import ppr
 
 
 def test_write_pipeline_early_exit_file_includes_stop_details(tmp_path: Path) -> None:
     """A requested error sentinel contains machine-readable stop details."""
-    early_exit = exceptions.PipelineEarlyExit('data require manual review', create_errorfile=True)
+    early_exit = workflow.PipelineEarlyExitRequest('data require manual review', create_errorfile=True)
 
     path = ppr.write_pipeline_early_exit_file(
         str(tmp_path),

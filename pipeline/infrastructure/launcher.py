@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 
 from pipeline import domain, environment
 
-from . import callibrary, casa_tools, eventbus, exceptions, imagelibrary, logging, project, utils
+from . import callibrary, casa_tools, eventbus, exceptions, imagelibrary, logging, project, utils, workflow
 from .eventbus import ContextCreatedEvent, ContextResumedEvent
 
 if TYPE_CHECKING:
@@ -127,7 +127,7 @@ class Context:
         self.results = []
         self.task_counter = 0
         self.subtask_counter = 0
-        self.pipeline_early_exit: exceptions.PipelineEarlyExit | None = None
+        self.pipeline_early_exit: workflow.PipelineEarlyExitRequest | None = None
         self.pipeline_early_exit_overridden = False
         LOG.trace('Pipeline stage counter set to {0}'.format(self.stage))
 
@@ -180,11 +180,11 @@ class Context:
             and not getattr(self, 'pipeline_early_exit_overridden', False)
         )
 
-    def request_pipeline_early_exit(self, early_exit: exceptions.PipelineEarlyExit) -> None:
+    def request_pipeline_early_exit(self, early_exit: workflow.PipelineEarlyExitRequest) -> None:
         """Record a workflow stop request on this context.
 
         Args:
-            early_exit: Stop request raised after the current result is rendered.
+            early_exit: Stop request recorded before the current result is rendered.
         """
         self.pipeline_early_exit = early_exit
         self.pipeline_early_exit_overridden = False

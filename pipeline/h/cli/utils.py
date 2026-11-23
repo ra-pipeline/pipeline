@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.api as api
 import pipeline.infrastructure.argmapper as argmapper
-import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.infrastructure import exceptions, task_registry, utils
 from pipeline.infrastructure.launcher import current_task_name
@@ -78,7 +77,11 @@ def cli_wrapper(func: Callable) -> Callable:
 
         context = get_context()
         if context.pipeline_early_exit_active:
-            raise context.pipeline_early_exit
+            raise exceptions.PipelineException(
+                'Pipeline execution is stopped: '
+                f'{context.pipeline_early_exit}. Call '
+                'context.override_pipeline_early_exit() before running another task.'
+            )
 
         with set_contextvar(current_task_name, task_name):
             results = execute_task(context, task_name, all_inputs)
@@ -188,10 +191,6 @@ def execute_task(context, casa_task, casa_args):
 
     # accept the results if desired
     _merge_results(context, results)
-
-    early_exit = basetask.get_pipeline_early_exit(results)
-    if early_exit is not None and context.pipeline_early_exit_active:
-        raise early_exit
 
     tracebacks = utils.get_tracebacks(results)
     if len(tracebacks) > 0:

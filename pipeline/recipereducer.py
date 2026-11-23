@@ -255,8 +255,6 @@ def _execute_task(task: Callable, task_args: dict) -> Any:
 
     try:
         result = task(**task_args)
-    except exceptions.PipelineEarlyExit:
-        raise
     except Exception:
         # Log message if an exception occurred that was not handled by
         # standardtask template (not turned into failed task result).
@@ -299,36 +297,30 @@ def run_named_tasks(tasks: list[tuple[str, dict[str, Any]]]) -> Context:
         exceptions.PipelineException: If any executed task reports tracebacks.
     """
     LOG.info('Initializing context for explicit task list...')
-    cli.h_init()
+    context = cli.h_init()
 
     for task_name, task_args in tasks:
         task = cli.get_pipeline_task_with_name(task_name=task_name)
-        try:
-            result = _execute_task(task, task_args)
-        except exceptions.PipelineEarlyExit as exc:
-            pipeline = h_cli.stack.get(h_cli.PIPELINE_NAME)
-            context = getattr(pipeline, 'context', None)
-            if context is not None and hasattr(context, 'request_pipeline_early_exit'):
-                context.request_pipeline_early_exit(exc)
-            LOG.info('Pipeline task %s requested an early exit: %s', task_name, exc)
-            if exc.create_errorfile and context is not None:
-                utils.write_pipeline_early_exit_file(
-                    context.output_dir,
-                    exc,
-                    task_name=task_name,
-                    stage_number=context.task_counter,
-                )
-            break
+        result = _execute_task(task, task_args)
 
         # If an unhandled exception occurred, return context early
         if result is None:
-            return launcher.Pipeline(context='last').context
+            return context
+
+        if context.pipeline_early_exit_active:
+            LOG.info('Pipeline task %s requested an early exit: %s', task_name, context.pipeline_early_exit)
+            utils.write_pipeline_early_exit_file_if_requested(
+                context.output_dir,
+                context,
+                task_name=task_name,
+                stage_number=context.task_counter,
+            )
+            break
 
     LOG.info('Saving context after explicit task list execution...')
     cli.h_save()
 
-    # Return the current ("last") context for caller convenience.
-    return launcher.Pipeline(context='last').context
+    return context
 
 
 def reduce(
@@ -402,23 +394,22 @@ def reduce(
             if result is None:
                 return context
 
+            if context.pipeline_early_exit_active:
+                LOG.info('Pipeline recipe requested an early exit: %s', context.pipeline_early_exit)
+                utils.write_pipeline_early_exit_file_if_requested(
+                    context.output_dir,
+                    context,
+                    task_name=getattr(task, '__name__', None),
+                    stage_number=context.task_counter,
+                )
+                break
+
             # Check if we should exit after this stage
             if result.stage_number is exitstage:
                 break
 
     except StopIteration:
         pass
-    except exceptions.PipelineEarlyExit as exc:
-        if hasattr(context, 'request_pipeline_early_exit'):
-            context.request_pipeline_early_exit(exc)
-        LOG.info('Pipeline recipe requested an early exit: %s', exc)
-        if exc.create_errorfile:
-            utils.write_pipeline_early_exit_file(
-                context.output_dir,
-                exc,
-                task_name=getattr(task, '__name__', None),
-                stage_number=context.task_counter,
-            )
     finally:
         LOG.info('Saving context...')
         cli.h_save()

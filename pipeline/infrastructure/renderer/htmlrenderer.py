@@ -25,9 +25,17 @@ import pipeline
 import pipeline.infrastructure.pipelineqa as pqa
 from pipeline import environment, infrastructure
 from pipeline.domain import measures
-from pipeline.infrastructure import (basetask, casa_tasks, casa_tools,
-                                     eventbus, exceptions, logging, mpihelpers,
-                                     task_registry, utils)
+from pipeline.infrastructure import (
+    basetask,
+    casa_tasks,
+    casa_tools,
+    eventbus,
+    logging,
+    mpihelpers,
+    task_registry,
+    utils,
+    workflow,
+)
 from pipeline.infrastructure.displays import pointing, summary
 from pipeline.infrastructure.renderer import qaadapter, templates, weblog
 
@@ -43,7 +51,7 @@ if TYPE_CHECKING:
 LOG = infrastructure.logging.get_logger(__name__)
 
 
-def get_pipeline_early_exit(result: object) -> exceptions.PipelineEarlyExit | None:
+def get_pipeline_early_exit(result: object) -> workflow.PipelineEarlyExitRequest | None:
     """Return a workflow stop request contained in a task result."""
     return basetask.get_pipeline_early_exit(result)
 
