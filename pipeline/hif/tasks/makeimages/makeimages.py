@@ -175,9 +175,7 @@ class MakeImagesInputs(vdp.StandardInputs):
                 product retains the same name.  Additional products start
                 counting with 'v2', 'v3', etc.
 
-            vlass_plane_reject_im: Only used for the 'VLASS-SE-CUBE' imaging mode.
-
-                Default: True
+            vlass_plane_reject_im: Only used for the 'VLASS-SE-CUBE' imaging mode. Defaults to True.
 
                 If True, reject VLASS Coarse Cube planes with high flagging percentages or outlier beam sizes (see the heuristics details below)
 
@@ -290,9 +288,16 @@ class MakeImages(basetask.StandardTaskTemplate):
                 try:
                     worker_result = task.get_result()
                 except exceptions.PipelineException as ex:
-                    error_msg = ('Cleaning failure for field {!s}, intent {!s}, specmode {!s}, spw {!s}. '
-                                 'Exception from hif_tclean: {!s}'.format(
-                                 target['field'], target['intent'], target['specmode'], target['spw'], ex))
+                    error_msg = (
+                        'Cleaning failure for field {!s}, intent {!s}, specmode {!s}, spw {!s}. '
+                        'Exception from hif_tclean: {!s}'.format(
+                            utils.condense_field_names(target['field']),
+                            target['intent'],
+                            target['specmode'],
+                            target['spw'],
+                            ex,
+                        )
+                    )
                     worker_result = TcleanResult()
                     worker_result.qa.pool.append(pqa.QAScore(0.34, longmsg=error_msg, shortmsg='Cleaning failure'))
                     result.add_result(worker_result, target, outcome='failure')
@@ -854,6 +859,8 @@ class CleanTaskFactory:
 
         if target['vis']:
             task_args['vis'] = target['vis']
+        elif image_heuristics and getattr(image_heuristics, 'vislist', None):
+            task_args['vis'] = image_heuristics.vislist
 
         if target['is_per_eb']:
             task_args['is_per_eb'] = target['is_per_eb']

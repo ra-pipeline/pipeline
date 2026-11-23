@@ -1,73 +1,69 @@
 name: Sync from On-Prem Bitbucket
 
-# Grant write permission to the token so it can push commits
-permissions:
-  contents: write
-
 on:
   schedule:
-    # Run every 15 minutes
-    - cron: '*/15 * * * *'
-  workflow_dispatch: # Allows manual trigger from UI
+    - cron: '0 */2 * * *'  # fallback safety net; primary trigger is Bitbucket webhook -> workflow_dispatch
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview branch and tag updates and deletions"
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: sync-from-open-bitbucket
+  cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout GitHub Repo
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0 # Fetch full history for proper merging
-          token: ${{ secrets.GITHUB_TOKEN }} # Built-in token to push back to GitHub
-
-      - name: Configure Git and Fetch from Bitbucket
+      - name: Mirror branches and tags
+        shell: bash
+        env:
+          BITBUCKET_URL: https://open-bitbucket.nrao.edu/scm/pipe/pipeline.git
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          GH_TOKEN: ${{ secrets.MIRROR_PAT }}
         run: |
-          source .github/scripts/git-resilient.sh
+          mirror_dir=$(mktemp -d "$RUNNER_TEMP/bitbucket-mirror.XXXXXX")
+          git init --bare --quiet "$mirror_dir"
 
-          git config user.name "GitHub Action Sync"
-          git config user.email "action@github.com"
-          
-          # Add PUBLIC on-prem URL and fetch with resilience retries
-          git remote add bitbucket https://open-bitbucket.nrao.edu/scm/pipe/pipeline.git
-
-          if ! retry_cmd git fetch bitbucket; then
-            if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
-              echo "::warning::open-bitbucket.nrao.edu appears to be offline or unreachable. Skipping scheduled sync until next run."
-              echo "SYNC_SKIPPED=true" >> "$GITHUB_ENV"
-              exit 0
-            else
-              echo "::error::Failed to fetch from open-bitbucket.nrao.edu."
-              exit 1
+          refspecs=('+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*')
+          fetched=false
+          delay=5
+          for attempt in 1 2 3 4; do
+            if git -C "$mirror_dir" \
+              -c http.lowSpeedLimit=1000 \
+              -c http.lowSpeedTime=30 \
+              -c http.postBuffer=524288000 \
+              fetch --quiet --no-tags "$BITBUCKET_URL" "${refspecs[@]}"; then
+              fetched=true
+              break
             fi
-          fi
+            if [[ "$attempt" -lt 4 ]]; then
+              echo "Fetch failed (attempt $attempt/4). Retrying in ${delay}s..." >&2
+              sleep "$delay"
+              delay=$((delay * 2))
+            fi
+          done
 
-      - name: Sync Main Branch
-        if: env.SYNC_SKIPPED != 'true'
-        run: |
-          # Checkout main (from GitHub)
-          git checkout main
-          
-          # Check if there are new commits from Bitbucket to merge
-          LOCAL_SHA=$(git rev-parse HEAD)
-          REMOTE_SHA=$(git rev-parse bitbucket/main)
-
-          if [ "$LOCAL_SHA" = "$REMOTE_SHA" ]; then
-            echo "GitHub 'main' is already up to date with 'bitbucket/main' ($LOCAL_SHA). No sync needed."
-            exit 0
-          fi
-
-          echo "Merging changes: $LOCAL_SHA -> $REMOTE_SHA"
-
-          # Merge changes from open-bitbucket's main
-          # Using --ff-only ensures a clean history (fails if streams diverged)
-          if ! git merge bitbucket/main --ff-only ; then
-            echo "::error::Failed to merge 'bitbucket/main' into 'main' with --ff-only. Manual conflict resolution is required."
-            echo "=== Git status ==="
-            git status
-            echo "=== Recent commit graph (last 10 commits across all refs) ==="
-            git log --oneline --graph --all -10
+          if [[ "$fetched" != true ]]; then
+            if [[ "$GITHUB_EVENT_NAME" == "schedule" ]]; then
+              echo "::warning::open-bitbucket.nrao.edu appears offline or unreachable. Skipping scheduled sync."
+              exit 0
+            fi
+            echo "::error::Failed to fetch from $BITBUCKET_URL after 4 attempts."
             exit 1
           fi
-          
-          # Push updated main back to GitHub
-          git push origin main
+
+          git -C "$mirror_dir" show-ref --verify refs/heads/main
+
+          gh auth setup-git
+          push_options=(--atomic --prune --porcelain)
+          if [[ "$DRY_RUN" == true ]]; then
+            push_options+=(--dry-run)
+          fi
+          git -C "$mirror_dir" push "${push_options[@]}" \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "${refspecs[@]}"

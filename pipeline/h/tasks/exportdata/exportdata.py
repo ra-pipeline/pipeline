@@ -1041,12 +1041,15 @@ class ExportData(basetask.StandardTaskTemplate):
             calto = callibrary.CalTo(vis=vis)
             applied_calstate = context.callibrary.applied.trimmed(context, calto)
 
+            # Application view, computed once and shared by the log, the
+            # count and the file, so the three cannot disagree.
+            calapps = [callibrary.CalApplication(calto, calfrom)
+                       for calto, calfrom in applied_calstate.application_partition(hide_empty=True).items()]
+
             # Log the list in human readable form. Better way to do this ?
-            nitems = 0
-            for calto, calfrom in applied_calstate.merged().items():
-                LOG.info('Apply to:  Field: %s  Spw: %s  Antenna: %s', calto.field, calto.spw, calto.antenna)
-                nitems = nitems + 1
-                for item in calfrom:
+            for calapp in calapps:
+                LOG.info('Apply to:  Field: %s  Spw: %s  Antenna: %s', calapp.field, calapp.spw, calapp.antenna)
+                for item in calapp.calfrom:
                     LOG.info(
                         '    Gaintable: %s  Caltype: %s  Gainfield: %s  Spwmap: %s  Interp: %s',
                         os.path.basename(item.gaintable),
@@ -1057,10 +1060,10 @@ class ExportData(basetask.StandardTaskTemplate):
                     )
 
             # Open the file
-            if nitems > 0:
+            if calapps:
                 with open(os.path.join(products_dir, applyfile_name), 'w') as applyfile:
                     applyfile.write('# Apply file for %s\n' % (os.path.basename(vis)))
-                    applyfile.write(applied_calstate.as_applycal())
+                    applyfile.write('\n'.join(str(calapp) for calapp in calapps))
             else:
                 applyfile_name = 'Undefined'
                 LOG.info('No calibrations for MS %s', os.path.basename(vis))

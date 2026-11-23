@@ -13,6 +13,19 @@
 
 alma-science-pipeline
 quick-start
+```
+
+````{only} internal
+```{toctree}
+:maxdepth: 1
+
+whats-new-2027
+```
+````
+
+```{toctree}
+:maxdepth: 1
+
 whats-new-2026
 pipeline-versions-and-documentation
 data-processing-files

@@ -52,6 +52,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+unit-results.xml
 
 # Translations
 *.mo
@@ -71,7 +72,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/**
+docs/_build*/**
 docs/source/_autosummary/**
 docs/source/_automodapi/**
 

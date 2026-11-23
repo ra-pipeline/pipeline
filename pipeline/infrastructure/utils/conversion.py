@@ -39,6 +39,7 @@ LOG = infrastructure.logging.get_logger(__name__)
 __all__ = [
     'ant_arg_to_id',
     'commafy',
+    'condense_field_names',
     'dequote',
     'field_arg_to_id',
     'flatten',
@@ -153,6 +154,34 @@ def commafy(l: Iterable, quotes: bool = True, multi_prefix: str = '', separator:
             return '%s%s%s%s' % (
                 multi_prefix, l[0], separator,
                 commafy(l[1:], separator=separator, quotes=quotes, conjunction=conjunction))
+
+
+def condense_field_names(field_str: str, max_chars: int = 80, num_head: int = 2, num_tail: int = 1) -> str:
+    """Condense long comma-separated field lists for logging and presentation.
+
+    If a comma-separated list of field names exceeds `max_chars`, abbreviate it
+    to the first `num_head` and last `num_tail` fields, e.g.:
+    "field1, field2, ..., fieldN (X fields)"
+
+    Args:
+        field_str: Input field name string (single name or comma-separated list).
+        max_chars: Maximum character length before condensing (default: 80).
+        num_head: Number of leading items to show (default: 2).
+        num_tail: Number of trailing items to show (default: 1).
+
+    Returns:
+        Condensed or original field name string.
+    """
+    if not isinstance(field_str, str) or len(field_str) <= max_chars or ',' not in field_str:
+        return str(field_str) if field_str is not None else ''
+
+    items = [item.strip() for item in field_str.split(',') if item.strip()]
+    if len(items) <= (num_head + num_tail):
+        return field_str
+
+    head = ', '.join(items[:num_head])
+    tail = ', '.join(items[-num_tail:])
+    return f'{head}, ..., {tail} ({len(items)} fields)'
 
 
 def flatten(l: Sequence[Any]) -> Iterator[Any]:

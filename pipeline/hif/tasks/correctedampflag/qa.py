@@ -19,9 +19,10 @@ class CorrectedampflagQAHandler(pqa.QAPlugin):
         vis = result.inputs['vis']
         ms = context.observing_run.get_ms(vis)
         scores = []
-        # PIPE-2203: restrict to intents that are requested in inputs and
-        # present in the MS.
-        intents = set(result.inputs['intent'].split(',')).intersection(ms.intents)
+        # PIPE-2203, PIPE-3111: restrict to intents that are requested in inputs and
+        # present in the MS, preserving input order to ensure deterministic scoring.
+        requested_intents = [i.strip() for i in result.inputs['intent'].split(',')]
+        intents = [i for i in requested_intents if i in ms.intents]
 
         # Create a separate flagging score for each intent.
         for intent in intents:
@@ -33,6 +34,7 @@ class CorrectedampflagQAHandler(pqa.QAPlugin):
                 metric_units='Fraction of unflagged {} data newly '
                              'flagged'.format(intent))
             score.origin = new_origin
+            score.applies_to.intent.add(intent)
 
             scores.append(score)
 

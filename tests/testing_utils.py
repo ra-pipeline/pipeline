@@ -524,12 +524,19 @@ class PipelineTester:
         ppr_local = f'../{os.path.basename(ppr_path)}'
         shutil.copyfile(ppr_path, ppr_local)
 
-        if telescope == 'alma':
-            executeppr.executeppr(ppr_local, importonly=False)
-        elif telescope == 'vla':
-            executevlappr.executeppr(ppr_local, importonly=False)
-        else:
-            LOG.error("Telescope is not 'alma' or 'vla'. Can't run executeppr.")
+        # PIPE-3292 / PIPE-2093: Ensure executeppr uses local test staging (../rawdata)
+        # rather than attempting production path resolution via $SCIPIPE_ROOTDIR.
+        old_rootdir = os.environ.pop('SCIPIPE_ROOTDIR', None)
+        try:
+            if telescope == 'alma':
+                executeppr.executeppr(ppr_local, importonly=False)
+            elif telescope == 'vla':
+                executevlappr.executeppr(ppr_local, importonly=False)
+            else:
+                LOG.error("Telescope is not 'alma' or 'vla'. Can't run executeppr.")
+        finally:
+            if old_rootdir is not None:
+                os.environ['SCIPIPE_ROOTDIR'] = old_rootdir
 
     def _cleanup(self):
         """Cleans up the working directory and releases the pipeline context from memory.
