@@ -1,5 +1,7 @@
 import collections
 import copy
+import os
+import re
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -186,9 +188,17 @@ class Analyzestokescubes(basetask.StandardTaskTemplate):
         # As below, we use the name pattern to retreive the .mask images in their original dimension
         # and make their subimages on-demand for the LEL expression.
 
+        match = re.match(r'^(?P<base>.+)\.iter\d+\.image\.pbcor\.tt0\.subim$', imagename_pbcor_subim)
+        if match is None:
+            LOG.warning(f'Unexpected image name pattern {imagename_pbcor_subim!r}; '
+                        'searching the intensity peaks without a tclean mask.')
+            return ''
+        base = match.group('base')
         mask_lel = []
-        for mask_pat in ['.iter2.cleanmask', '.iter3.mask']:
-            tclean_mask = imagename_pbcor_subim.replace('.iter3.image.pbcor.tt0.subim', mask_pat)
+        for tclean_mask in [f'{base}.iter2.cleanmask', f'{base}.iter3.mask']:
+            if tclean_mask == imagename_pbcor_subim or not os.path.exists(tclean_mask):
+                LOG.info(f'tclean mask {tclean_mask} is not available; skipping it.')
+                continue
             tclean_mask_flatten = tclean_mask+'.subim'
             try:
                 with casa_tools.ImageReader(tclean_mask) as image:
@@ -201,5 +211,7 @@ class Analyzestokescubes(basetask.StandardTaskTemplate):
             except Exception as e:
                 LOG.warning(f'Failed to obtain the tclean mask subimage: {tclean_mask_flatten}')
         mask_lel = '&&'.join(mask_lel)
+        if not mask_lel:
+            LOG.warning('No tclean mask available; searching the intensity peaks within the pbcor image pixel mask.')
 
         return mask_lel
