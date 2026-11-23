@@ -86,8 +86,7 @@ def test_uvrange_falls_back_without_usable_data(
 def test_uvrange_ignores_empty_spw_in_multi_spw_bin(
     heuristics: ImageParamsHeuristicsVLA, sbl_mean: float, expected_uvrange: str, expected_ratio: float
 ) -> None:
-    """Verify an empty spw does not bias the ratio and only a ratio above 2 restricts the uvrange.
-    """
+    """Verify an empty spw does not bias the ratio and only a ratio above 2 restricts the uvrange."""
     sbl_amp = {'mean': sbl_mean, 'npts': 1000.0}
     sbl = {'DATA_DESC_ID=1': sbl_amp, 'DATA_DESC_ID=2': sbl_amp}
     mbl = {'DATA_DESC_ID=1': GOOD_AMP, 'DATA_DESC_ID=2': EMPTY_AMP}
