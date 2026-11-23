@@ -1707,7 +1707,11 @@ class SDImaging(basetask.StandardTaskTemplate):
         rep_width = numpy.nanmedian(_extract_values('width', beam_unit))
         rep_height = numpy.nanmedian(_extract_values('height', beam_unit))
         rep_angle = numpy.nanmedian([cqa.getvalue(r.scan_angle) for r in pp.raster_infos if r is not None])
-        center_ra = numpy.nanmedian(_extract_values('center_ra', center_unit))
+        center_ra = numpy.nanmedian(
+            sdutils.rewrap_angle(
+                numpy.asarray(_extract_values('center_ra', center_unit))
+            )
+        )
         center_dec = numpy.nanmedian(_extract_values('center_dec', center_unit))
         width = rep_width - beam_size
         height = rep_height - beam_size
@@ -2116,6 +2120,9 @@ def _analyze_raster_pattern(datatable: DataTable, msobj: MeasurementSet,
     rgp.imager_result.rasterscan_heuristics_results_rgap \
                      .setdefault(msobj.origin_ms, []) \
                      .append(_rsres)
+    # rewrap
+    ra = sdutils.rewrap_angle(numpy.asarray(ra))
+
     try:
         gap_r = rasterscan.find_raster_gap(ra, dec, dtrow_list)
     except Exception as e:
