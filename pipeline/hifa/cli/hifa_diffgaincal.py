@@ -53,7 +53,7 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
     As of PL2025, low-SNR heuristics allow ``combine='spw'`` to be used in any of the three solve steps.
     The gaincal workflow and low SNR logical flow are shown in the figure below.
 
-    .. figure:: /figures/PL2026_hifa_diffgaincal_incHeuristic_lowSNR.png
+    .. figure:: /figures/PL2027_hifa_diffgaincal_incHeuristic_lowSNR.png
        :width: 60%
        :alt: Gain solution workflow for hifa_diffgaincal
 
@@ -68,7 +68,8 @@ def hifa_diffgaincal(vis=None, flagging_frac_limit=None, hm_spwmapmode=None, mis
        of the band-to-band offset - the group of scans, as to meet an SNR of 5.0. If this SNR threshold is not met,
        spw combination is triggered.
     2. A temporary ``gaincal`` shows that (i) not all spw solutions are made; (ii) the fraction of flagged solutions
-       exceeds 0.5 of the total solutions, and (iii) the fraction of missing scans exceeds 0.7 of the expected scans.
+       exceeds 0.5 of the total solutions, and (iii) the fraction of missing scans is equal to, or exceeds 0.5 of 
+       the expected scans, i.e. one DIFFGAIN 'group' is missing (expected from the MS vs. those in the gaintable).
 
     Notes:
         QA sub-scores:

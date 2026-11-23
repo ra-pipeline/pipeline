@@ -86,7 +86,8 @@ class DiffGaincalInputs(vdp.StandardInputs):
             raise ValueError('Value not in allowed value set ({!s}): {!r}'.format(m, value))
         return value
 
-    missing_scans_frac_limit = vdp.VisDependentProperty(default=0.7)
+    # PIPE-3301 make spw occur when half of the scans are missing (i.e. one of two Diffgain 'blocks')
+    missing_scans_frac_limit = vdp.VisDependentProperty(default=0.5)
 
     def __init__(self, context, output_dir=None, vis=None, flagging_frac_limit=None, hm_spwmapmode=None,
                  missing_scans_frac_limit=None):
