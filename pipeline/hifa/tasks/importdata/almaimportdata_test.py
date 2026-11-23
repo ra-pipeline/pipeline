@@ -2,14 +2,46 @@ from unittest import mock
 
 import pytest
 
-from pipeline.infrastructure.launcher import Context
+from pipeline.h.tasks.importdata import importdata
 from pipeline.hifa.tasks.importdata import almaimportdata
+from pipeline.infrastructure.launcher import Context
 
 
 @pytest.fixture
 def context(tmp_path, monkeypatch, request):
     monkeypatch.chdir(tmp_path)
     return Context(name=request.node.name)
+
+
+@pytest.mark.parametrize(
+    ('dbservice', 'fluxservice', 'expect_early_exit'),
+    [
+        (True, 'FAIL', True),
+        (True, 'FIRSTURL', False),
+        (False, 'FAIL', False),
+    ],
+)
+@mock.patch.object(importdata.ImportData, 'prepare')
+def test_prepare_requests_early_exit_for_fluxservice_failure(
+    mock_prepare,
+    dbservice,
+    fluxservice,
+    expect_early_exit,
+    context,
+):
+    """A requested but unavailable flux service stops after import rendering."""
+    result = almaimportdata.ALMAImportDataResults()
+    result.fluxservice = fluxservice
+    mock_prepare.return_value = result
+    inputs = almaimportdata.ALMAImportDataInputs(context=context, dbservice=dbservice)
+
+    returned = almaimportdata.SerialALMAImportData(inputs=inputs).prepare()
+
+    assert returned is result
+    assert (result.pipeline_early_exit is not None) is expect_early_exit
+    if expect_early_exit:
+        assert result.pipeline_early_exit.create_errorfile
+        assert 'Online flux catalog unavailable' in str(result.pipeline_early_exit)
 
 
 @mock.patch('pipeline.hifa.tasks.importdata.almaimportdata.fluxes.import_flux', return_value=['combined_result'])
