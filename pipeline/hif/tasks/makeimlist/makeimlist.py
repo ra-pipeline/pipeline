@@ -875,22 +875,25 @@ class MakeImList(basetask.StandardTaskTemplate):
         else:
             vislists = [inputs.vis]
 
-        if 'VLA' in imaging_mode:
-            ref_ms = inputs.context.observing_run.get_ms(inputs.vis[0])
-            vla_band = ref_ms.get_vla_spw2band()
+        if 'VLA' in imaging_mode or 'ALMA' in imaging_mode:
+            # The determination of spws per band needs to loop over all vislists since
+            # one can now have sparse setups where not all MSes have all spws.
             band_spws = {}
-            for k, v in vla_band.items():
-                if str(k) in spwlist:
-                    band_spws.setdefault(v, []).append(k)
-        elif 'ALMA' in imaging_mode:
-            ref_ms = inputs.context.observing_run.get_ms(inputs.vis[0])
-            band_spws = {}
-            for spwid in spwlist:
-                real_spw_id = inputs.context.observing_run.virtual2real_spw_id(int(spwid), ref_ms)
-                real_spw_id_obj = ref_ms.get_spectral_window(real_spw_id)
-                if real_spw_id_obj:
-                    band_name = real_spw_id_obj.band
-                    band_spws.setdefault(band_name, []).append(spwid)
+            for vislist in vislists:
+                for vis_name in vislist:
+                    ref_ms = inputs.context.observing_run.get_ms(vis_name)
+                    if 'VLA' in imaging_mode:
+                        vla_band = ref_ms.get_vla_spw2band()
+                        for k, v in vla_band.items():
+                            if str(k) in spwlist:
+                                band_spws.setdefault(v, []).append(k)
+                    elif 'ALMA' in imaging_mode:
+                        for spwid in spwlist:
+                            real_spw_id = inputs.context.observing_run.virtual2real_spw_id(int(spwid), ref_ms)
+                            real_spw_id_obj = ref_ms.get_spectral_window(real_spw_id)
+                            if real_spw_id_obj:
+                                band_name = real_spw_id_obj.band
+                                band_spws.setdefault(band_name, []).append(spwid)
         else:
             band_spws = {None: 0}
 
