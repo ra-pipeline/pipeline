@@ -172,11 +172,13 @@ def ImageCoordinateUtil(
             ra2, dec2 = dirutil.direction_recover(ra1, dec1, org_direction)
             ra.append(ra2)
             dec.append(dec2)
-        ra = utils.rewrap_angle(ra)
     else:
         ra = ra0
         dec = dec0
     del ra0, dec0
+
+    # rewrap RA
+    ra = utils.rewrap_angle(np.asarray(ra))
 
     ra_min = min(ra)
     ra_max = max(ra)
