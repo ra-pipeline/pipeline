@@ -191,16 +191,33 @@ def calculate_phase_rms(context, gaintable, qa_intent):
                     continue
                 times = np.array(times)
 
-                # look for continuously sampled chunks of data. Sometimes
-                # there are small gaps of 10-15 sec within lengths of data
-                # that we want to regard as continuous, so make the minimum
-                # 'gap' larger than this.
-                time_chunks = findchunks(times, gap_time=30.0)
-
                 cparam = sb.getcol('CPARAM')
                 flag = sb.getcol('FLAG')
                 rows = np.arange(sb.nrows())
 
+                # PIPE-406
+                # The variable name is changed from time_chunks in this is a refactor.
+                # Produce a list of arrays containing the indicies of each - in order - solution
+                # from the gain table. The indices are establised on a per scan basis by
+                # extracting the actual solutions and counting them . As this process is in a loop over
+                # gaintables and computes the "phase metric" per scan, there cannot be 
+                # any miss matching between tables. Flags (per solution) caused by the gaincal process
+                # are filtered while any scan flagging happens at an EB level, so both any pair of
+                # gaintables will not have the scan filled.
+                scan_chunks = []
+                for scan_use in intent_scans:
+                    with casa_tools.TableReader(gaintable) as tablescan:
+                        sb_perscan = tablescan.query('SCAN_NUMBER in %s' % str(scan_use))
+                        timecol_perscan = sb_perscan.getcol('TIME')
+                    times_perscan = np.array(sorted(set(timecol_perscan)))
+                    # Robust to flagged scans in the MS as these are not in the gaintable. Do not count.
+                    if len(times_perscan) > 0:
+                        if len(scan_chunks) > 0 :
+                            # Count up from the last filled solution 
+                            scan_chunks.append(np.array(range(len(times_perscan)))+scan_chunks[-1][-1]+1)
+                        else:
+                            scan_chunks.append(np.array(range(len(times_perscan))))                
+                
                 # to eliminate the effect of the refant on the results 
                 # (i.e. phase rms of refant is always 0) we first
                 # construct 8 versions of the gain table with the entries
@@ -254,9 +271,9 @@ def calculate_phase_rms(context, gaintable, qa_intent):
 
                 # now calculate the phase rms views
                 for spwid in spwids:
-                    data = np.zeros([max(antennas)+1, len(time_chunks)])
-                    data_flag = np.ones([max(antennas)+1, len(time_chunks)], bool)
-                    chunk_base_times = np.zeros([len(time_chunks)])
+                    data = np.zeros([max(antennas)+1, len(scan_chunks)])
+                    data_flag = np.ones([max(antennas)+1, len(scan_chunks)], bool)
+                    chunk_base_times = np.zeros([len(scan_chunks)])
 
                     for antenna in antennas:
                         selected_rows = rows[(spectral_window_id == spwid)
@@ -264,7 +281,7 @@ def calculate_phase_rms(context, gaintable, qa_intent):
 
                         gain_times = timecol[selected_rows]
 
-                        for i, chunk in enumerate(time_chunks):
+                        for i, chunk in enumerate(scan_chunks):
                             chunk_start = times[chunk[0]] - 0.1
                             chunk_end = times[chunk[-1]] + 0.1
                             chunk_select = \
@@ -347,28 +364,3 @@ def calculate_phase_rms(context, gaintable, qa_intent):
     finally:
         np.seterr(**olderr)
 
-
-def findchunks(times, gap_time):
-    """Return a list of arrays, each containing the indices of a chunk
-    of data i.e. a sequence of equally spaced measurements separated
-    from other chunks by larger time gaps.
-
-    Keyword arguments:
-    times    -- Numeric array of times at which the measurements
-                were taken.
-    gap_time -- Minimum gap that signifies a 'gap'.
-    """
-    difference = times[1:] - times[:-1]
-    median_diff = np.median(difference)
-    gap_diff = max(1.5 * median_diff, gap_time)
-
-    chunks = []
-    chunk = [0]
-    for i in np.arange(len(difference)):
-        if difference[i] < gap_diff:
-            chunk.append(i+1)
-        else:
-            chunks.append(np.array(chunk))
-            chunk = [i+1]
-    chunks.append(np.array(chunk))
-    return chunks
