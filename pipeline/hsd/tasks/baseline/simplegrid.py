@@ -7,7 +7,7 @@ import os
 from math import cos
 from typing import TYPE_CHECKING, Any
 
-import numpy
+import numpy as np
 
 import pipeline.infrastructure as infrastructure
 import pipeline.infrastructure.basetask as basetask
@@ -194,7 +194,7 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
 
     def make_grid_table(
         self, datatable_dict: dict, index_list: list[int]
-    ) -> list[list[int | float | numpy.ndarray]]:
+    ) -> list[list[int | float | np.ndarray]]:
         """Create grid table.
 
         The method configures two-dimensional grid onto the celestial
@@ -248,8 +248,8 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
                 datatable = datatable_dict[origin_vis]
                 yield datatable.getcell(colname, j)
 
-        ras = numpy.fromiter(_g('OFS_RA'), dtype=numpy.float64)
-        decs = numpy.fromiter(_g('OFS_DEC'), dtype=numpy.float64)
+        ras = np.fromiter(_g('OFS_RA'), dtype=np.float64)
+        decs = np.fromiter(_g('OFS_DEC'), dtype=np.float64)
 
         # Curvature has not been taken account
         dec_corr = 1.0 / cos(decs[0] / 180.0 * 3.141592653)
@@ -265,7 +265,7 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         max_dec = decs.max()
         # Check if the distribution crosses over the RA=0
         if min_ra < 10 and max_ra > 350:
-            ras = ras + numpy.less_equal(ras, 180) * 360.0
+            ras = ras + np.less_equal(ras, 180) * 360.0
             min_ra = ras.min()
             max_ra = ras.max()
         LOG.info(' RA range: [%s, %s]', min_ra, max_ra)
@@ -278,11 +278,11 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         # Calculate Grid index for each position
         igrid_ra_corr = 1.0 / grid_ra_corr
         igrid_dec = 1.0 / grid_dec
-        index_ra = numpy.array((ras - min_ra) * igrid_ra_corr, dtype=int)
-        index_dec = numpy.array((decs - min_dec) * igrid_dec, dtype=int)
+        index_ra = np.array((ras - min_ra) * igrid_ra_corr, dtype=int)
+        index_dec = np.array((decs - min_dec) * igrid_dec, dtype=int)
 
         # Counter for distributing spectrum into several planes (nplane)
-        counter = numpy.zeros((ngrid_ra, ngrid_dec), dtype=int)
+        counter = np.zeros((ngrid_ra, ngrid_dec), dtype=int)
 
         # Make lists to store indexes for combine spectrum
         nplane = self.inputs.nplane
@@ -338,7 +338,7 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
                         ant = datatable.getcell('ANTENNA', datatable_index)
                         msid = msid_list[origin_vis]
                         line[6].append([row, None, None, datatable_index, ant, msid])
-                    line[6] = numpy.array(line[6])
+                    line[6] = np.array(line[6])
                     grid_table.append(line)
         del ras, decs, combine_list
 
@@ -346,8 +346,8 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         return grid_table
 
     def grid(self,
-             grid_table: list[list[int | float | numpy.ndarray]],
-             datatable_dict: dict) -> tuple[numpy.ndarray, list[list[int | float]]]:
+             grid_table: list[list[int | float | np.ndarray]],
+             datatable_dict: dict) -> tuple[np.ndarray, list[list[int | float]]]:
         """Perform gridding operation according to grid_table.
 
         The process does re-map and combine spectrum for each position.
@@ -428,10 +428,10 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         LOG.debug('sorted bind_to_grid=%s', bind_to_grid)
 
         # create storage for output
-        StorageOut = numpy.zeros((nrow, nchan), dtype=complex)
-        StorageWeight = numpy.zeros((nrow, nchan), dtype=numpy.float32)
-        StorageNumSp = numpy.zeros((nrow), dtype=int)
-        StorageNumFlag = numpy.zeros((nrow), dtype=int)
+        StorageOut = np.zeros((nrow, nchan), dtype=complex)
+        StorageWeight = np.zeros((nrow, nchan), dtype=np.float32)
+        StorageNumSp = np.zeros((nrow), dtype=int)
+        StorageNumFlag = np.zeros((nrow), dtype=int)
         OutputTable = []
 
         # Return empty result if all the spectra are flagged out
@@ -467,15 +467,15 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
                         if SFLAG == 1:
                             if Sp is None:
                                 Sp = tb.getcell(ms_colname, mapped_row)
-                            if not numpy.all(numpy.isfinite(Sp[Pol])):
+                            if not np.all(np.isfinite(Sp[Pol])):
                                 LOG.debug('vis "%s" row %s pol %s contains NaN or Inf', os.path.basename(vis), tROW, Pol)
-                                Sp[Pol, :] = numpy.where(numpy.isfinite(Sp[Pol]), Sp[Pol], 0)
+                                Sp[Pol, :] = np.where(np.isfinite(Sp[Pol]), Sp[Pol], 0)
                             if Mask is None:
-                                Mask = numpy.asarray(numpy.logical_not(tb.getcell('FLAG', mapped_row)),
+                                Mask = np.asarray(np.logical_not(tb.getcell('FLAG', mapped_row)),
                                                      dtype=int)#vquery(tb.getcell('FLAG', mapped_row) == False)
                             StorageOut[ROW] += (Sp[Pol] * Mask[Pol] * Weight)
                             StorageWeight[ROW] += (Mask[Pol] * Weight)
-                            StorageNumSp[ROW] += 1 if numpy.any(Mask[Pol] == 1) else 0#query(any(Mask[Pol] == 1))
+                            StorageNumSp[ROW] += 1 if np.any(Mask[Pol] == 1) else 0#query(any(Mask[Pol] == 1))
                         else:
                             StorageNumFlag[ROW] += 1
                     Timer.count()
@@ -487,7 +487,7 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         for ROW in range(nrow):
             LOG.debug('Calculate weighed average for row %s', ROW)
             [IF, POL, X, Y, RAcent, DECcent, RowDelta] = grid_table[ROW]
-            if StorageNumSp[ROW] == 0 or numpy.all(StorageWeight[ROW] == 0.0):
+            if StorageNumSp[ROW] == 0 or np.all(StorageWeight[ROW] == 0.0):
                 StorageOut[ROW,:] = NoData
                 RMS = 0.0
             else:
@@ -500,4 +500,4 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
             OutputTable.append([IF, POL, X, Y, RAcent, DECcent, StorageNumSp[ROW], StorageNumFlag[ROW], RMS])
 
         del StorageWeight, StorageNumSp, StorageNumFlag, Timer
-        return (numpy.real(StorageOut), OutputTable)
+        return (np.real(StorageOut), OutputTable)

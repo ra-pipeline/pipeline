@@ -8,7 +8,7 @@ import os
 from numbers import Number
 from typing import TYPE_CHECKING
 
-import numpy
+import numpy as np
 from scipy import interpolate
 
 import pipeline.infrastructure as infrastructure
@@ -638,7 +638,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             cp : Common parameter object of prepare()
             rgp : Reduction group parameter object of prepare()
         """
-        _v_spwids_unique = numpy.unique(rgp.v_spwids)
+        _v_spwids_unique = np.unique(rgp.v_spwids)
         assert len(_v_spwids_unique) == 1
         rgp.imagename = self.get_imagename(rgp.source_name, _v_spwids_unique, rgp.ant_name,
                                            rgp.asdm, specmode=rgp.specmode)
@@ -1175,7 +1175,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         rgp.ref_ms = self.inputs.context.observing_run.get_ms(name=rgp.combined.infiles[REF_MS_ID])
         # image name
         # image name should be based on virtual spw id
-        rgp.combined.v_spws_unique = numpy.unique(rgp.combined.v_spws)
+        rgp.combined.v_spws_unique = np.unique(rgp.combined.v_spws)
         assert len(rgp.combined.v_spws_unique) == 1
         rgp.imagename = self.get_imagename(rgp.source_name, rgp.combined.v_spws_unique, specmode=rgp.specmode)
 
@@ -1252,7 +1252,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             spw_nchan: int,
             frequency_channel_reversed: bool,
             extra_edge_channels: tuple[int, int],
-            atm_channels: numpy.ndarray | list[bool] = []
+            atm_channels: np.ndarray | list[bool] = []
     ) -> dict[str, bool]:
         """
         Detect lines that are possibly missed to be identified
@@ -1288,7 +1288,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         # Input list, include_channel_range, is 1-D list of line ranges like
         # [min0, max0, min1, max1, ...]. What we need is a list of [min, max]
         # pairs, so reshape to 2-D like [[min0, max0], [min1, max1], ...].
-        linefree_ranges = numpy.reshape(
+        linefree_ranges = np.reshape(
             include_channel_range,
             (len(include_channel_range) // 2, 2)
         ).tolist()
@@ -1319,7 +1319,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             image_item: ImageItem,
             is_lsb: bool,
             extra_edge_channels: tuple[int, int] = (0, 0),
-            atm_channels: numpy.ndarray | list[bool] = []
+            atm_channels: np.ndarray | list[bool] = []
     ) -> bool:
         """Detect contamination of image.
 
@@ -1342,7 +1342,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         # PIPE-251: detect contamination
         do_plot = not basetask.DISABLE_WEBLOG
         # exclude ATM feature
-        channel_mask = numpy.logical_not(atm_channels)
+        channel_mask = np.logical_not(atm_channels)
         # exclude edge channels
         edge_count_lower, edge_count_upper = extra_edge_channels
         if edge_count_lower > 0:
@@ -1415,10 +1415,10 @@ class SDImaging(basetask.StandardTaskTemplate):
                 image_nchan = image_shape[freq_axis]
 
             # detect range of ATM feature
-            ms_index_list, unique_indices = numpy.unique(
+            ms_index_list, unique_indices = np.unique(
                 r.outcome['file_index'], return_index=True
             )
-            vspw_list = numpy.asarray(
+            vspw_list = np.asarray(
                 r.outcome['assoc_spws']
             )[unique_indices]
 
@@ -1428,7 +1428,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             spw_id = ctx.observing_run.virtual2real_spw_id(vspw_list[0], ms)
             spw_nchan = ms.get_spectral_window(spw_id).num_channels
 
-            atm_channels = numpy.zeros(image_nchan, dtype=bool)
+            atm_channels = np.zeros(image_nchan, dtype=bool)
             for ms_id, vspw in zip(ms_index_list, vspw_list):
                 ms = ctx.observing_run.measurement_sets[ms_id]
                 spw_id = ctx.observing_run.virtual2real_spw_id(vspw, ms)
@@ -1438,7 +1438,7 @@ class SDImaging(basetask.StandardTaskTemplate):
                     assert spw_nchan - sum(edge_param) == image_nchan
                     # trim edge channels excluded at hsd_baseline stage
                     _trimmed = _detected_chans[edge_param[0]:spw_nchan - edge_param[1]]
-                    atm_channels = numpy.logical_or(
+                    atm_channels = np.logical_or(
                         atm_channels, _trimmed
                     )
 
@@ -1449,7 +1449,7 @@ class SDImaging(basetask.StandardTaskTemplate):
 
             LOG.debug(
                 "ATM feature range: %s",
-                numpy.where(atm_channels)[0].tolist()
+                np.where(atm_channels)[0].tolist()
             )
 
             contaminated = self._detect_contamination(
@@ -1491,7 +1491,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             for map_range in chanmap_range:
                 if map_range[2]:
                     min_chan = int(map_range[0] - map_range[1] * 0.5)
-                    max_chan = int(numpy.ceil(map_range[0] + map_range[1] * 0.5))
+                    max_chan = int(np.ceil(map_range[0] + map_range[1] * 0.5))
                     channelmap_range.append([min_chan, max_chan])
         LOG.debug("#####CHANNEL MAP RANGE = {}".format(str(channelmap_range)))
         for i in range(len(rgp.msobjs)):
@@ -1523,7 +1523,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             LOG.info("{} : channel map and deviation mask channel ranges "
                      "in MS frame = {}".format(msobj.basename, str(exclude_channel_range)))
             # define frequency ranges of RMS
-            exclude_freq_range = numpy.zeros(2 * len(exclude_channel_range))
+            exclude_freq_range = np.zeros(2 * len(exclude_channel_range))
             for jseg in range(len(exclude_channel_range)):
                 (lfreq, rfreq) = (spwobj.channels.chan_freqs[jchan] for jchan in exclude_channel_range[jseg])
                 # handling of LSB
@@ -1574,7 +1574,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         if len(image_rms_freq_range) == 0:
             return image_rms_freq_range
 
-        return merge_ranges(numpy.reshape(image_rms_freq_range, (len(image_rms_freq_range) // 2, 2), 'C'))
+        return merge_ranges(np.reshape(image_rms_freq_range, (len(image_rms_freq_range) // 2, 2), 'C'))
 
     def get_imagename(self, source: str, spwids: list[int],
                       antenna: str=None, asdm: str=None, stokes: str=None, specmode: str='cube') -> str:
@@ -1670,7 +1670,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         """
         Retrun region to calculate statistics.
 
-        Median width, height, and position angle is adopted as a reference
+        Median width, height, and position angle are adopted as a reference
         map extent and then the width and height will be shrinked by 2 beam
         size in each direction.
 
@@ -1684,7 +1684,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         cqa = casa_tools.quanta
         beam_unit = cqa.getunit(pp.beam['major'])
         assert cqa.getunit(pp.beam['minor']) == beam_unit
-        beam_size = numpy.sqrt(cqa.getvalue(pp.beam['major']).item() * cqa.getvalue(pp.beam['minor']).item())
+        beam_size = np.sqrt(cqa.getvalue(pp.beam['major']).item() * cqa.getvalue(pp.beam['minor']).item())
         center_unit = 'deg'
         angle_unit = None
         for r in pp.raster_infos:
@@ -1704,15 +1704,15 @@ class SDImaging(basetask.StandardTaskTemplate):
             # Extract valid values of specified attributes in list
             return [_value_in_unit(getattr(r, value), unit) for r in pp.raster_infos if r is not None]
 
-        rep_width = numpy.nanmedian(_extract_values('width', beam_unit))
-        rep_height = numpy.nanmedian(_extract_values('height', beam_unit))
-        rep_angle = numpy.nanmedian([cqa.getvalue(r.scan_angle) for r in pp.raster_infos if r is not None])
-        center_ra = numpy.nanmedian(
+        rep_width = np.nanmedian(_extract_values('width', beam_unit))
+        rep_height = np.nanmedian(_extract_values('height', beam_unit))
+        rep_angle = np.nanmedian([cqa.getvalue(r.scan_angle) for r in pp.raster_infos if r is not None])
+        center_ra = np.nanmedian(
             sdutils.rewrap_angle(
-                numpy.asarray(_extract_values('center_ra', center_unit))
+                np.asarray(_extract_values('center_ra', center_unit))
             )
         )
-        center_dec = numpy.nanmedian(_extract_values('center_dec', center_unit))
+        center_dec = np.nanmedian(_extract_values('center_dec', center_unit))
         width = rep_width - beam_size
         height = rep_height - beam_size
         if width <= 0 or height <= 0:  # No valid region selected.
@@ -1835,7 +1835,7 @@ class SDImaging(basetask.StandardTaskTemplate):
             LOG.warning('No rms estimate is available.')
             return tirp.failed_rms
 
-        _theoretical_rms = numpy.sqrt(tirp.sq_rms) / tirp.weight_sum
+        _theoretical_rms = np.sqrt(tirp.sq_rms) / tirp.weight_sum
         LOG.info(f'Theoretical sensitivity of image = {_theoretical_rms} {pp.brightnessunit}')
         return tirp.cqa.quantity(_theoretical_rms, pp.brightnessunit)
 
@@ -1960,9 +1960,9 @@ class SDImaging(basetask.StandardTaskTemplate):
         jy_per_k = self._obtain_jy_per_k(pp, tirp)
         if jy_per_k is False:
             return False
-        ang = tirp.cqa.getvalue(tirp.cqa.convert(tirp.raster_info.scan_angle, 'rad'))[0] + 0.5 * numpy.pi
-        c_proj = numpy.sqrt((tirp.cy_val * numpy.sin(ang)) ** 2 + (tirp.cx_val * numpy.cos(ang)) ** 2)
-        inv_variant_on = tirp.effBW * numpy.abs(tirp.cx_val * tirp.cy_val) * \
+        ang = tirp.cqa.getvalue(tirp.cqa.convert(tirp.raster_info.scan_angle, 'rad'))[0] + 0.5 * np.pi
+        c_proj = np.sqrt((tirp.cy_val * np.sin(ang)) ** 2 + (tirp.cx_val * np.cos(ang)) ** 2)
+        inv_variant_on = tirp.effBW * np.abs(tirp.cx_val * tirp.cy_val) * \
             tirp.t_on_act / tirp.width / tirp.height
         inv_variant_off = tirp.effBW * c_proj * tirp.t_sub_off * tirp.t_on_act / tirp.t_sub_on / tirp.height
         weight = tirp.t_on_act ** 2 * tirp.t_sub_off / tirp.t_sub_on
@@ -1987,7 +1987,7 @@ class SDImaging(basetask.StandardTaskTemplate):
         (num_pol, num_data) = flag_summary.shape
         # PIPE-2508: fraction of data where any of polarization is flagged. (FLAG_SUMMARY is 0 for flagged data)
         # TODO: This logic should be improved in future when full polarization is supported.
-        num_flagged = numpy.count_nonzero(flag_summary.sum(axis=0) < num_pol)
+        num_flagged = np.count_nonzero(flag_summary.sum(axis=0) < num_pol)
         frac_flagged = num_flagged / num_data
         LOG.debug('Per polarization flag summary (# of integrations): total=%d, flagged per pol=%s, any pol flagged=%d',
                   num_data, num_data - flag_summary.sum(axis=1), num_flagged)
@@ -2112,7 +2112,7 @@ def _analyze_raster_pattern(datatable: DataTable, msobj: MeasurementSet,
     # dtrow_list is a list of numpy array holding datatable rows separated by raster rows
     # [[r00, r01, r02, ...], [r10, r11, r12, ...], ...]
     dtrow_list_nomask = rasterutil.extract_dtrow_list(timetable)
-    dtrow_list = [rows[pflag[rows]] for rows in dtrow_list_nomask if numpy.any(pflag[rows] == True)]
+    dtrow_list = [rows[pflag[rows]] for rows in dtrow_list_nomask if np.any(pflag[rows] == True)]
     radec_unit = datatable.getcolkeyword('OFS_RA', 'UNIT')
     assert radec_unit == datatable.getcolkeyword('OFS_DEC', 'UNIT')
     exp_unit = datatable.getcolkeyword('EXPOSURE', 'UNIT')
@@ -2121,7 +2121,7 @@ def _analyze_raster_pattern(datatable: DataTable, msobj: MeasurementSet,
                      .setdefault(msobj.origin_ms, []) \
                      .append(_rsres)
     # rewrap
-    ra = sdutils.rewrap_angle(numpy.asarray(ra))
+    ra = sdutils.rewrap_angle(np.asarray(ra))
 
     try:
         gap_r = rasterscan.find_raster_gap(ra, dec, dtrow_list)
@@ -2145,35 +2145,35 @@ def _analyze_raster_pattern(datatable: DataTable, msobj: MeasurementSet,
             return None
 
     cqa = casa_tools.quanta
-    idx_all = numpy.concatenate(dtrow_list)
-    mean_dec = numpy.mean(datatable.getcol('DEC')[idx_all])
+    idx_all = np.concatenate(dtrow_list)
+    mean_dec = np.mean(datatable.getcol('DEC')[idx_all])
     dec_unit = datatable.getcolkeyword('DEC', 'UNIT')
     map_center_dec = cqa.getvalue(
         cqa.convert(cqa.quantity(mean_dec, dec_unit), 'rad')
     )[0]
-    dec_factor = numpy.abs(numpy.cos(map_center_dec))
+    dec_factor = np.abs(np.cos(map_center_dec))
 
     ndata = len(dtrow_list)
-    duration = numpy.fromiter(
+    duration = np.fromiter(
         map(lambda x: exposure[x].sum(), dtrow_list),
         dtype=float, count=ndata
     )
-    num_integration = numpy.fromiter(
+    num_integration = np.fromiter(
         map(len, dtrow_list), dtype=int, count=ndata
     )
-    center_ra = numpy.fromiter(
+    center_ra = np.fromiter(
         map(lambda x: ra[x].mean(), dtrow_list),
         dtype=float, count=ndata
     )
-    center_dec = numpy.fromiter(
+    center_dec = np.fromiter(
         map(lambda x: dec[x].mean(), dtrow_list),
         dtype=float, count=ndata
     )
-    delta_ra = numpy.fromiter(
+    delta_ra = np.fromiter(
         map(lambda x: (ra[x[-1]] - ra[x[0]]) * dec_factor, dtrow_list),
         dtype=float, count=ndata
     )
-    delta_dec = numpy.fromiter(
+    delta_dec = np.fromiter(
         map(lambda x: dec[x[-1]] - dec[x[0]], dtrow_list),
         dtype=float, count=ndata
     )
@@ -2184,7 +2184,7 @@ def _analyze_raster_pattern(datatable: DataTable, msobj: MeasurementSet,
         end_ra = center_ra[e - 1]
         end_dec = center_dec[e - 1]
         height_list.append(
-            numpy.hypot((start_ra - end_ra) * dec_factor, start_dec - end_dec)
+            np.hypot((start_ra - end_ra) * dec_factor, start_dec - end_dec)
         )
     LOG.debug('REFACTOR: ant %s, spw %s, field %s', antid, spwid, fieldid)
     LOG.debug('REFACTOR: map_center_dec=%s, dec_factor=%s', map_center_dec, dec_factor)
@@ -2198,25 +2198,25 @@ def _analyze_raster_pattern(datatable: DataTable, msobj: MeasurementSet,
     LOG.debug('REFACTOR: dtrows')
     for rows in dtrow_list:
         LOG.debug('REFACTOR:   %s', list(rows))
-    center_ra = numpy.array(center_ra)
-    center_dec = numpy.array(center_dec)
+    center_ra = np.array(center_ra)
+    center_dec = np.array(center_dec)
     row_sep_ra = (center_ra[1:] - center_ra[:-1]) * dec_factor
     row_sep_dec = center_dec[1:] - center_dec[:-1]
-    row_separation = numpy.median(numpy.hypot(row_sep_ra, row_sep_dec))
+    row_separation = np.median(np.hypot(row_sep_ra, row_sep_dec))
     # find complate raster
     num_row_int = rasterutil.find_most_frequent(num_integration)
-    complete_idx = numpy.where(num_integration >= num_row_int)
+    complete_idx = np.where(num_integration >= num_row_int)
     # raster scan parameters
-    row_duration = numpy.array(duration)[complete_idx].mean()
+    row_duration = np.array(duration)[complete_idx].mean()
     assert row_duration > 0
-    row_delta_ra = numpy.abs(delta_ra)[complete_idx].mean()
-    row_delta_dec = numpy.abs(delta_dec)[complete_idx].mean()
-    width = numpy.hypot(row_delta_ra, row_delta_dec)
+    row_delta_ra = np.abs(delta_ra)[complete_idx].mean()
+    row_delta_dec = np.abs(delta_dec)[complete_idx].mean()
+    width = np.hypot(row_delta_ra, row_delta_dec)
     assert width > 0
     sign_ra = +1.0 if delta_ra[complete_idx[0][0]] >= 0 else -1.0
     sign_dec = +1.0 if delta_dec[complete_idx[0][0]] >= 0 else -1.0
     scan_angle = math.atan2(sign_dec * row_delta_dec, sign_ra * row_delta_ra)
-    height = numpy.max(height_list)
+    height = np.max(height_list)
     assert height > 0
     center = (cqa.quantity(0.5 * (center_ra.min() + center_ra.max()), radec_unit),
               cqa.quantity(0.5 * (center_dec.min() + center_dec.max()), radec_unit))
@@ -2246,7 +2246,7 @@ def calc_image_statistics(imagename: str, chans: str, region: str) -> dict:
     Returns:
         A dictionary of statistic values returned by ia.statistics.
     """
-    LOG.info("Calculateing image statistics of chans='{}', region='{}' in {}".format(chans, region, imagename))
+    LOG.info("Calculating image statistics of chans='{}', region='{}' in {}".format(chans, region, imagename))
     rg = casa_tools.regionmanager
     with casa_tools.ImageReader(imagename) as ia:
         cs = ia.coordsys()
@@ -2425,11 +2425,11 @@ def detect_extra_edge_channels(imagename: str) -> tuple[int, int]:
     with casa_tools.ImageReader(imagename) as ia:
         mask = ia.getchunk(getmask=True)
 
-    num_valid_pixels = numpy.sum(mask, axis=(0, 1, 2))
+    num_valid_pixels = np.sum(mask, axis=(0, 1, 2))
     nchan = len(num_valid_pixels)
     # PIPE-1727 threshold for edge channels should be strict,
     # no tolerance using stddev nor MAD
-    median_num_valid_pixels = numpy.median(num_valid_pixels)
+    median_num_valid_pixels = np.median(num_valid_pixels)
     LOG.debug(
         "typical number of valid pixels %s",
         median_num_valid_pixels
@@ -2451,7 +2451,7 @@ def detect_extra_edge_channels(imagename: str) -> tuple[int, int]:
     return edge_count_lower, edge_count_upper
 
 
-def detect_atm_channels(ms: MeasurementSet, spw: int) -> numpy.ndarray | None:
+def detect_atm_channels(ms: MeasurementSet, spw: int) -> np.ndarray | None:
     if ms.antenna_array.name == 'NRO':
         return None
 
