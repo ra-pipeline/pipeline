@@ -8,6 +8,11 @@ on:
         required: false
         default: "ubuntu-24.04"
         type: string
+      container:
+        description: "Optional container image for Linux jobs (e.g., 'almalinux:8')"
+        required: false
+        default: ""
+        type: string
       pixi_env:
         description: "Pixi environment name (from pyproject.toml)"
         required: false
@@ -19,10 +24,25 @@ on:
         default: false
         type: boolean
       test_data:
-        description: "Type of test data to checkout (e.g., 'unit')"
+        description: "Type of test data to checkout (e.g., 'unit', 'regression-smoke', or 'none')"
         required: false
         default: "none"
         type: string
+      testdata_paths:
+        description: "Newline-separated sparse-checkout paths for pipeline-testdata (defaults to .github/testdata-paths.txt)"
+        required: false
+        default: ""
+        type: string
+      free_disk_space:
+        description: "Reclaim disk space on Linux runners before setup"
+        required: false
+        default: false
+        type: boolean
+      timeout_minutes:
+        description: "Maximum job runtime in minutes"
+        required: false
+        default: 360
+        type: number
       task:
         description: "Pixi task name to run (e.g., 'test-unit')"
         required: false
@@ -36,171 +56,131 @@ on:
       artifact_name:
         description: "Name of the artifact to upload"
         required: false
+        default: ""
         type: string
       artifact_path:
         description: "Path of files to upload"
         required: false
+        default: ""
         type: string
 
 jobs:
   run-in-env:
     name: Run in Pixi Env
+    if: inputs.container == '' || startsWith(inputs.os, 'macos')
     runs-on: ${{ inputs.os }}
+    timeout-minutes: ${{ inputs.timeout_minutes }}
 
     steps:
+      - name: Free disk space (Ubuntu)
+        if: inputs.free_disk_space && runner.os == 'Linux'
+        shell: bash
+        run: |
+          df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /usr/local/share/boost \
+            /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Install System Dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        timeout-minutes: 5
+        shell: bash
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          if ! dpkg -s ca-certificates git xvfb >/dev/null 2>&1; then
+            APT_OPTS="-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3"
+            sudo apt-get $APT_OPTS update -y
+            sudo -E apt-get $APT_OPTS install -y --no-install-recommends ca-certificates git xvfb
+          fi
+
+      - name: Install System Dependencies (macOS)
+        if: runner.os == 'macOS'
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          # GH macOS runners use Homebrew for package management
+          brew install git
+          # casaplotms on macOS is native Qt (Cocoa), not X11, but task_plotms.py
+          # still requires DISPLAY to be set and pytest-xvfb does not start Xvfb
+          # on macOS; start XQuartz Xvfb so DISPLAY points to a valid server.
+          brew install --cask xquartz
+          if [ -x /opt/X11/bin/Xvfb ]; then
+            /opt/X11/bin/Xvfb :99 -screen 0 1280x1024x24 >/dev/null 2>&1 &
+            echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          fi
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Install System Dependencies (Ubuntu)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ca-certificates git xvfb
-
-      - name: Install Pixi
-        uses: prefix-dev/setup-pixi@v0.11.3
+      - name: Setup and Run in Pixi Env
+        uses: ./.github/actions/setup-run-pixi
         with:
-          pixi-version: v0.83.0
-          environments: ${{ inputs.pixi_env }}
-          # Use the reviewed lockfile; refresh dev snapshots with pixi update.
-          cache: false
-          # To enable caching in future, set `cache: true` and define an appropriate cache key,
-          # for example: v1-${{ runner.os }}-${{ inputs.pixi_env }}.
-          locked: true
-          activate-environment: ${{ inputs.pixi_env }}
+          pixi_env: ${{ inputs.pixi_env }}
+          update_casa: ${{ inputs.update_casa }}
+          test_data: ${{ inputs.test_data }}
+          testdata_paths: ${{ inputs.testdata_paths }}
+          task: ${{ inputs.task }}
+          run_command: ${{ inputs.run_command }}
+          artifact_name: ${{ inputs.artifact_name }}
+          artifact_path: ${{ inputs.artifact_path }}
 
-      - name: Enable post-link scripts
-        shell: bash
-        run: pixi config set --local run-post-link-scripts insecure
+  run-in-container:
+    name: Run in Pixi Container
+    if: inputs.container != '' && !startsWith(inputs.os, 'macos')
+    runs-on: ${{ inputs.os }}
+    container: ${{ inputs.container }}
+    # Note: To run AppImages via FUSE instead of APPIMAGE_EXTRACT_AND_RUN=1, replace `container:` above with:
+    # container:
+    #   image: ${{ inputs.container }}
+    #   options: --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor=unconfined
+    # and install `fuse` / `fuse-libs` (EL8) or `libfuse2t64` (Ubuntu 24.04) below.
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: "1"
 
-      - name: Install System Dependencies (macOS)
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          # GH macOS runners use Homebrew for package management          
-          brew install git
-          # Note: xvfb is X11 specific. macOS usually doesn't need it for headless browsers,
-          # or requires XQuartz (brew install --cask xquartz) if you specifically need X11.          
-          brew install --cask xquartz
-
-      - name: Configure CASA
-        shell: bash
-        run: |
-          mkdir -p ~/.casa
-          mkdir -p casarundata
-          cat > ~/.casa/config.py << PYEOF
-          measurespath = "$GITHUB_WORKSPACE/casarundata"
-          datapath = [ "$GITHUB_WORKSPACE/casarundata", "$GITHUB_WORKSPACE/pipeline-testdata" ]
-          measures_auto_update = True
-          data_auto_update = True
-          PYEOF
-
-      - name: Update CASA snapshots
-        if: inputs.update_casa
+    steps:
+      - name: Install System Dependencies (Container)
+        timeout-minutes: 5
         shell: bash
         env:
-          CASA_PIXI_ENV: ${{ inputs.pixi_env }}
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          pixi update --environment "$CASA_PIXI_ENV" \
-            casatools casatasks casashell casaplotms casampi
-
-      - name: Cache casarundata
-        uses: actions/cache@v6
-        with:
-          path: casarundata
-          key: casarundata
-
-      - name: Fetch casarundata
-        # Trigger casatools import to fetch or update casarundata under $GITHUB_WORKSPACE/casarundata.
-        # This may download or update measurement sets and related runtime data; fail explicitly if it does not succeed.
-        shell: bash
-        run: |
-          pixi run -e ${{ inputs.pixi_env }} python -c "import casatools" || {
-            echo 'casatools import failed; casarundata may be incomplete.' >&2
-            exit 1
-          }
-
-      - name: Get latest testdata commit hash
-        id: testdata-commit
-        if: inputs.test_data == 'unit'
-        shell: bash
-        run: |
-          source .github/scripts/git-resilient.sh
-          SHA=$(retry_cmd git ls-remote https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git HEAD 2>/dev/null | awk '{ print $1 }' || true)
-          if [ -z "$SHA" ]; then
-            echo "::warning::Could not resolve testdata commit hash from Bitbucket. Using fallback cache key."
-            SHA="fallback"
+          if command -v dnf >/dev/null 2>&1; then
+            dnf install -y --setopt=install_weak_deps=False --setopt=timeout=30 --setopt=retries=3 \
+              ca-certificates dbus-libs findutils fontconfig git git-lfs gzip mesa-libGL perl procps-ng tar which xorg-x11-server-Xvfb
+            # dnf install -y --setopt=install_weak_deps=False fuse fuse-libs
+            dnf clean all
+          elif command -v apt-get >/dev/null 2>&1; then
+            APT_OPTS="-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3"
+            apt-get $APT_OPTS update -y
+            apt-get $APT_OPTS install -y --no-install-recommends \
+              ca-certificates curl findutils fontconfig git git-lfs gzip libgl1 perl procps tar xvfb
+            # apt-get $APT_OPTS install -y --no-install-recommends libfuse2t64
+            rm -rf /var/lib/apt/lists/*
           fi
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          git config --system --add safe.directory '*'
 
-      - name: Cache pipeline-testdata
-        if: inputs.test_data == 'unit'
-        uses: actions/cache@v6
-        id: cache-testdata
+      - uses: actions/checkout@v7
         with:
-          path: pipeline-testdata
-          key: pipeline-testdata-unit-${{ hashFiles('.github/testdata-paths.txt') }}-${{ steps.testdata-commit.outputs.sha }}
-          restore-keys: |
-            pipeline-testdata-unit-${{ hashFiles('.github/testdata-paths.txt') }}-
-            pipeline-testdata-unit-
+          fetch-depth: 0
+          fetch-tags: true
 
-      - name: Checkout and LFS pull test data
-        if: inputs.test_data == 'unit' && steps.cache-testdata.outputs.cache-hit != 'true'
-        shell: bash
-        run: |
-          source .github/scripts/git-resilient.sh
-
-          TESTDATA_URL="https://open-bitbucket.nrao.edu/scm/pipe/pipeline-testdata.git"
-
-          if [ ! -d "pipeline-testdata/.git" ]; then
-            echo "No existing cache found. Performing sparse clone..."
-            retry_cmd git clone --filter=blob:none --sparse "$TESTDATA_URL" pipeline-testdata
-            cd pipeline-testdata
-            git sparse-checkout set --stdin < "$GITHUB_WORKSPACE/.github/testdata-paths.txt"
-          else
-            echo "Existing cache restored. Updating incrementally..."
-            cd pipeline-testdata
-            git sparse-checkout set --stdin < "$GITHUB_WORKSPACE/.github/testdata-paths.txt"
-            retry_cmd git remote set-url origin "$TESTDATA_URL" || true
-            if ! retry_cmd git fetch origin; then
-              echo "::warning::Incremental fetch from Bitbucket failed; using restored cache data."
-            else
-              git checkout -f FETCH_HEAD || git checkout -f master || true
-            fi
-          fi
-
-          echo "Pulling LFS test files..."
-          LFS_INCLUDE=$(
-            sed 's|$|/**|' "$GITHUB_WORKSPACE/.github/testdata-paths.txt" |
-              paste -sd, -
-          )
-          retry_cmd git lfs pull --include="$LFS_INCLUDE" --exclude="" || {
-            echo "::error::Failed to download required LFS test data."
-            git lfs logs last || true
-            exit 1
-          }
-
-      - name: Run Pixi Task
-        if: inputs.task != ''
-        shell: bash
-        run: pixi run -e ${{ inputs.pixi_env }} ${{ inputs.task }}
-
-      - name: Run Custom Commands
-        if: inputs.task == '' && inputs.run_command != ''
-        shell: bash
-        env:
-          RUN_COMMAND: ${{ inputs.run_command }}
-        run: |
-          pixi run -e ${{ inputs.pixi_env }} bash -c "$RUN_COMMAND"
-
-      - name: Upload Artifacts
-        if: inputs.artifact_name != ''
-        uses: actions/upload-artifact@v7
+      - name: Setup and Run in Pixi Env
+        uses: ./.github/actions/setup-run-pixi
         with:
-          name: ${{ inputs.artifact_name }}
-          path: ${{ inputs.artifact_path }}
-          if-no-files-found: warn
-
+          pixi_env: ${{ inputs.pixi_env }}
+          update_casa: ${{ inputs.update_casa }}
+          test_data: ${{ inputs.test_data }}
+          testdata_paths: ${{ inputs.testdata_paths }}
+          task: ${{ inputs.task }}
+          run_command: ${{ inputs.run_command }}
+          artifact_name: ${{ inputs.artifact_name }}
+          artifact_path: ${{ inputs.artifact_path }}

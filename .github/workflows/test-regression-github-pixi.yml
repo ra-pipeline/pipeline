@@ -1,0 +1,167 @@
+name: "Test-Regression-GitHub (Pixi)"
+
+on:
+  push:
+    branches:
+      - "main"
+      - "release/**"
+    paths:
+      - "pipeline/**"
+      - "tests/**"
+      - "scripts/**"
+      - ".github/scripts/collect_github_regression.py"
+      - ".github/actions/**"
+      - ".github/workflows/env-setup-run-template-pixi.yml"
+      - ".github/workflows/test-regression-github-pixi.yml"
+      - "pyproject.toml"
+      - "pixi.lock"
+  pull_request:
+    branches:
+      - "**"
+    paths:
+      - "pipeline/**"
+      - "tests/**"
+      - "scripts/**"
+      - ".github/scripts/collect_github_regression.py"
+      - ".github/actions/**"
+      - ".github/workflows/env-setup-run-template-pixi.yml"
+      - ".github/workflows/test-regression-github-pixi.yml"
+      - "pyproject.toml"
+      - "pixi.lock"
+  workflow_dispatch:
+    inputs:
+      test_filter:
+        description: "Optional substring filter on test name (empty = all)"
+        required: false
+        default: ""
+        type: string
+      os:
+        description: "Target OS filter"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - ubuntu-24.04
+          - macos-15
+      linux_env:
+        description: "Linux runtime environment"
+        required: false
+        default: "almalinux:8"
+        type: choice
+        options:
+          - almalinux:8
+          - ubuntu-24.04
+      pixi_env:
+        description: "Pixi environment name"
+        required: false
+        default: "casa674-py312"
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    name: Discover GitHub Regression Tests
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.collect.outputs.matrix }}
+      has_tests: ${{ steps.collect.outputs.has_tests }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: |
+            tests/regression
+            .github/scripts/collect_github_regression.py
+
+      - name: Collect @pytest.mark.github_runner tests
+        id: collect
+        shell: bash
+        env:
+          TEST_FILTER: ${{ github.event.inputs.test_filter || '' }}
+          OS_FILTER: ${{ github.event.inputs.os || 'all' }}
+        run: |
+          MATRIX=$(python3 .github/scripts/collect_github_regression.py --filter "$TEST_FILTER" --os "$OS_FILTER")
+          HAS_TESTS=$(python3 -c "import json, sys; print('true' if json.loads(sys.argv[1])['include'] else 'false')" "$MATRIX")
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "has_tests=$HAS_TESTS" >> "$GITHUB_OUTPUT"
+          echo "$MATRIX" | python3 -m json.tool
+
+  regression:
+    name: "${{ matrix.name }} (${{ matrix.os == 'ubuntu-24.04' && (github.event.inputs.linux_env || 'almalinux:8') || matrix.os }})"
+    needs: discover
+    if: needs.discover.outputs.has_tests == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
+
+    uses: ./.github/workflows/env-setup-run-template-pixi.yml
+    with:
+      os: ${{ matrix.os }}
+      container: ${{ matrix.os == 'ubuntu-24.04' && (github.event.inputs.linux_env || 'almalinux:8') == 'almalinux:8' && 'almalinux:8' || '' }}
+      pixi_env: ${{ github.event.inputs.pixi_env || 'casa674-py312' }}
+      update_casa: ${{ github.event_name != 'workflow_dispatch' && github.ref_type != 'tag' && !startsWith(github.base_ref || github.ref_name, 'release/') }}
+      free_disk_space: ${{ (github.event.inputs.linux_env || 'almalinux:8') != 'almalinux:8' }}
+      timeout_minutes: 180
+      test_data: regression-github
+      testdata_paths: ${{ matrix.testdata_paths }}
+      run_command: |
+        export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONNOUSERSITE=1
+        ulimit -Sn 8192 2>/dev/null || true
+        COV_ARGS=""
+        if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
+          export COVERAGE_FILE=coverage.dat
+          COV_ARGS="--cov=pipeline --cov-branch --cov-report= --cov-fail-under=0"
+        fi
+        python -m pytest "${{ matrix.node_id }}" --junitxml=regression-results.xml $COV_ARGS
+        rc=$?
+        df -h
+        exit $rc
+      artifact_name: github-regression-${{ matrix.name }}-${{ matrix.os }}
+      artifact_path: |
+        regression-results.xml
+        coverage.dat*
+        casa-*.log
+        **/html/
+
+  upload_codecov:
+    name: Upload Regression Coverage to Codecov
+    needs: regression
+    if: ${{ !cancelled() && needs.regression.result != 'skipped' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Full History for Codecov
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download Regression Artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: github-regression-*-ubuntu-24.04
+
+      - name: Combine Coverage Data
+        shell: bash
+        run: |
+          if compgen -G "github-regression-*-ubuntu-24.04/coverage.dat*" >/dev/null; then
+            python3 -m venv .cov-venv
+            .cov-venv/bin/pip install --quiet "coverage>=7,<8"
+            .cov-venv/bin/coverage combine github-regression-*-ubuntu-24.04/coverage.dat*
+            .cov-venv/bin/coverage xml
+          else
+            echo "::warning::No coverage.dat* files found in downloaded artifacts."
+          fi
+
+      - name: Upload Regression Coverage to Codecov
+        if: hashFiles('coverage.xml') != ''
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: regression
+          name: codecov-regression-ubuntu
+          fail_ci_if_error: true
+          verbose: true
+          disable_telem: true

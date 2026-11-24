@@ -168,11 +168,19 @@ quote-style = "single"
 skip-magic-trailing-comma = false
 
 [tool.coverage.run]
-omit = ['pipeline/run*pipeline.py', 'tests/*']
+omit = ['pipeline/run*pipeline.py', 'pipeline/_version.py', 'tests/*']
 branch = true                                  # Same as --cov-branch
 source = ['pipeline']                          # Same as --cov=pipeline
 parallel = true                                # Enable parallel coverage collection for xdist
 concurrency = ["multiprocessing", "thread"]    # Handle xdist workers properly
+
+[tool.coverage.paths]
+source = [
+    "pipeline/",
+    "/__w/*/*/pipeline/",
+    "/home/runner/work/*/*/pipeline/",
+    "/Users/runner/work/*/*/pipeline/",
+]
 
 [tool.coverage.report]
 fail_under = 10 # Set the minimum coverage percentage required
@@ -209,6 +217,7 @@ markers = [
     "makeimages: makeimages task(s)",
     "mpi: test recommended for an MPI-enabled CASA session; use -m mpi or -m 'not mpi' to control execution",
     "unit: unit test",
+    "github_runner: regression test suitable for free GitHub-hosted runners",
 ]
 addopts = [
     "-ra", # show extra test summary info for (a)ll except passed
