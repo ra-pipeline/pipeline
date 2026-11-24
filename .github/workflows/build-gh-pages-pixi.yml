@@ -75,7 +75,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: documentation-ubuntu-latest
           path: site_content
@@ -84,6 +84,12 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           path: site_content
+
+      - name: Wait for Pages artifact propagation
+        # actions/deploy-pages queries ListArtifacts immediately; allow brief
+        # backend propagation so the newly finalized github-pages artifact is visible.
+        shell: bash
+        run: sleep 10
 
       - name: Deploy to GitHub Pages
         id: deployment
