@@ -315,10 +315,8 @@ class TestWeblogRenderingFailureDetection(unittest.TestCase):
     @mock.patch('pipeline.infrastructure.renderer.regression.errorexit_present', return_value=False)
     @mock.patch('pipeline.infrastructure.renderer.regression.manifest_present', return_value=True)
     @mock.patch('pipeline.infrastructure.renderer.regression.missing_directories', return_value=[])
-    @mock.patch('pipeline.infrastructure.launcher.Pipeline')
     @mock.patch('tests.testing_utils.pytest.fail')
-    def test_sanity_check_fails_on_weblog_errors(self, mock_fail, mock_pipeline,
-                                                   mock_missing_dirs, mock_manifest, mock_errorexit):
+    def test_sanity_check_fails_on_weblog_errors(self, mock_fail, mock_missing_dirs, mock_manifest, mock_errorexit):
         """Test that __do_sanity_checks raises pytest.fail when weblog rendering fails."""
         # Create a PipelineTester instance
         tester = PipelineTester(
@@ -333,7 +331,6 @@ class TestWeblogRenderingFailureDetection(unittest.TestCase):
         mock_context.output_dir = self.tmpdir
         mock_context.name = 'test_context'
         mock_context.products_dir = self.tmpdir
-        mock_pipeline.return_value.context = mock_context
 
         # Create timetracker database with failed stages
         db_path = os.path.join(self.tmpdir, f'{mock_context.name}.timetracker')
@@ -346,7 +343,7 @@ class TestWeblogRenderingFailureDetection(unittest.TestCase):
             }
 
         # Call the sanity check method
-        tester._PipelineTester__do_sanity_checks()
+        tester._PipelineTester__do_sanity_checks(mock_context)
 
         # Verify pytest.fail was called with the right message
         mock_fail.assert_called()
