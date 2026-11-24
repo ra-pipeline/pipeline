@@ -83,7 +83,6 @@ def pytest_addoption(parser: Parser) -> None:
                      help="Clean up .pyc to reproduce certain warnings only issued when the bytecode is compiled.")
     parser.addoption("--remove-workdir", action="store_true", default=False,
                      help="Remove individual working directories from regression tests.")
-    parser.addoption("--longtests", action="store_true", default=False, help="Run longer tests.")
     parser.addoption("--compare-only", action="store_true", default=False, help="Skip running the recipe and do the comparison using the working directories from a previous test run.")
     parser.addoption("--data-directory", action="store", default="/lustre/cv/projects/pipeline-test-data/regression-test-data/", help="Specify directory where larger test data files are stored.")
 
@@ -200,17 +199,9 @@ def pytest_collection_finish(session: Session) -> None:
 
 
 def pytest_collection_modifyitems(config: Config, items: list[Item]) -> None:
-    """Apply auto-marking based on test location and filter slow tests."""
-    # 1) Auto-mark everything based on path and test type
+    """Apply auto-marking based on test location."""
     for item in items:
         _auto_mark(item)
-
-    # 2) Optionally skip slow unless --longtests
-    if not config.getoption("--longtests"):
-        skip_slow = pytest.mark.skip(reason="need --longtests option to run")
-        for item in items:
-            if "slow" in item.keywords:
-                item.add_marker(skip_slow)
 
 
 def _auto_mark(item: Item) -> None:
