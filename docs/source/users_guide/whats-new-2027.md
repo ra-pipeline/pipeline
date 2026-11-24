@@ -21,9 +21,10 @@ section below with `{jira}` and API role references.
 *(not weblog or QA - see {ref}`IF weblog/QA <if-weblog-qa-2027>` for score/plot changes
 to these same tasks)*
 
-**Band-to-Band improvements.** The {func}`~pipeline.hifa.cli.hifa_diffgaincal`
-stage will now trigger `combine='spw'` when great or equal to half of the
-scans from any spectral window are fully flagged. *Ticket: {jira}`PIPE-3301`.*
+- **Band-to-Band improvements.** The {func}`~pipeline.hifa.cli.hifa_diffgaincal`
+   stage will now trigger `combine='spw'` when great or equal to half of the
+   scans from any spectral window are fully flagged. *Ticket: {jira}`PIPE-3301`.*
+   
 ---
 
 (if-imaging-2027)=
