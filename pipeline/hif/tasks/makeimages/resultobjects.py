@@ -105,58 +105,26 @@ class MakeImagesResult(basetask.Results):
                 pass
 
     def __repr__(self):
-        repr = 'MakeImages:'
+        repr_str = 'MakeImages:'
 
-        field_width = len('field')
-        intent_width = len('intent')
-        spw_width = len('spw')
-        phasecenter_width = len('phasecenter')
-        cell_width = len('cell')
-        imsize_width = len('imsize')
-        imagename_width = len('imagename')
-        outcome_width = len('outcome')
-        for target in self.targets:
-            field_width = max(field_width, len(target['field']))
-            intent_width = max(intent_width, len(target['intent']))
-            spw_width = max(spw_width, len(target['spw']))
-            phasecenter_width = max(phasecenter_width,
-             len(target['phasecenter']))
-            cell_width = max(cell_width, len(str(target['cell'])))
-            imsize_width = max(imsize_width, len(str(target['imsize'])))
-            imagename = os.path.basename(target['imagename'])
-            imagename_width = max(imagename_width, len(imagename))
-            outcome = target['outcome']
-            outcome_width = max(outcome_width, len(outcome))
+        columns = [
+            ('field', lambda t: str(t['field'])),
+            ('intent', lambda t: str(t['intent'])),
+            ('spw', lambda t: str(t['spw'])),
+            ('phasecenter', lambda t: str(t['phasecenter'])),
+            ('cell', lambda t: str(t['cell'])),
+            ('imsize', lambda t: str(t['imsize'])),
+            ('imagename', lambda t: os.path.basename(str(t['imagename']))),
+            ('outcome', lambda t: str(t['outcome'])),
+        ]
+        rows = [[getter(target) for _, getter in columns] for target in self.targets]
+        widths = [max([len(header)] + [len(row[idx]) for row in rows]) + 1 for idx, (header, _) in enumerate(columns)]
 
-        field_width += 1
-        intent_width += 1
-        spw_width += 1
-        phasecenter_width += 1
-        cell_width += 1
-        imsize_width += 1
-        imagename_width += 1
-        outcome_width += 1
+        repr_str += '\n'
+        repr_str += ''.join(f'{header:{width}}' for (header, _), width in zip(columns, widths))
 
-        repr += '\n'
-        repr += '{0:{1}}'.format('field', field_width)
-        repr += '{0:{1}}'.format('intent', intent_width)
-        repr += '{0:{1}}'.format('spw', spw_width)
-        repr += '{0:{1}}'.format('phasecenter', phasecenter_width)
-        repr += '{0:{1}}'.format('cell', cell_width)
-        repr += '{0:{1}}'.format('imsize', imsize_width)
-        repr += '{0:{1}}'.format('imagename', imagename_width)
-        repr += '{0:{1}}'.format('outcome', outcome_width)
+        for row in rows:
+            repr_str += '\n'
+            repr_str += ''.join(f'{val:{width}}' for val, width in zip(row, widths))
 
-        for target in self.targets:
-            repr += '\n'
-            repr += '{0:{1}}'.format(target['field'], field_width)
-            repr += '{0:{1}}'.format(target['intent'], intent_width)
-            repr += '{0:{1}}'.format(target['spw'], spw_width)
-            repr += '{0:{1}}'.format(target['phasecenter'], phasecenter_width)
-            repr += '{0:{1}}'.format(str(target['cell']), cell_width)
-            repr += '{0:{1}}'.format(str(target['imsize']), imsize_width)
-            repr += '{0:{1}}'.format(os.path.basename(target['imagename']),
-              imagename_width)
-            repr += '{0:{1}}'.format(target['outcome'], outcome_width)
-
-        return repr
+        return repr_str
