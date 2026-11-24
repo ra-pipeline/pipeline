@@ -41,7 +41,7 @@ Expected filename patterns
 How to run
 ----------
 Directly call file:
-    python3 -m pytest -vv <repo root>/tests/test_pipeline_testing_framework.py
+    python3 -m pytest -vv <repo root>/tests/unit/test_pipeline_testing_framework.py
 
 Or as part of the unit suite:
     python3 -m pytest -vv -m 'not regression and not component' '<repo root>'

@@ -191,6 +191,7 @@ exclude_lines = [
 ]
 
 [tool.pytest.ini_options]
+testpaths = ["pipeline", "tests/unit"]
 markers = [
     "regression: regression test",
     "alma: alma test",
@@ -288,7 +289,8 @@ PYTHONNOUSERSITE=1 python -m pytest \
   -n logical --max-worker-restart=1 \
   --junitxml=unit-results.xml \
   --cov=pipeline --cov-append --cov-report=html --cov-report=xml \
-  $PIXI_PROJECT_ROOT/pipeline/
+  $PIXI_PROJECT_ROOT/pipeline/ \
+  $PIXI_PROJECT_ROOT/tests/unit/
 """
 
 # Run fast regression tests in a serial CASA session (xdist, no mpi)
