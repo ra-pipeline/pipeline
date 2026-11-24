@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import abc
 import collections.abc
+import dbm
 import glob
 import os.path
 import re
@@ -1138,17 +1139,11 @@ def weblog_rendering_failures(context: Context) -> list[int]:
     """
     failed_stages = []
 
-    # Construct path to timetracker database (shelve uses multiple files)
+    # Construct path to timetracker database
     timetracker_db = os.path.join(context.output_dir, f'{context.name}.timetracker')
 
-    # Check if timetracker database exists (shelve produces .dat, .dir, .bak files on Unix)
-    db_exists = False
-    for ext in ['.dat', '.dir', '.bak']:
-        if os.path.exists(timetracker_db + ext):
-            db_exists = True
-            break
-
-    if not db_exists:
+    # Check if timetracker database exists (shelve backend varies by platform/Python version)
+    if not dbm.whichdb(timetracker_db):
         LOG.debug('Timetracker database not found: %s', timetracker_db)
         return failed_stages
 
@@ -1164,7 +1159,7 @@ def weblog_rendering_failures(context: Context) -> list[int]:
                     if execution_state.state == 'abnormal exit':
                         failed_stages.append(stage_num)
                         LOG.warning('Weblog rendering failed for stage %s', stage_num)
-    except (OSError, KeyError) as e:
+    except (OSError, KeyError, dbm.error) as e:
         LOG.warning('Failed to read timetracker database: %s', e)
 
     return sorted(failed_stages)
