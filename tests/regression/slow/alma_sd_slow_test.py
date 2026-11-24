@@ -17,7 +17,6 @@ def test_2019_2_00093_S__uid___A001_X14c3_Xc33__regression(data_directory):
     pt = PipelineTester(
         visname=['uid___A002_Xe850fb_X2df8', 'uid___A002_Xe850fb_X36e4', 'uid___A002_Xe850fb_X11e13'],
         recipe='procedure_hsd_calimage.xml',
-        project_id="2019_2_00093_S",
         input_dir=test_directory,
         expectedoutput_dir=ref_directory,
         )
@@ -41,7 +40,6 @@ def test_2019_1_01056_S__uid___A001_X1465_X1b44__regression(data_directory):
     pt = PipelineTester(
         visname=['uid___A002_Xe1d2cb_X110f1', 'uid___A002_Xe1d2cb_X11d0a', 'uid___A002_Xe1f219_X6eeb'], 
         recipe='procedure_hsd_calimage.xml',
-        project_id="2019_1_01056_S",
         input_dir=test_directory,
         expectedoutput_dir=f'{ref_directory}',
         )
@@ -65,7 +63,6 @@ def test_2016_1_01489_T__uid___A001_X898_Xda__regression(data_directory):
     pt = PipelineTester(
         visname=['uid___A002_Xbadc30_X43ee', 'uid___A002_Xbaedce_X7694'],
         recipe='procedure_hsd_calimage.xml',
-        project_id="2016_1_01489_T",
         input_dir=test_directory,
         expectedoutput_dir=ref_directory,
         )
