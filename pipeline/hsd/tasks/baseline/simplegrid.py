@@ -14,9 +14,9 @@ import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataType
 from pipeline.domain.datatable import DataTableIndexer
+from pipeline.hsd.tasks import common
+from pipeline.hsd.tasks.common import utils as sdutils
 from pipeline.infrastructure import casa_tools
-from .. import common
-from ..common import utils
 from .typing import LineWindow
 
 if TYPE_CHECKING:
@@ -257,7 +257,7 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         grid_dec = grid_size
 
         # rewrap RA
-        ras = utils.rewrap_angle(ras)
+        ras = sdutils.rewrap_angle(ras)
 
         min_ra = ras.min()
         max_ra = ras.max()
@@ -448,11 +448,11 @@ class SDSimpleGridding(basetask.StandardTaskTemplate):
         for in_ms in self.inputs.member_ms:
             origin_ms = self.inputs.context.observing_run.get_ms(in_ms.origin_ms)
             entries = bind_to_grid[origin_ms.basename]
-            bl_ms = utils.match_origin_ms(bl_mses, in_ms.origin_ms)
+            bl_ms = sdutils.match_origin_ms(bl_mses, in_ms.origin_ms)
             grid_ms = bl_ms if bl_ms is not None else in_ms
             vis = grid_ms.name
-            ms_colname = utils.get_datacolumn_name(vis)
-            rowmap = utils.make_row_map_between_ms(origin_ms, vis)
+            ms_colname = sdutils.get_datacolumn_name(vis)
+            rowmap = sdutils.make_row_map_between_ms(origin_ms, vis)
             LOG.debug('Start reading data from "%s"', os.path.basename(vis))
             LOG.debug('There are %s entries', len(entries))
             with casa_tools.TableReader(vis) as tb:

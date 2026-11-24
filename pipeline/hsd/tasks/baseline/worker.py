@@ -14,12 +14,11 @@ from pipeline.infrastructure.utils import relative_path
 from pipeline.domain import DataTable, DataType
 from pipeline.h.heuristics import caltable as caltable_heuristic
 from pipeline.hsd.heuristics import BaselineFitParamConfig
+from pipeline.hsd.tasks import common
 from pipeline.hsd.tasks.common import utils as sdutils
 from pipeline.infrastructure import casa_tasks
 from pipeline.infrastructure import casa_tools
 from . import plotter
-from .. import common
-from ..common import utils
 from .typing import FitFunc, FitOrder
 
 if TYPE_CHECKING:
@@ -482,8 +481,8 @@ class SerialBaselineSubtractionWorker(basetask.StandardTaskTemplate):
         accum = self.inputs.plan
         deviationmask_list = self.inputs.deviationmask
         formatted_edge = list(common.parseEdge(self.inputs.edge))
-        out_rowmap = utils.make_row_map(origin_ms, outfile)
-        in_rowmap = None if ms.name == ms.origin_ms else utils.make_row_map(origin_ms, ms.name)
+        out_rowmap = sdutils.make_row_map(origin_ms, outfile)
+        in_rowmap = None if ms.name == ms.origin_ms else sdutils.make_row_map(origin_ms, ms.name)
         plot_list = []
         stats = []
 
