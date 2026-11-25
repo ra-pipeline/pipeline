@@ -1,0 +1,146 @@
+name: Sync Bitbucket PR Status
+
+on:
+  workflow_dispatch:
+    inputs:
+      event_key:
+        type: string
+        required: true
+      pr_id:
+        type: string
+        required: true
+      head:
+        type: string
+        required: true
+      base:
+        type: string
+        required: true
+      title:
+        type: string
+        required: true
+      draft:
+        type: string
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: sync-bitbucket-pr-${{ inputs.pr_id }}
+  cancel-in-progress: false
+
+jobs:
+  sync-pr:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.MIRROR_PAT }}
+      GH_REPO: ${{ github.repository }}
+      BITBUCKET_URL: https://open-bitbucket.nrao.edu/scm/pipe/pipeline.git
+      EVENT_KEY: ${{ inputs.event_key }}
+      PR_ID: ${{ inputs.pr_id }}
+      HEAD_BRANCH: ${{ inputs.head }}
+      BASE_BRANCH: ${{ inputs.base }}
+      PR_TITLE: ${{ inputs.title }}
+      IS_DRAFT: ${{ inputs.draft }}
+    steps:
+      - name: Sync branches for PR
+        if: ${{ inputs.event_key == 'pr:opened' || inputs.event_key == 'pr:modified' || inputs.event_key == 'pr:merged' }}
+        shell: bash
+        run: |
+          mirror_dir=$(mktemp -d "$RUNNER_TEMP/pr-sync.XXXXXX")
+          git init --bare --quiet "$mirror_dir"
+          gh auth setup-git
+
+          if [[ "$EVENT_KEY" == "pr:merged" ]]; then
+            refspecs=("+refs/heads/${BASE_BRANCH}:refs/heads/${BASE_BRANCH}")
+          else
+            refspecs=(
+              "+refs/heads/${HEAD_BRANCH}:refs/heads/${HEAD_BRANCH}"
+              "+refs/heads/${BASE_BRANCH}:refs/heads/${BASE_BRANCH}"
+            )
+          fi
+
+          git -C "$mirror_dir" fetch --quiet --no-tags "$BITBUCKET_URL" "${refspecs[@]}"
+
+          delay=3
+          for attempt in 1 2 3; do
+            if git -C "$mirror_dir" push --atomic "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "${refspecs[@]}"; then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "::error::Failed to push PR branches after 3 attempts." >&2
+              exit 1
+            fi
+            echo "Push failed (attempt $attempt/3). Retrying in ${delay}s..." >&2
+            sleep "$delay"
+            delay=$((delay * 2))
+          done
+
+      - name: Reconcile GitHub PR state
+        shell: python3 {0}
+        run: |
+          import json
+          import os
+          import re
+          import subprocess
+          import sys
+
+          repo = os.environ["GH_REPO"]
+          event_key = os.environ["EVENT_KEY"]
+          pr_id = os.environ["PR_ID"]
+          head = os.environ["HEAD_BRANCH"]
+          base = os.environ["BASE_BRANCH"]
+          title = f"[BB #{pr_id}] {os.environ['PR_TITLE']}"
+          is_draft = os.environ["IS_DRAFT"].lower() == "true"
+          marker = f"<!-- bb-pr:{pr_id} -->"
+          marker_re = re.compile(rf"<!--\s*bb-pr:{re.escape(pr_id)}\s*-->")
+
+          def gh(*args):
+              return subprocess.check_output(["gh", *args], text=True, stderr=subprocess.PIPE)
+
+          open_prs = json.loads(gh(
+              "pr", "list", "--repo", repo,
+              "--state", "open", "--limit", "200",
+              "--json", "number,title,headRefName,baseRefName,isDraft,body",
+          ))
+          existing = next((p for p in open_prs if marker_re.search(p.get("body") or "")), None)
+          if not existing:
+              existing = next(
+                  (p for p in open_prs if p.get("headRefName") == head and p.get("baseRefName") == base),
+                  None,
+              )
+
+          if event_key in ("pr:opened", "pr:modified"):
+              if not existing:
+                  bb_url = f"https://open-bitbucket.nrao.edu/projects/PIPE/repos/pipeline/pull-requests/{pr_id}"
+                  body = f"{marker}\nMirrored from Open Bitbucket @ NRAO: {bb_url}"
+                  cmd = [
+                      "pr", "create", "--repo", repo,
+                      "--head", head, "--base", base,
+                      "--title", title, "--body", body,
+                  ]
+                  if is_draft:
+                      cmd.append("--draft")
+                  try:
+                      gh(*cmd)
+                  except subprocess.CalledProcessError as exc:
+                      if "No commits between" in exc.stderr:
+                          print(f"::notice::Skipping BB #{pr_id}: no commits between {base} and {head}.")
+                          sys.exit(0)
+                      print(exc.stderr, file=sys.stderr)
+                      raise
+              else:
+                  num = str(existing["number"])
+                  if existing["title"] != title or existing["baseRefName"] != base:
+                      gh("pr", "edit", num, "--repo", repo, "--title", title, "--base", base)
+                  if existing["isDraft"] != is_draft:
+                      if is_draft:
+                          gh("pr", "ready", "--undo", num, "--repo", repo)
+                      else:
+                          gh("pr", "ready", num, "--repo", repo)
+
+          elif event_key in ("pr:declined", "pr:deleted", "pr:merged") and existing:
+              num = str(existing["number"])
+              gh(
+                  "pr", "close", num, "--repo", repo,
+                  "--comment", f"Closed automatically ({event_key} on Bitbucket PR #{pr_id}).",
+              )
