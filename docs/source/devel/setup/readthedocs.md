@@ -113,12 +113,14 @@ Source code is hosted on [Open Bitbucket @ NRAO](https://open-bitbucket.nrao.edu
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#f4f6fb', 'primaryBorderColor': '#c5d0e6', 'primaryTextColor': '#1f2328', 'lineColor': '#57606a', 'edgeLabelBackground': '#ffffff' }}}%%
 flowchart LR
-    BB("<b>Open Bitbucket @ NRAO</b><br/>open-bitbucket.nrao.edu") -->|"push webhook<br/>(HMAC)"| CF("<b>Cloudflare Worker</b><br/>workflow_dispatch")
-    CF -->|"sync workflow<br/>(MIRROR_PAT)"| GH("<b>GitHub Mirror</b><br/>--atomic --prune")
+    BB("<b>Open Bitbucket @ NRAO</b><br/>open-bitbucket.nrao.edu") -->|"push & PR webhooks<br/>(HMAC)"| CF("<b>Cloudflare Worker</b><br/>workflow_dispatch")
+    CF -->|"sync & PR workflows<br/>(workflow_dispatch)"| GH("<b>GitHub Mirror</b><br/>--atomic --prune")
     GH -->|"push / delete<br/>webhooks"| RTD("<b>Read the Docs</b><br/>auto-activate, build, prune")
 ```
 
-1. **Bitbucket to GitHub mirror**: Bitbucket `repo:refs_changed` webhooks hit a Cloudflare Worker relay, which triggers `.github/workflows/sync-from-open-bitbucket.yml` via `workflow_dispatch`. The workflow fetches all branches and tags (`refs/heads/*`, `refs/tags/*`) from Bitbucket and pushes them to GitHub with `--atomic --prune`, causing GitHub to emit `push` and `delete` webhook events. A 2-hour `cron` schedule serves as a fallback if a webhook is missed.
+1. **Bitbucket to GitHub mirror**: Bitbucket webhooks go through a Cloudflare Worker relay to GitHub Actions:
+   - **Branches and tags (`repo:refs_changed`)**: Triggers `.github/workflows/sync-from-open-bitbucket.yml` to mirror `refs/heads/*` and `refs/tags/*` (`--atomic --prune`), with a 2-hour `cron` fallback.
+   - **Pull requests (`pr:*`)**: Triggers `.github/workflows/sync-bitbucket-pr.yml` for same-repo PRs, mirroring open, draft, merged, and declined status to GitHub so `pull_request` CI checks run automatically.
 2. **Read the Docs automation**: Three RTD Automation Rules manage branch versions, and active branches rebuild automatically on each mirrored push:
    - **Activate version** (`Branch`, `Any`): activates every newly pushed branch.
    - **Hide version** (`Branch`, `^(?!main$|docs/20).*$`): hides branches other than `main` and `docs/20*` from the flyout menu while keeping them accessible via direct URL.
