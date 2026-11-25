@@ -111,11 +111,13 @@ class T2_4MDetailsVLAApplycalRenderer(basetemplates.T2_4MDetailsDefaultRenderer)
         groups = [('Complex Gain Calibrators', 'PHASE'), ('Science Targets', 'TARGET')]
         field_flags = {}
         for title, intent in groups:
+            # flagdata fieldcnt stats are keyed by name, so collapse field IDs sharing a name
+            field_names = utils.deduplicate(utils.dequote(f.name) for f in ms.get_fields(intent=intent))
             field_flags[title] = [
-                (utils.dequote(field.name),
-                 {band: utils.sum_flag_counts(stats, 'spw', fields=[utils.dequote(field.name)])
+                (name,
+                 {band: utils.sum_flag_counts(stats, 'spw', fields=[name])
                   for band, stats in band_stats.items()})
-                for field in ms.get_fields(intent=intent)
+                for name in field_names
             ]
         return field_flags
 
