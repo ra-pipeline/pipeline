@@ -988,13 +988,17 @@ def applycal_score_specline_spws_flagged(ms, band_stats, target_fields):
                      metric_units='Number of science target spectral line windows newly fully flagged')
     spw2band = ms.get_vla_spw2band()
     scores = []
+    evaluated = False
     for band, stats in band_stats.items():
         band_specline_spws = sorted(spw for spw in specline_spws if spw2band[spw] == band)
         flagged = collections.defaultdict(list)
         for field in target_fields:
             for spw in band_specline_spws:
                 before, after, total = utils.sum_flag_counts(stats, 'spw', ids=[spw], fields=[field])
-                if total and before < total and after == total:
+                if not total:
+                    continue
+                evaluated = True
+                if before < total and after == total:
                     flagged[field].append(spw)
         if not flagged:
             continue
@@ -1011,6 +1015,8 @@ def applycal_score_specline_spws_flagged(ms, band_stats, target_fields):
         scores.append(pqa.QAScore(score, longmsg=longmsg, shortmsg=shortmsg, vis=ms.basename,
                                   origin=pqa.QAOrigin(metric_score=n_flagged, **origin_kw),
                                   applies_to=applies_to))
+    if not evaluated:
+        return []
     if not scores:
         longmsg = f'No spectral line window became completely flagged on a science target.'
         shortmsg = 'No spectral line window fully flagged on target'
