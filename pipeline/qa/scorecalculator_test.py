@@ -288,6 +288,21 @@ def test_applycal_score_additional_flagged(cgc_counts, target_counts, expected):
 
 
 @pytest.mark.parametrize(
+    'cgc_fields, target_fields, band_stats',
+    [
+        ([], [], {'L': {'CGC': {'spw': {0: (0, 10, 100)}}, 'T1': {'spw': {0: (0, 10, 100)}}}}),
+        (['CGC'], ['T1'], {}),
+        (['CGC'], ['T1'], {'L': {}}),
+        (['CGC'], ['T1'], {'L': {'CGC': {'spw': {0: (0, 0, 0)}}, 'T1': {'spw': {0: (0, 0, 0)}}}}),
+    ]
+)
+def test_applycal_score_additional_flagged_no_data(cgc_fields, target_fields, band_stats):
+    """Test applycal_score_additional_flagged returns no score when no field has data."""
+    scores = qacalc.applycal_score_additional_flagged(MagicMock(), band_stats, cgc_fields, target_fields)
+    assert scores == []
+
+
+@pytest.mark.parametrize(
     'cgc_counts, target_counts, expected',
     [
         ((0, 10, 100), (0, 10, 100), [rendererutils.SCORE_THRESHOLD_OPTIMAL]),
@@ -324,3 +339,23 @@ def test_applycal_score_specline_spws_flagged(specline_window, target_counts, ex
     band_stats = {'L': {'T1': {'spw': {0: target_counts}}}}
     scores = qacalc.applycal_score_specline_spws_flagged(ms, band_stats, ['T1'])
     assert [s.score for s in scores] == expected
+
+
+@pytest.mark.parametrize(
+    'target_fields, band_stats',
+    [
+        ([], {'L': {'T1': {'spw': {0: (0, 100, 100)}}}}),
+        (['T1'], {'L': {'T1': {'spw': {0: (0, 0, 0)}}}}),
+        # target not observed in the spectral line window
+        (['T1'], {'L': {'T1': {'spw': {1: (0, 100, 100)}}}}),
+        # spectral line window in a band with no stats
+        (['T1'], {'C': {'T1': {'spw': {0: (0, 100, 100)}}}}),
+    ]
+)
+def test_applycal_score_specline_spws_flagged_no_data(target_fields, band_stats):
+    """Test applycal_score_specline_spws_flagged returns no score when no target has spectral line data."""
+    ms = MagicMock()
+    ms.get_spectral_windows.return_value = [MagicMock(id=0, specline_window=True)]
+    ms.get_vla_spw2band.return_value = {0: 'L'}
+    scores = qacalc.applycal_score_specline_spws_flagged(ms, band_stats, target_fields)
+    assert scores == []
