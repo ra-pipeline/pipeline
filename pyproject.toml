@@ -305,6 +305,7 @@ PYTHONNOUSERSITE=1 python -m pytest \
 # Run fast regression tests in a serial CASA session (xdist, no mpi)
 test-regression = """
 cd $INIT_CWD && \
+if [ "$(uname -s)" = "Linux" ]; then export OPENBLAS_CORETYPE=HASWELL; fi && \
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
   python -m pytest -n 12 --dist worksteal \
   -m \"not mpi\" \
@@ -316,6 +317,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
 # Run a single small ALMA-IF fast regression test (pltest1)
 test-pltest1 = """
 cd $INIT_CWD && \
+if [ "$(uname -s)" = "Linux" ]; then export OPENBLAS_CORETYPE=HASWELL; fi && \
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
   python -m casashell --nogui --log2term \
   -c "import pytest; pytest.main(['$PIXI_PROJECT_ROOT/tests/regression/fast/alma_if_fast_test.py::test_uid___A002_Xc46ab2_X15ae_repSPW_spw16_17_small__PPR__regression'])"

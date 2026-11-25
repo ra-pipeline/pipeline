@@ -112,6 +112,7 @@ jobs:
         ulimit -Sn 8192 2>/dev/null || true
         COV_ARGS=""
         if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
+          export OPENBLAS_CORETYPE=HASWELL
           export COVERAGE_FILE=coverage.dat
           COV_ARGS="--cov=pipeline --cov-branch --cov-report= --cov-fail-under=0"
         fi
