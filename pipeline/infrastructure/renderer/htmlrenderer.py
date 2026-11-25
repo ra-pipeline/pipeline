@@ -25,9 +25,17 @@ import pipeline
 import pipeline.infrastructure.pipelineqa as pqa
 from pipeline import environment, infrastructure
 from pipeline.domain import measures
-from pipeline.infrastructure import (basetask, casa_tasks, casa_tools,
-                                     eventbus, logging, mpihelpers,
-                                     task_registry, utils)
+from pipeline.infrastructure import (
+    basetask,
+    casa_tasks,
+    casa_tools,
+    eventbus,
+    logging,
+    mpihelpers,
+    task_registry,
+    utils,
+    workflow,
+)
 from pipeline.infrastructure.displays import pointing, summary
 from pipeline.infrastructure.renderer import qaadapter, templates, weblog
 
@@ -41,6 +49,11 @@ if TYPE_CHECKING:
 
 
 LOG = infrastructure.logging.get_logger(__name__)
+
+
+def get_pipeline_early_exit(result: object) -> workflow.PipelineEarlyExitRequest | None:
+    """Return a workflow stop request contained in a task result."""
+    return basetask.get_pipeline_early_exit(result)
 
 
 def format_correlation_bits(ms, spw):
@@ -167,6 +180,8 @@ def get_task_name(result_obj, include_stage=True):
         elif isinstance(result_obj, basetask.ResultsList) and \
             any([isinstance(result, basetask.FailedTaskResults) for result in result_obj]):
             s += ' (failed)'
+        elif get_pipeline_early_exit(result_obj) is not None:
+            s += ' (stopped)'
 
         return s
     else:
@@ -208,6 +223,8 @@ def get_task_name(result_obj, include_stage=True):
         if any([isinstance(result, basetask.FailedTaskResults)
                 for result in result_obj]):
             s += ' (failed)'
+        elif get_pipeline_early_exit(result_obj) is not None:
+            s += ' (stopped)'
 
         return s
 

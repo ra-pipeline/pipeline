@@ -76,6 +76,13 @@ def cli_wrapper(func: Callable) -> Callable:
         all_inputs = dict(bound_arguments.arguments)
 
         context = get_context()
+        if context.pipeline_early_exit_active:
+            raise exceptions.PipelineException(
+                'Pipeline execution is stopped: '
+                f'{context.pipeline_early_exit}. Call '
+                'context.override_pipeline_early_exit() before running another task.'
+            )
+
         with set_contextvar(current_task_name, task_name):
             results = execute_task(context, task_name, all_inputs)
 

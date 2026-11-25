@@ -14,12 +14,16 @@ import sys
 import traceback
 from typing import TYPE_CHECKING
 
-from . import casa_tools
-from . import exceptions
-from . import project
-from . import utils
 from .. import cli
-from .executeppr import _getCommands, _getIntents, _getPerformanceParameters, _getProcessingIntents, _getPprObject, save_existing_context
+from . import casa_tools, exceptions, project, utils
+from .executeppr import (
+    _getCommands,
+    _getIntents,
+    _getPerformanceParameters,
+    _getPprObject,
+    _getProcessingIntents,
+    save_existing_context,
+)
 
 if TYPE_CHECKING:
     from pipeline.extern.XmlObjectifier import XmlObject
@@ -190,6 +194,22 @@ def executeppr(pprXmlFile: str, importonly: bool = True, loglevel: str = 'info',
 
             results = pipeline_task(**task_args)
             casa_tools.post_to_log('Results ' + str(results), echo_to_screen=echo_to_screen)
+
+            if context.pipeline_early_exit_active:
+                casa_tools.post_to_log(
+                    'Pipeline task {} requested an early exit: {}'.format(
+                        pipeline_task_name,
+                        context.pipeline_early_exit,
+                    ),
+                    echo_to_screen=echo_to_screen,
+                )
+                utils.write_pipeline_early_exit_file_if_requested(
+                    workingDir,
+                    context,
+                    task_name=pipeline_task_name,
+                    stage_number=context.task_counter,
+                )
+                break
 
             if importonly and pipeline_task_name in import_tasks:
                 casa_tools.post_to_log("Terminating execution after running " + pipeline_task_name,

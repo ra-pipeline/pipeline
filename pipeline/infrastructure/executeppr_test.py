@@ -1,8 +1,17 @@
+"""Tests for Pipeline Processing Request execution."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from io import StringIO
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 
-from io import StringIO
-from .filenamer import sanitize_for_ms
+from . import executeppr, workflow
 from .executeppr import _getFirstRequest
+from .filenamer import sanitize_for_ms
 
 test_params = [('uid__A002_target.msXd3e89f_Xc53e', 'uid__A002_target.msXd3e89f_Xc53e'),
                ('uid__A002_target.msXd3e89f_Xc53e.ms', 'uid__A002_target.msXd3e89f_Xc53e'),
@@ -28,6 +37,73 @@ test_parameter_values = [(r"1,2,3", '1,2,3'),
                          (r"&lt;12km", '<12km'),
                          (r"None", 'None'),
                          (r"[[0,0,1,1],[0,1,0,1]]", [[0, 0, 1, 1], [0, 1, 0, 1]])]
+
+
+@pytest.mark.parametrize('create_errorfile', [False, True])
+def test_executeppr_early_exit(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    create_errorfile: bool,
+) -> None:
+    """An early exit follows its requested ALMA PPR completion policy."""
+    context = SimpleNamespace(
+        pipeline_early_exit=None,
+        pipeline_early_exit_active=False,
+        task_counter=1,
+    )
+    saved = []
+    resolved_tasks = []
+    working_dir = tmp_path / 'working'
+    working_dir.mkdir()
+
+    info = [
+        ('proposal_code', ('Proposal code: ', 'synthetic')),
+        ('observatory', ('Observatory: ', 'ALMA')),
+        ('telescope', ('Telescope: ', 'ALMA')),
+    ]
+    structure = [
+        ('ous_entity_id', ('OUS entity ID: ', 'uid://A001/X0/X0')),
+        ('ous_part_id', ('OUS part ID: ', 'X0')),
+        ('ous_title', ('OUS title: ', 'Synthetic')),
+        ('ous_type', ('OUS type: ', 'Member')),
+        ('ps_entity_id', ('PS entity ID: ', 'uid://A001/X0/X1')),
+        ('ousstatus_entity_id', ('OUS status ID: ', 'uid://A001/X0/X2')),
+    ]
+    commands = [('request_review', {}), ('must_not_run', {})]
+
+    def get_task(task_name: str) -> Callable[[], object]:
+        resolved_tasks.append(task_name)
+
+        def request_early_exit() -> object:
+            context.pipeline_early_exit = workflow.PipelineEarlyExitRequest(
+                'review required',
+                create_errorfile=create_errorfile,
+            )
+            context.pipeline_early_exit_active = True
+            return object()
+
+        return request_early_exit
+
+    monkeypatch.delenv('SCIPIPE_ROOTDIR', raising=False)
+    monkeypatch.chdir(working_dir)
+    monkeypatch.setattr(executeppr, 'save_existing_context', lambda: None)
+    monkeypatch.setattr(
+        executeppr,
+        '_getFirstRequest',
+        lambda _: (info, structure, 'synthetic', {}, [('asdm', 'test_small.ms')], 'procedure_test', commands),
+    )
+    monkeypatch.setattr(executeppr, '_getProcessingIntents', lambda *args: {})
+    monkeypatch.setattr(executeppr, '_getPerformanceParameters', lambda *args: None)
+    monkeypatch.setattr(executeppr.cli, 'h_init', lambda **kwargs: context)
+    monkeypatch.setattr(executeppr.cli, 'h_save', lambda: saved.append(True))
+    monkeypatch.setattr(executeppr.cli, 'get_pipeline_task_with_name', get_task)
+    monkeypatch.setattr(executeppr.casa_tools, 'post_to_log', lambda *args, **kwargs: None)
+    monkeypatch.setattr(executeppr.casa_tools, 'set_log_origin', lambda *args, **kwargs: None)
+    executeppr.executeppr('synthetic-ppr.xml', importonly=False, breakpoint='')
+
+    assert resolved_tasks == ['request_review']
+    assert saved == [True]
+    assert bool(list(working_dir.glob('errorexit-*.txt'))) is create_errorfile
 
 
 def create_example_alma_ppr(input_parameter_str):

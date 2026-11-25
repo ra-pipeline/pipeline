@@ -297,7 +297,7 @@ def run_named_tasks(tasks: list[tuple[str, dict[str, Any]]]) -> Context:
         exceptions.PipelineException: If any executed task reports tracebacks.
     """
     LOG.info('Initializing context for explicit task list...')
-    cli.h_init()
+    context = cli.h_init()
 
     for task_name, task_args in tasks:
         task = cli.get_pipeline_task_with_name(task_name=task_name)
@@ -305,13 +305,22 @@ def run_named_tasks(tasks: list[tuple[str, dict[str, Any]]]) -> Context:
 
         # If an unhandled exception occurred, return context early
         if result is None:
-            return launcher.Pipeline(context='last').context
+            return context
+
+        if context.pipeline_early_exit_active:
+            LOG.info('Pipeline task %s requested an early exit: %s', task_name, context.pipeline_early_exit)
+            utils.write_pipeline_early_exit_file_if_requested(
+                context.output_dir,
+                context,
+                task_name=task_name,
+                stage_number=context.task_counter,
+            )
+            break
 
     LOG.info('Saving context after explicit task list execution...')
     cli.h_save()
 
-    # Return the current ("last") context for caller convenience.
-    return launcher.Pipeline(context='last').context
+    return context
 
 
 def reduce(
@@ -384,6 +393,16 @@ def reduce(
             # If an unhandled exception occurred, return context early
             if result is None:
                 return context
+
+            if context.pipeline_early_exit_active:
+                LOG.info('Pipeline recipe requested an early exit: %s', context.pipeline_early_exit)
+                utils.write_pipeline_early_exit_file_if_requested(
+                    context.output_dir,
+                    context,
+                    task_name=getattr(task, '__name__', None),
+                    stage_number=context.task_counter,
+                )
+                break
 
             # Check if we should exit after this stage
             if result.stage_number is exitstage:

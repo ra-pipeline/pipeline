@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import abc
 import collections
 import collections.abc
@@ -5,33 +7,41 @@ import copy
 import datetime
 import functools
 import inspect
-import matplotlib
 import os
 import pickle
 import re
 import textwrap
 import traceback
 import uuid
-
-from . import api
-from . import casa_tools
-from . import eventbus
-from . import filenamer
-from . import jobrequest
-from . import logging
-from . import pipelineqa
-from . import project
-from . import task_registry
-from . import utils
-from . import vdp
-
-from .eventbus import TaskStartedEvent, TaskCompleteEvent, TaskAbnormalExitEvent
-from .eventbus import ResultAcceptingEvent, ResultAcceptedEvent, ResultAcceptErrorEvent
-from .casa_tasks import CasaTasks
-
 from typing import Generic, TypeVar
 
-LOG = logging.get_logger(__name__)
+import matplotlib
+
+from . import (
+    api,
+    casa_tools,
+    eventbus,
+    filenamer,
+    jobrequest,
+    pipelineqa,
+    project,
+    task_registry,
+    utils,
+    vdp,
+    workflow,
+)
+from . import logging as pipeline_logging
+from .casa_tasks import CasaTasks
+from .eventbus import (
+    ResultAcceptedEvent,
+    ResultAcceptErrorEvent,
+    ResultAcceptingEvent,
+    TaskAbnormalExitEvent,
+    TaskCompleteEvent,
+    TaskStartedEvent,
+)
+
+LOG = pipeline_logging.get_logger(__name__)
 
 # control generation of the weblog
 DISABLE_WEBLOG = False
@@ -212,6 +222,25 @@ class Results(api.Results):
         # destined for the weblog. Currently a dict, but could change.
         self._metadata = {}
 
+        # Optional request to stop workflow execution after this result has
+        # been accepted and rendered.
+        self.pipeline_early_exit: workflow.PipelineEarlyExitRequest | None = None
+
+    def request_pipeline_early_exit(self, message: str, *, create_errorfile: bool = False) -> None:
+        """Request that workflow execution stop after this result is rendered.
+
+        This method can be called during task analysis or QA calculation.
+
+        Args:
+            message: Reason workflow execution should stop.
+            create_errorfile: Whether the workflow entry point should create
+                an ``errorexit`` sentinel.
+        """
+        self.pipeline_early_exit = workflow.PipelineEarlyExitRequest(
+            message,
+            create_errorfile=create_errorfile,
+        )
+
     @property
     def uuid(self):
         """
@@ -285,6 +314,10 @@ class Results(api.Results):
             if task_completed and not DISABLE_QA:
                 pipelineqa.qa_registry.do_qa(context, self)
 
+            early_exit = get_pipeline_early_exit(self)
+            if task_completed and early_exit is not None:
+                context.request_pipeline_early_exit(early_exit)
+
         # If an exception happened during the acceptance of a top-level
         # pipeline task, then create a new FailedTaskResults that contains
         # the exception traceback, and mark this new result as the one
@@ -338,7 +371,7 @@ class Results(api.Results):
             # If running at DEBUG loglevel and this is a top-level task result,
             # then store to disk a pickle of the context as it existed at the
             # end of this pipeline stage; this may be useful for debugging.
-            if task_completed and LOG.isEnabledFor(logging.DEBUG):
+            if task_completed and LOG.isEnabledFor(pipeline_logging.DEBUG):
                 basename = f'context-stage{result_to_append.stage_number}.pickle'
                 path = os.path.join(context.output_dir, context.name, 'saved_state', basename)
 
@@ -529,6 +562,28 @@ class ResultsList(Results, Generic[T]):
             return None
 
 
+def get_pipeline_early_exit(result: object) -> workflow.PipelineEarlyExitRequest | None:
+    """Return the first workflow stop request contained in a result.
+
+    Args:
+        result: A result or nested result collection.
+
+    Returns:
+        The first stop request, or ``None`` if the result has none.
+    """
+    early_exit = getattr(result, 'pipeline_early_exit', None)
+    if early_exit is not None:
+        return early_exit
+
+    if isinstance(result, (list, tuple, ResultsList)):
+        for child in result:
+            early_exit = get_pipeline_early_exit(child)
+            if early_exit is not None:
+                return early_exit
+
+    return None
+
+
 class StandardTaskTemplate(api.Task, abc.ABC):
     """
     StandardTaskTemplate is a template class for pipeline reduction tasks whose
@@ -655,7 +710,7 @@ class StandardTaskTemplate(api.Task, abc.ABC):
 
         # create a new log handler that will capture all messages above
         # ATTENTION level.
-        handler = logging.CapturingHandler(logging.ATTENTION)
+        handler = pipeline_logging.CapturingHandler(pipeline_logging.ATTENTION)
 
         try:
 
@@ -679,7 +734,7 @@ class StandardTaskTemplate(api.Task, abc.ABC):
 
                 # register the capturing log handler, buffering all messages so that
                 # we can add them to the result - and subsequently, the weblog
-                logging.add_handler(handler)
+                pipeline_logging.add_handler(handler)
 
                 # get our result
                 result = self.prepare(**prepare_parameters)
@@ -747,7 +802,7 @@ class StandardTaskTemplate(api.Task, abc.ABC):
             # now that the WARNING and above messages have been attached to the
             # result, remove the capturing logging handler from all loggers
             if handler:
-                logging.remove_handler(handler)
+                pipeline_logging.remove_handler(handler)
 
             # delete the executor so that the pickled context can be released
             self._executor = None

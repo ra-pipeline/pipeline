@@ -198,6 +198,16 @@ from pipeline.infrastructure.pipelineqa import WebLogLocation, scores_with_locat
 </div>
 
 <%
+pipeline_early_exit = hr.get_pipeline_early_exit(result)
+%>
+% if pipeline_early_exit is not None:
+<div class="alert alert-danger" role="alert">
+    <strong>Pipeline execution stopped after this task.</strong>
+    ${saxutils.escape(str(pipeline_early_exit))}
+</div>
+% endif
+
+<%
 weblog_scores = scores_with_location(result.qa.pool, [WebLogLocation.ACCORDION, WebLogLocation.BANNER, WebLogLocation.UNSET])
 num_scores = 0
 score_color_counts = []

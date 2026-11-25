@@ -15,17 +15,12 @@ import sys
 import traceback
 from typing import TYPE_CHECKING
 
-from ..extern import XmlObjectifier
-
-from . import casa_tools
-from . import exceptions
-from . import filenamer
-from . import project
-from . import utils
 from .. import cli
+from ..extern import XmlObjectifier
+from . import casa_tools, exceptions, filenamer, project, utils
 
 if TYPE_CHECKING:
-    from . launcher import Context
+    from .launcher import Context
 
 # Dictionary with known processing intents and their possible recipe
 # names. The latter is fragile, but initially necessary until the PPR
@@ -279,6 +274,22 @@ def executeppr(pprXmlFile: str, importonly: bool = True, breakpoint: str = 'brea
 
             results = pipeline_task(**task_args)
             casa_tools.post_to_log('Results ' + str(results), echo_to_screen=echo_to_screen)
+
+            if context.pipeline_early_exit_active:
+                casa_tools.post_to_log(
+                    'Pipeline task {} requested an early exit: {}'.format(
+                        pipeline_task_name,
+                        context.pipeline_early_exit,
+                    ),
+                    echo_to_screen=echo_to_screen,
+                )
+                utils.write_pipeline_early_exit_file_if_requested(
+                    workingDir,
+                    context,
+                    task_name=pipeline_task_name,
+                    stage_number=context.task_counter,
+                )
+                break
 
             if importonly and pipeline_task_name in import_tasks:
                 casa_tools.post_to_log("Terminating execution after running " + pipeline_task_name,

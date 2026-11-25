@@ -178,12 +178,13 @@ class SerialALMAImportData(importdata.ImportData):
     def prepare(self, **parameters) -> Results:
         results = super().prepare()
 
-        # If online flux services were requested but unavailable, signal an error
-        # after weblog generation to stop the pipeline before the next task.
+        # If online flux services were requested but unavailable, stop the
+        # workflow after rendering this task result.
         if getattr(self.inputs, 'dbservice', False) and results.fluxservice == 'FAIL':
-            results.tb = (
+            results.request_pipeline_early_exit(
                 'Online flux catalog unavailable; fell back to local Source.xml fluxes. '
-                'Stopping after weblog export.'
+                'Stopping after weblog export.',
+                create_errorfile=True,
             )
 
         return results
