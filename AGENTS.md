@@ -49,7 +49,7 @@ Root level: `docs/` (Sphinx), `tests/` (regression and component tests; unit tes
 | `component` | Component tests (single task) |
 | `regression` | End-to-end pipeline tests |
 | `fast` | Fast regression tests |
-| `slow` | Slow regression tests (requires `--longtests`) |
+| `slow` | Slow regression tests |
 
 Full marker list: `pyproject.toml` (`[tool.pytest.ini_options]`).
 
