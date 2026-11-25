@@ -6,10 +6,7 @@ import pipeline.infrastructure.utils as utils
 import pipeline.qa.scorecalculator as qacalc
 from pipeline.h.tasks.applycal.applycal import ApplycalResults
 
-from . import Applycals
-from . import Finalcals
-from . import FinalcalsResults
-
+from . import Applycals, Finalcals, FinalcalsResults
 
 LOG = logging.get_logger(__name__)
 
@@ -87,14 +84,14 @@ class FinalcalsListQAHandler(pqa.QAPlugin):
 
 
 class ApplycalsQAHandler(pqa.QAPlugin):
-    """
-    PIPE-2586: VLA-specific QA on the data flagged by hifv_applycals.
-    """
+    """PIPE-2586: VLA-specific QA on the data flagged by hifv_applycals."""
+
     result_cls = ApplycalResults
     child_cls = None
     generating_task = Applycals
 
     def handle(self, context, result):
+        """Add the VLA applycal flagging scores to the result's QA pool."""
         vis = result.inputs['vis']
         ms = context.observing_run.get_ms(vis)
 

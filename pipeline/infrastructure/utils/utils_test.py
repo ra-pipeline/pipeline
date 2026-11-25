@@ -11,12 +11,29 @@ import numpy as np
 import pytest
 
 from pipeline import domain
-from pipeline.infrastructure import casa_tools, casa_tasks
+from pipeline.infrastructure import casa_tasks, casa_tools
 from pipeline.infrastructure.utils import caltable_tools
-from .utils import find_ranges, dict_merge, are_equal, approx_equal, flagged_intervals, \
-    get_casa_quantity, fieldname_for_casa, fieldname_clean, \
-    get_field_accessor, get_field_identifiers, get_receiver_type_for_spws, place_repr_source_first, \
-    get_taskhistory_fromimage, list_to_str, build_refantignore, wrap_long_str, imstat_items, sum_flag_counts
+
+from .utils import (
+    approx_equal,
+    are_equal,
+    build_refantignore,
+    dict_merge,
+    fieldname_clean,
+    fieldname_for_casa,
+    find_ranges,
+    flagged_intervals,
+    get_casa_quantity,
+    get_field_accessor,
+    get_field_identifiers,
+    get_receiver_type_for_spws,
+    get_taskhistory_fromimage,
+    imstat_items,
+    list_to_str,
+    place_repr_source_first,
+    sum_flag_counts,
+    wrap_long_str,
+)
 
 if TYPE_CHECKING:
     from typing import Any
