@@ -1,9 +1,12 @@
 import shutil
 
+import pytest
+
 from pipeline.infrastructure import casa_tools
 from tests.testing_utils import PipelineTester
 
 
+@pytest.mark.github_runner(testdata=['pl-regressiontest/uid___A002_X85c183_X36f'])
 def test_uid___A002_X85c183_X36f__procedure_hsd_calimage__regression():
     """Run ALMA single-dish cal+image regression on the observation data of M100.
 
@@ -22,6 +25,7 @@ def test_uid___A002_X85c183_X36f__procedure_hsd_calimage__regression():
     pt.run()
 
 
+@pytest.mark.github_runner(testdata=['pl-regressiontest/uid___A002_X85c183_X36f_SPW15_23'])
 def test_uid___A002_X85c183_X36f_SPW15_23__PPR__regression():
     """Run ALMA single-dish restoredata regression on the observation data of M100.
 

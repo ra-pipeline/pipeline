@@ -29,8 +29,6 @@ Here `casa_python` is an alias for `PYTHONNOUSERSITE=1 ${casa_dir}/bin/python3` 
   - Skip pipeline execution; compare against existing working-directory results only
 * - ``--remove-workdir``
   - Remove individual working directories after regression tests complete
-* - ``--longtests``
-  - Enable longer-running tests excluded by default
 * - ``--data-directory``
   - Path to large input data files; defaults to ``/lustre/cv/projects/pipeline-test-data/regression-test-data/``
 ```
@@ -126,10 +124,16 @@ Manually applied markers (added with ``@pytest.mark.<name>`` per test function):
 
 Select tests with `-m`:
 
+:::{warning}
+Passing `<pipeline_dir>` or `tests/` with `-m` (for example `-m vlass`) includes
+`tests/regression/slow/` unless you add `and not slow` or target `tests/regression/fast/`
+explicitly.
+:::
+
 ```console
 # run only VLASS tests
 xvfb-run casa --nogui --nologger --log2term --agg \
-    -c "import pytest; pytest.main(['-vv', '-m vlass', '--longtests', '<pipeline_dir>'])"
+    -c "import pytest; pytest.main(['-vv', '-m vlass', '<pipeline_dir>'])"
 
 # combine: fast VLA tests only
 xvfb-run casa --nogui --nologger --log2term --agg \

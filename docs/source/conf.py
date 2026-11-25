@@ -70,10 +70,51 @@ except ImportError as error:
     pass
 
 
+def _get_docs_branch() -> str:
+    """Return the Git branch name for branch-aware badges, defaulting to 'main'."""
+    rtd_type = os.getenv('READTHEDOCS_VERSION_TYPE')
+    if rtd_type and rtd_type != 'branch':
+        return 'main'
+    branch = os.getenv('READTHEDOCS_GIT_IDENTIFIER') or os.getenv('GITHUB_HEAD_REF') or os.getenv('GITHUB_REF_NAME')
+    if not branch:
+        try:
+            import subprocess
+
+            branch = subprocess.check_output(
+                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                stderr=subprocess.DEVNULL,
+                text=True,
+            ).strip()
+        except Exception:
+            branch = ''
+    return branch if branch and branch != 'HEAD' else 'main'
+
+
+_branch = _get_docs_branch()
+
+
 def setup(app):
     # Raise docutils substitution line-length limit (default 10 000) so that
     # the Task inheritance diagram substitution (~14 500 chars) is not dropped.
     app.connect('builder-inited', lambda app: app.env.settings.update({'line_length_limit': 20_000}))
+
+    # PIPE-3307: point Codecov badges in docs/README.rst to the active branch during Sphinx/RTD builds,
+    # while keeping docs/README.rst self-contained for GitHub's plain .rst rendering.
+    def on_doctree_read(app, doctree):
+        if app.env.docname != 'index' or _branch == 'main':
+            return
+        from docutils import nodes
+
+        for node in doctree.findall(nodes.image):
+            uri = node.get('uri', '')
+            if uri.startswith('https://img.shields.io/codecov/c/github/ra-pipeline/pipeline?'):
+                node['uri'] = uri.replace('/pipeline?', f'/pipeline/{_branch}?', 1)
+        for node in doctree.findall(nodes.reference):
+            refuri = node.get('refuri', '')
+            if refuri.startswith('https://app.codecov.io/github/ra-pipeline/pipeline?'):
+                node['refuri'] = refuri.replace('/pipeline?', f'/pipeline/tree/{_branch}?', 1)
+
+    app.connect('doctree-read', on_doctree_read)
 
     # PIPE-3252: Include ALMA tasks reference in User's Guide only for LaTeX (PDF)
     # to enable internal hyperlinks, while omitting it from HTML to avoid duplicating
@@ -226,6 +267,7 @@ else:
         'internal_notes/*',
         'inheritance.rst',
         'timeline*',
+        'users_guide/whats-new-2027.md',
         'devel/process/*',
         'devel/reference/*',
         'devel/misc/*',

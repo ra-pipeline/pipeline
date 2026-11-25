@@ -24,8 +24,16 @@ if TYPE_CHECKING:
 
 LOG = infrastructure.logging.get_logger(__name__)
 
-# Set by the autouse fixture in conftest.py to the current test function name.
-_current_test_name: str | None = None
+
+def _current_test_output_dir() -> str | None:
+    """Derive a normalized output directory name from ``PYTEST_CURRENT_TEST``."""
+    current_test = os.environ.get('PYTEST_CURRENT_TEST', '')
+    if '::' not in current_test:
+        return None
+    node_name = current_test.rsplit('::', 1)[-1]
+    node_name = re.sub(r'\s+\((?:setup|call|teardown)\)$', '', node_name)
+    node_name = node_name.split('[', 1)[0]
+    return re.sub(r'^test_?|_?regression$', '', node_name).strip('_') or None
 
 
 def ensure_working_dir(pt: PipelineTester) -> None:
@@ -83,7 +91,6 @@ class PipelineTester:
             ppr: str | None = None,
             recipe: str | None = None,
             tasks: list[tuple[str, dict[str, Any]] | None] | None = None,
-            project_id: str | None = None,
             input_dir: str | None = None,
             output_dir: str | None = None,
             expectedoutput_file: str | None = None,
@@ -98,9 +105,8 @@ class PipelineTester:
             recipe: Path to the recipe XML file.
             tasks: List of tuples with pipeline stage strings first and optional parameters second. Only used in
                 component tests.
-            project_id: Project ID. If provided, it is prefixed to the `output_dir` name.
             input_dir: Path to the directory containing input files.
-            output_dir: Path to the output directory. If `None`, it is derived using `visname` and/or `project_id`.
+            output_dir: Path to the output directory. If `None`, it is derived from the current pytest test name or `visname`.
             expectedoutput_file: Path to a file defining the expected test output. Overrides `expectedoutput_dir` if set.
             expectedoutput_dir: Path to a directory containing expected output files. Ignored if `expectedoutput_file` is set.
 
@@ -119,16 +125,13 @@ class PipelineTester:
         self.ppr = ppr
         self.recipe = recipe
         self.tasks = tasks
-        self.project_id = project_id
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.expectedoutput_file = expectedoutput_file
         if output_dir:
             self.output_dir = output_dir
-        elif _current_test_name:
-            self.output_dir = _current_test_name
-        elif self.project_id:
-            self.output_dir = f'{self.project_id}__{self.visname[0]}_test_output'
+        elif test_output_dir := _current_test_output_dir():
+            self.output_dir = test_output_dir
         else:
             self.output_dir = f'{self.visname[0]}_test_output'
         if expectedoutput_file:

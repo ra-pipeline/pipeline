@@ -12,6 +12,7 @@ on:
       - "pipeline/**"
       - "tests/**"
       - "scripts/**"
+      - ".github/actions/**"
       - ".github/workflows/**"
       - ".github/testdata-paths.txt"
       - "pyproject.toml"
@@ -33,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-24.04, macos-15]
         pixi_env:
           - casa674-py312
           - casa676-py312
@@ -51,7 +52,7 @@ jobs:
       test_data: unit
       task: test-unit
       # Only upload artifacts for a single reference configuration:
-      #   - ubuntu-latest OS
+      #   - ubuntu-24.04 OS
       #   - casa674-py312 environment
       #
       # Other matrix combinations (macOS and newer CASA versions) run tests
@@ -60,10 +61,10 @@ jobs:
       # to download this specific artifact name: "pytest-results-ubuntu-latest".
       #
       # Standard GitHub Runner specs:
-      #   ubuntu-latest: 4 vCPUs / 16 GB RAM (public), 2 vCPUs / 8 GB RAM (private)
-      #   macos-latest:  3 vCPUs / 7 GB RAM (M1 Apple Silicon)
+      #   ubuntu-24.04: 4 vCPUs / 16 GB RAM (public), 2 vCPUs / 8 GB RAM (private)
+      #   macos-15: 3 vCPUs / 7 GB RAM (M1 Apple Silicon)
       # (pytest uses '-n logical' in pixi task to auto-scale across runner cores).
-      artifact_name: ${{ (matrix.os == 'ubuntu-latest' && matrix.pixi_env == 'casa674-py312') && 'pytest-results-ubuntu-latest' || '' }}
+      artifact_name: ${{ (matrix.os == 'ubuntu-24.04' && matrix.pixi_env == 'casa674-py312') && 'pytest-results-ubuntu-latest' || '' }}
       artifact_path: |
         coverage.xml
         htmlcov/
@@ -72,21 +73,21 @@ jobs:
   upload_codecov:
     name: Upload Coverage to CodeCov
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: needs.test.result == 'success'
     steps:
       - name: Checkout Full History for Codecov
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: pytest-results-ubuntu-latest
 
       - name: Upload coverage to CodeCov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
@@ -98,6 +99,10 @@ jobs:
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./junit.xml
+          report_type: test_results
+          name: codecov-ubuntu-latest
+          disable_telem: true

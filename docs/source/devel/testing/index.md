@@ -32,7 +32,7 @@ tests/
 ├── component/              # component tests
 ├── regression/
 │   ├── fast/               # quick regression tests
-│   └── slow/               # longer tests (requires --longtests)
+│   └── slow/               # longer regression tests
 ├── testing_utils.py        # PipelineTester framework
 └── test_pipeline_testing_framework.py
 ```

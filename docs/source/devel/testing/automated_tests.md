@@ -16,7 +16,7 @@ results.
 
 - Located in `tests/regression/fast/` and `tests/regression/slow/`
 - Run complete recipes using PPR files or recipe XML files
-- Slow tests (marked `slow`) require the `--longtests` flag and are not actively maintained
+- Slow tests (marked `slow`) are not actively maintained
   due to computing resource constraints
 
 Tests are organized under `tests/`:
@@ -98,24 +98,26 @@ xvfb-run -d ${casa_dir}/bin/casa --nogui --nologger --agg -c \
 
 ### Regression tests
 
-Run all fast tests (slow tests excluded by default):
+Run all fast tests:
 
 ```console
 PYTHONNOUSERSITE=1 ${casa_dir}/bin/python3 -m pytest -vv --junitxml=regression-results.xml \
     <pipeline_dir>/tests/regression/fast/.
 ```
 
-Include slow tests:
+Run all regression tests (including slow tests):
 
 ```console
-PYTHONNOUSERSITE=1 ${casa_dir}/bin/python3 -m pytest -vv --longtests \
+PYTHONNOUSERSITE=1 ${casa_dir}/bin/python3 -m pytest -vv \
     --junitxml=regression-results.xml <pipeline_dir>/tests/regression/.
 ```
 
 :::{warning}
-Slow tests (marked `slow`, enabled by `--longtests`) are not actively maintained due to
-computing resource constraints. They may have stale expected results or fail on current
-pipeline versions. Use them with caution and verify results independently.
+Slow tests (in `tests/regression/slow/`, marked `slow`) are not excluded automatically when
+running `pytest` on `tests/`, `tests/regression/`, or `<pipeline_dir>`. Target
+`tests/regression/fast/` or pass `-m "not slow"` unless you intend to run them. They are
+not actively maintained due to computing resource constraints and may have stale expected
+results or fail on current pipeline versions.
 :::
 
 Select by node ID:
