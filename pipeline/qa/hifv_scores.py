@@ -54,8 +54,9 @@ __all__ = [
 
 
 def calc_vla_science_frac_total_flagged(summaries, agents=None, scanids=None):
-    """Calculate total fraction of vla science data that is flagged. If agents are provided,
-    then restrict to statistics for those agents. If scanids are provided,
+    """Calculate total fraction of VLA science data that is flagged.
+
+    If agents are provided, then restrict to statistics for those agents. If scanids are provided,
     then restrict to statistics for those scans.
     """
     agent_stats = calc_flags_per_agent(summaries, scanids=scanids)
@@ -85,8 +86,9 @@ def calc_vla_science_frac_total_flagged(summaries, agents=None, scanids=None):
 
 @log_qa
 def score_vla_science_data_flagged_by_agents(ms, summaries, min_frac, max_frac, agents, intents=None):
-    """Calculate a score for the agentflagger summaries based on the fraction of
-    VLA science data flagged by certain flagging agents. If intents are provided, then
+    """Score the fraction of VLA science data flagged by certain flagging agents.
+
+    The score is based on the agentflagger summaries. If intents are provided, then
     restrict scoring to the scans that match one or more of these intents.
 
     min_frac < flagged < max_frac maps to score of 1-0
@@ -334,7 +336,9 @@ def score_flagged_vla_baddef(amp_collection, phase_collection, num_antennas):
 
 
 def countbaddelays(m, delaytable, delaymax):
-    """Args:
+    """Collect the delays over delaymax in a delay caltable, per antenna.
+
+    Args:
         m: measurement set object
         delaytable: Delay caltable
         delaymax: units of ns.  If delay is over this value, it could be added to the dictionary
@@ -376,6 +380,7 @@ def countbaddelays(m, delaytable, delaymax):
 @log_qa
 def score_total_data_vla_delay(filename, vis, bandname=None):
     """Compute a QA score based on maximum delay values in a calibration table.
+
     If the maximum delay is below 15 ns, the score is 1.0. Otherwise, the score
     decreases linearly with increasing delay, down to a minimum of 0.3.
     """
@@ -408,13 +413,15 @@ def score_total_data_vla_delay(filename, vis, bandname=None):
 
 @log_qa
 def score_vla_flux_residual_rms(fractional_residuals, num_spws, spixl):
-    """score_vla_flux_residual_rms: calculates the score for pipeline task hifv_fluxboot
+    """Calculate the flux residual RMS score for pipeline task hifv_fluxboot.
 
-    output: returns QAscore
-    --------- parameter descriptions ---------------------------------------------
-    fractional_residuals: Take the RMS values of the residuals.
-    nums_spws: number of spws
-    spixl: list of a spectral index
+    Args:
+        fractional_residuals: Take the RMS values of the residuals.
+        num_spws: number of spws
+        spixl: list of a spectral index
+
+    Returns:
+        QAScore
     """
     if len(fractional_residuals) == 0:
         score = 0.0
@@ -534,6 +541,7 @@ def score_solint(short_solint: dict, long_solint: dict) -> list[pqa.QAScore]:
 
 @log_qa
 def score_longsolint(context, result) -> list[pqa.QAScore]:
+    """Score whether any band's long solint exceeds 1.5 times the median calibrator scan time."""
     bandlist = []
     calscantime = []
     long_solint = result.longsolint
@@ -635,9 +643,11 @@ def score_testBPdcals_delay(vis: str, caltable: str, bandname: str) -> pqa.QASco
 
 @log_qa
 def score_flagged_ant_spw(vis: str, flaggedSolnApplycaldelay: dict) -> [pqa.QAScore]:
-    """Calculates score for testBPdcals
-    if > 50% of spws in a baseband on a majority of antennas newly flagged
-    then score < 0.5
+    """Calculate score for testBPdcals.
+
+    If > 50% of spws in a baseband on a majority of antennas are newly flagged,
+    then score < 0.5.
+
     The flaggedSolnApplycaldelay dictionary is structured as follows:
     flaggedSolnApplycaldelay = {
         'antspw': {
@@ -701,6 +711,7 @@ def score_flagged_ant_spw(vis: str, flaggedSolnApplycaldelay: dict) -> [pqa.QASc
 
 @log_qa
 def score_fluxboot(context, result) -> list[pqa.QAScore]:
+    """Score hifv_fluxboot on calibrators.ms flagging, spectral indices and fully flagged spws."""
     qascores = []
     calms = 'calibrators.ms'
     ms = context.observing_run.get_ms(result.vis)
@@ -836,7 +847,7 @@ def score_fluxboot(context, result) -> list[pqa.QAScore]:
 # PIPE-2512: adding QA score for solint of spws
 @log_qa
 def score_spw_solint(vis: str, band: str, spw_solint: dict) -> pqa.QAScore | None:
-    """Evaluate QA score based on the solint of each spectral window"""
+    """Evaluate QA score based on the solint of each spectral window."""
     qascore = None
 
     pairs = [f'[spw={spw}, solint={solint}ch]' for spw, solint in spw_solint.items() if solint > 1]
@@ -857,7 +868,7 @@ def score_spw_solint(vis: str, band: str, spw_solint: dict) -> pqa.QAScore | Non
 # PIPE-3046: adding QA score 1 if cont.dat is applied
 @log_qa
 def score_contdat_applied(vis: str) -> pqa.QAScore:
-    """Evaluate QA score based on whether cont.dat is applied"""
+    """Evaluate QA score based on whether cont.dat is applied."""
     score = 1.0
     longmsg = "'cont.dat' file is present. Using VLA Spectral Line Heuristics for checkflagmode=target-vla."
     shortmsg = 'cont.dat is applied'
