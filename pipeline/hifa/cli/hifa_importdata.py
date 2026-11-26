@@ -29,7 +29,9 @@ def hifa_importdata(vis=None, session=None, asis=None, process_caldevice=None, o
     of TARGET, PHASE and CHECK intents on the sky. The separations are also shown graphically, large plus
     symbols representing the various intents. If there are >5 TARGET fields, only the minimum and maximum
     separations to the PHASE intent are tabulated, while for mosaics, the median field position is provided
-    and the TARGET name is suffixed "mosaic".
+    and the TARGET name is suffixed "mosaic". The plots are also grouped by measurement sets in chronological 
+    order when all parameters are exactly the same: intents, field name and ID, and separation angles. When plots
+    are grouped, the plot shown will be titled with the first measurement set name of the group.
 
     If a POLARIZATION intent is present, the parallactic angle coverage of each polarization session is shown
     graphically and reported quantitatively.
