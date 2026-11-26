@@ -644,9 +644,10 @@ def sep_angles_for_table(context, sepangles, sepplots):
     # then intent, fieldid, fieldname
     # need to make tuple table
     rows = []
+    ref_row = None # reference list of SepAng for chronological comparions with next MS (PIPE-3298)
     for keyu in sepangles.keys(): 
         msbasename = keyu
-        rows_holder=[] # to get all but allow filtering if too many targets
+        rows_holder = [] # to get all but allow filtering if too many targets.
         max_sep = 0.0
         min_sep = 99.0
         maxfield = ""
@@ -657,10 +658,10 @@ def sep_angles_for_table(context, sepangles, sepplots):
             intent1 = primary[0]
             field1 = f'{primary[2]} (#{primary[1]})' # can use other string process like -->>  f"{field} (#{fieldid})"
             # pull the items into a tuple
-            intent2 = [(fld2,id2,nm2,ang['unit'],ang['value']) for (fld2,id2,nm2),ang in secondaries.items()][0] # only item per secondary
+            intent2 = [(fld2,id2,nm2,ang['unit'],ang['value']) for (fld2,id2,nm2),ang in secondaries.items()][0] # only item per secondary.
             field2 = f'{intent2[2]} (#{intent2[1]})'
             if intent2[3] == 'deg':
-                sepvalue=round(intent2[4],2) # or 3 dp ?
+                sepvalue=round(intent2[4],2) # set as 2dp
                 if intent1 == 'TARGET':
                     if sepvalue > max_sep:
                         max_sep = sepvalue
@@ -675,6 +676,31 @@ def sep_angles_for_table(context, sepangles, sepplots):
                 rows_holder.append(SepAng(msbasename, field1, intent1, field2, intent2[0], 'n/a', 'n/a')) # if there is an issue with unit or something return n/a
                 LOG.info('Separation Angle of Fields: '+field1+'('+intent1+') - '+field2+'('+intent2[0]+') is n/a')
 
+        # PIPE-3298 (reduce sepangle plots for MSs that are exactly the same)                
+        # For the first MS fill the ref(erance)_row
+        if ref_row is None:
+            ref_row = rows_holder
+
+        # for any MS after the first run a comparion on the SepAng tuples
+        # appended to the row_holder and the ref_row.
+        # If these are all the same, rewrite the row_holder
+        # that propagates to the final weblog table entry to
+        # use the _plot_ from the reference MS.
+        # SepAng tuple is 6 elements (ms, field1, intent1, field2, intent2, sepang, html)
+        else:
+            replaceplot=True
+            for rowlp in range(len(ref_row)):
+                if not set(ref_row[rowlp][1:6]).issubset(set(rows_holder[rowlp][1:6])):
+                    replaceplot=False
+
+            if replaceplot:
+                for rowlp in range(len(ref_row)):
+                    rows_holder[rowlp] = SepAng(rows_holder[rowlp][0],rows_holder[rowlp][1],rows_holder[rowlp][2],rows_holder[rowlp][3],rows_holder[rowlp][4],rows_holder[rowlp][5],ref_row[rowlp][6])
+            # otherwise set the refernce row to the current MS for the
+            # next chronological MS comparion in sequence
+            else:
+                ref_row = rows_holder
+               
         # now we assess if we have too many targets and
         # only append the fields with max and min separations
         # along with any CHECK intents to be tabulated.
