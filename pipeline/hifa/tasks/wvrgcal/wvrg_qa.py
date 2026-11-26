@@ -134,7 +134,7 @@ def calculate_view(context, nowvrtable, withwvrtable, result, qa_intent):
         # simply add a bool again for 'good' phase rms
         # define this as <1 radian over all the data averaged
         # here just return the values for both, do logic for score elsewhere
-        LOG.info('phase rms is : '+str(perhi))
+        LOG.info('phase rms ('+v.intent+') is : '+str(perhi))
         if v.intent == 'PHASE' and perhi_nowvr < 57.1:
             PHgood = True
         elif v.intent == 'BANDPASS' and perhi_nowvr < 57.1:
@@ -196,15 +196,16 @@ def calculate_phase_rms(context, gaintable, qa_intent):
                 rows = np.arange(sb.nrows())
 
                 # PIPE-406
-                # The variable name is changed from time_chunks in this is a refactor.
                 # Produce a list of arrays containing the indicies of each - in order - solution
                 # from the gain table. The indices are establised on a per scan basis by
-                # extracting the actual solutions and counting them . As this process is in a loop over
+                # extracting the solutions and counting them. As this process loops over
                 # gaintables and computes the "phase metric" per scan, there cannot be 
                 # any miss matching between tables. Flags (per solution) caused by the gaincal process
-                # are filtered while any scan flagging happens at an EB level, so both any pair of
-                # gaintables will not have the scan filled.
+                # are filtered (not counted in as indicies for respective scans) while any
+                # scan flagging happens at an MS level, so any gaintables producted from that
+                # MS will not have the flagged scan filled, and thus nothing is counted.
                 scan_chunks = []
+                LOG.info('Assessing scans in the gaintable to compute phase RMS')
                 for scan_use in intent_scans:
                     with casa_tools.TableReader(gaintable) as tablescan:
                         sb_perscan = tablescan.query('SCAN_NUMBER in %s' % str(scan_use))
