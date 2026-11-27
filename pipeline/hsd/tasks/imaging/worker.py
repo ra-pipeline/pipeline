@@ -14,18 +14,19 @@ import pipeline.infrastructure.basetask as basetask
 import pipeline.infrastructure.imagelibrary as imagelibrary
 import pipeline.infrastructure.vdp as vdp
 from pipeline.domain import DataTable, DataType
+from pipeline.hsd.tasks import common
+from pipeline.hsd.tasks.common import direction_utils as dirutil
+from pipeline.hsd.tasks.common import observatory_policy
+from pipeline.hsd.tasks.common import utils as sdutils
 from pipeline.infrastructure import casa_tasks, casa_tools
 
-from .. import common
-from ..common import direction_utils as dirutil
-from ..common import observatory_policy, utils
 from . import resultobjects
 
 LOG = infrastructure.logging.get_logger(__name__)
 
 if TYPE_CHECKING:
     from pipeline.infrastructure.launcher import Context
-    from ..common.sdtyping import Angle, Direction
+    from pipeline.hsd.tasks.common.sdtyping import Angle, Direction
 
 
 def ImageCoordinateUtil(
@@ -107,7 +108,7 @@ def ImageCoordinateUtil(
             # get org_direction
             org_direction = msobj.get_fields(field_id)[0].source.org_direction
 
-        datatable_name = utils.get_data_table_path(context, msobj)
+        datatable_name = sdutils.get_data_table_path(context, msobj)
         datatable = DataTable(name=datatable_name, readonly=True)
 
         if (datatable.getcolkeyword('RA', 'UNIT') != 'deg') or \
@@ -178,7 +179,7 @@ def ImageCoordinateUtil(
     del ra0, dec0
 
     # rewrap RA
-    ra = utils.rewrap_angle(np.asarray(ra))
+    ra = sdutils.rewrap_angle(np.asarray(ra))
 
     ra_min = min(ra)
     ra_max = max(ra)
@@ -250,7 +251,7 @@ def get_brightness_unit(infiles: list[str]) -> str:
     Returns:
         Brightness unit string
     """
-    units = {utils.get_brightness_unit(infile) for infile in infiles}
+    units = {sdutils.get_brightness_unit(infile) for infile in infiles}
     num_units = len(units)
     LOG.info(f'units {units}')
     brightnessunit = units.pop()
@@ -535,7 +536,7 @@ class SDImagingWorker(basetask.StandardTaskTemplate):
             # first try using SOURCE.REST_FREQUENCY
             # if it is not available, use SPECTRAL_WINDOW.REF_FREQUENCY instead
             source_id = reference_field.source_id
-            rest_freq_value = utils.get_restfrequency(vis=infiles[0], spwid=ref_spwobj.id, source_id=source_id)
+            rest_freq_value = sdutils.get_restfrequency(vis=infiles[0], spwid=ref_spwobj.id, source_id=source_id)
             rest_freq_unit = 'Hz'
             if rest_freq_value is None:
                 # REST_FREQUENCY is not defined in the SOURCE tableq
